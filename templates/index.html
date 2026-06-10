@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rail Car Movement Simulator</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="container-fluid">
+    <nav>
+      <ul><li><strong>🚂 Rail Car Sim</strong></li></ul>
+      <ul>
+        <li><a href="#" data-tab="roster" class="tab-link active">Car Roster</a></li>
+        <li><a href="#" data-tab="operations" class="tab-link">Operations</a></li>
+        <li><a href="#" data-tab="waybills" class="tab-link">Waybills</a></li>
+        <li><a href="#" data-tab="layout" class="tab-link">Layout Setup</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+
+    <!-- ── CAR ROSTER ─────────────────────────────────────────────────── -->
+    <section id="tab-roster" class="tab-panel">
+      <div class="section-header">
+        <h2>Car Roster</h2>
+        <button id="btn-add-car" class="outline">+ Add Car via Photo</button>
+        <button id="btn-add-manual" class="outline">+ Add Car Manually</button>
+      </div>
+
+      <!-- Add-car form (hidden by default) -->
+      <article id="add-car-form" class="hidden">
+        <h4>Add New Car</h4>
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="photo-input" accept="image/*" />
+          <label for="photo-input">
+            <span id="upload-label">📷 Click or drop a photo of the car</span>
+          </label>
+        </div>
+        <div id="upload-preview" class="hidden">
+          <img id="preview-img" src="" alt="Car preview" />
+        </div>
+        <div id="car-fields" class="hidden">
+          <div class="grid">
+            <label>Reporting Marks <input id="field-marks" type="text" placeholder="e.g. BNSF" /></label>
+            <label>Car Number <input id="field-number" type="text" placeholder="e.g. 12345" /></label>
+          </div>
+          <div class="grid">
+            <label>Car Type
+              <select id="field-type">
+                <option>boxcar</option><option>flatcar</option><option>gondola</option>
+                <option>tank car</option><option>hopper</option><option>covered hopper</option>
+                <option>refrigerator car</option><option>caboose</option>
+                <option>passenger car</option><option>other</option>
+              </select>
+            </label>
+            <label>Color <input id="field-color" type="text" placeholder="e.g. brown" /></label>
+          </div>
+          <div id="vision-error" class="hidden error-msg">
+            <span id="vision-error-msg"></span>
+            <button id="btn-retry-vision" class="outline small" style="margin-left:0.5rem">↻ Retry</button>
+          </div>
+          <div class="button-row">
+            <button id="btn-save-car">Save Car</button>
+            <button id="btn-cancel-car" class="outline secondary">Cancel</button>
+          </div>
+        </div>
+        <div id="analyzing-msg" class="hidden">Analyzing photo with {{ vision_label }}…</div>
+      </article>
+
+      <!-- Car grid -->
+      <div id="car-grid" class="car-grid"></div>
+
+      <!-- Car detail panel -->
+      <dialog id="car-detail-dialog">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" id="close-detail-dialog"></button>
+            <h3 id="detail-title"></h3>
+          </header>
+          <div id="detail-body"></div>
+          <footer>
+            <button id="btn-advance-waybill">▶ Advance Waybill</button>
+            <button id="btn-move-car" class="outline">Move Car…</button>
+            <button id="btn-edit-waybills" class="outline secondary">Edit Waybills</button>
+            <button id="btn-edit-car" class="outline secondary">Edit Car…</button>
+            <button id="btn-delete-car" class="outline contrast">Delete Car</button>
+          </footer>
+        </article>
+      </dialog>
+
+      <!-- Move car dialog -->
+      <dialog id="move-car-dialog">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" id="close-move-dialog"></button>
+            <h3>Move Car to Location</h3>
+          </header>
+          <label>New Location
+            <select id="move-location-select"></select>
+          </label>
+          <footer>
+            <button id="btn-confirm-move">Confirm Move</button>
+            <button id="btn-cancel-move" class="outline secondary">Cancel</button>
+          </footer>
+        </article>
+      </dialog>
+
+      <!-- Edit car dialog -->
+      <dialog id="edit-car-dialog">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" id="close-edit-car-dialog"></button>
+            <h3>Edit Car</h3>
+          </header>
+          <div class="edit-photo-row">
+            <img id="edit-photo-preview" class="edit-thumb" alt="Car photo" />
+            <label style="cursor:pointer;align-self:center">
+              <input type="file" id="edit-photo-input" accept="image/*" style="display:none" />
+              <span id="edit-photo-btn-text" class="outline small">📷 Add Photo</span>
+            </label>
+          </div>
+          <input type="hidden" id="edit-photo-path" value="" />
+          <div class="grid">
+            <label>Reporting Marks <input id="edit-field-marks" type="text" placeholder="e.g. BNSF" /></label>
+            <label>Car Number <input id="edit-field-number" type="text" placeholder="e.g. 12345" /></label>
+          </div>
+          <div class="grid">
+            <label>Car Type
+              <select id="edit-field-type">
+                <option>boxcar</option><option>flatcar</option><option>gondola</option>
+                <option>tank car</option><option>hopper</option><option>covered hopper</option>
+                <option>refrigerator car</option><option>caboose</option>
+                <option>passenger car</option><option>other</option>
+              </select>
+            </label>
+            <label>Color <input id="edit-field-color" type="text" placeholder="e.g. brown" /></label>
+          </div>
+          <footer>
+            <button id="btn-save-edit-car">Save</button>
+            <button id="btn-cancel-edit-car" class="outline secondary">Cancel</button>
+          </footer>
+        </article>
+      </dialog>
+
+      <!-- Assign waybill slots dialog -->
+      <dialog id="waybill-dialog">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" id="close-waybill-dialog"></button>
+            <h3 id="waybill-dialog-title">Assign Waybills</h3>
+          </header>
+          <p class="muted">Pick a waybill from the pool for each slot, or leave empty.</p>
+          <div id="waybill-slots"></div>
+          <footer>
+            <button id="btn-save-waybills">Save</button>
+            <button id="btn-cancel-waybills" class="outline secondary">Cancel</button>
+          </footer>
+        </article>
+      </dialog>
+    </section>
+
+    <!-- ── WAYBILLS ──────────────────────────────────────────────────── -->
+    <section id="tab-waybills" class="tab-panel hidden">
+      <div class="section-header">
+        <h2>Waybill Pool</h2>
+        <div class="button-row">
+          <button id="btn-generate-waybills" class="outline">⚡ Generate from Industries</button>
+          <button id="btn-auto-assign" class="outline">↔ Auto-Assign to Cars</button>
+          <button id="btn-add-waybill" class="outline">+ New Waybill</button>
+        </div>
+      </div>
+      <div id="waybill-pool-list"></div>
+
+      <!-- Generate waybills dialog -->
+      <dialog id="generate-waybills-dialog">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" id="close-generate-dialog"></button>
+            <h3>Generate Waybills from Industries</h3>
+          </header>
+          <label>Origin location (staging/yard waybills ship from)
+            <select id="gen-origin-location"></select>
+          </label>
+          <fieldset>
+            <label><input type="radio" name="gen-mode" value="append" checked /> Append — skip existing waybills</label>
+            <label><input type="radio" name="gen-mode" value="replace" /> Replace all — delete existing waybills first</label>
+          </fieldset>
+          <footer>
+            <button id="btn-confirm-generate">Generate</button>
+            <button id="btn-cancel-generate" class="outline secondary">Cancel</button>
+          </footer>
+        </article>
+      </dialog>
+
+      <!-- Waybill create / edit dialog -->
+      <dialog id="waybill-edit-dialog">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" id="close-waybill-edit-dialog"></button>
+            <h3 id="waybill-edit-title">New Waybill</h3>
+          </header>
+          <label>Name <input id="we-name" type="text" placeholder="e.g. UP Lumber to Yard A" /></label>
+          <div class="grid">
+            <label>Origin <select id="we-origin"></select></label>
+            <label>Destination <select id="we-destination"></select></label>
+          </div>
+          <div class="grid">
+            <label>Industry <select id="we-industry"></select></label>
+            <label>Commodity <input id="we-commodity" type="text" placeholder="e.g. lumber" /></label>
+          </div>
+          <div class="grid">
+            <label>Required Car Type
+              <select id="we-car-type">
+                <option value="">— any —</option>
+                <option>boxcar</option><option>flatcar</option><option>gondola</option>
+                <option>tank car</option><option>hopper</option><option>covered hopper</option>
+                <option>refrigerator car</option><option>caboose</option>
+                <option>passenger car</option><option>other</option>
+              </select>
+            </label>
+            <label class="checkbox-label" style="align-self:flex-end;padding-bottom:0.5rem">
+              <input type="checkbox" id="we-empty" /> Empty / return move
+            </label>
+          </div>
+          <footer>
+            <button id="btn-save-waybill-edit">Save</button>
+            <button id="btn-cancel-waybill-edit" class="outline secondary">Cancel</button>
+          </footer>
+        </article>
+      </dialog>
+    </section>
+
+    <!-- ── OPERATIONS ─────────────────────────────────────────────────── -->
+    <section id="tab-operations" class="tab-panel hidden">
+      <div class="section-header">
+        <h2>Operations</h2>
+        <button id="btn-refresh-ops" class="outline">↻ Refresh</button>
+      </div>
+      <div id="ops-list"></div>
+    </section>
+
+    <!-- ── LAYOUT SETUP ───────────────────────────────────────────────── -->
+    <section id="tab-layout" class="tab-panel hidden">
+
+      <!-- Data export / import -->
+      <div class="section-header" style="margin-bottom:1rem">
+        <h3>Data</h3>
+        <div class="button-row">
+          <a href="/api/export" download class="outline small">⬇ Export Backup</a>
+          <button id="btn-import-trigger" class="outline small">⬆ Import Backup</button>
+          <input type="file" id="import-file-input" accept=".zip" class="hidden" />
+        </div>
+      </div>
+      <hr />
+
+      <div class="grid layout-grid">
+
+        <!-- Locations column -->
+        <div>
+          <div class="section-header">
+            <h3>Locations</h3>
+            <button id="btn-add-location" class="outline small">+</button>
+          </div>
+          <form id="location-form" class="hidden inline-form">
+            <input id="loc-name" type="text" placeholder="Location name" required />
+            <select id="loc-type">
+              <option value="yard">Yard</option>
+              <option value="industry">Industry</option>
+              <option value="staging">Staging</option>
+              <option value="storage">Storage</option>
+            </select>
+            <button type="submit" class="small">Save</button>
+            <button type="button" id="btn-cancel-location" class="outline secondary small">✕</button>
+            <input type="hidden" id="loc-edit-id" value="" />
+          </form>
+          <div id="location-list"></div>
+        </div>
+
+        <!-- Industries column -->
+        <div>
+          <div class="section-header">
+            <h3>Industries</h3>
+            <button id="btn-add-industry" class="outline small">+</button>
+          </div>
+          <form id="industry-form" class="hidden inline-form">
+            <input id="ind-name" type="text" placeholder="Industry name" required />
+            <select id="ind-location">
+              <option value="">— no location —</option>
+            </select>
+            <input id="ind-car-types" type="text" placeholder="Accepted car types (comma-sep)" />
+            <div class="commodity-wrap">
+              <input id="ind-commodities" type="text" placeholder="Commodities (comma-sep)" autocomplete="off" />
+              <ul id="commodity-suggestions" class="suggestion-dropdown hidden"></ul>
+            </div>
+            <small id="commodity-warn" class="hidden error-msg"></small>
+            <label class="checkbox-label">
+              <input type="checkbox" id="ind-receiver" checked /> Receiver (receives loaded cars)
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="ind-shipper" /> Shipper (ships loaded cars)
+            </label>
+            <button type="submit" class="small">Save</button>
+            <button type="button" id="btn-cancel-industry" class="outline secondary small">✕</button>
+            <input type="hidden" id="ind-edit-id" value="" />
+          </form>
+          <div id="industry-list"></div>
+        </div>
+
+      </div>
+
+      <!-- Commodity → Car Type mapping -->
+      <hr />
+      <div class="section-header" style="margin-top:1rem">
+        <h3>Commodity → Car Type</h3>
+        <div class="button-row">
+          <button id="btn-seed-commodity-map" class="outline small">⚙ Seed Defaults</button>
+          <button id="btn-add-commodity-map" class="outline small">+</button>
+        </div>
+      </div>
+      <form id="commodity-map-form" class="hidden inline-form">
+        <div class="grid">
+          <label>Commodity <input id="cmap-commodity" type="text" placeholder="e.g. grain" required /></label>
+          <label>Car Type
+            <select id="cmap-car-type">
+              <option value="boxcar">boxcar</option><option value="flatcar">flatcar</option>
+              <option value="gondola">gondola</option><option value="tank car">tank car</option>
+              <option value="hopper">hopper</option><option value="covered hopper">covered hopper</option>
+              <option value="refrigerator car">refrigerator car</option><option value="caboose">caboose</option>
+              <option value="passenger car">passenger car</option><option value="other">other</option>
+            </select>
+          </label>
+        </div>
+        <div class="button-row">
+          <button type="submit" class="small">Save</button>
+          <button type="button" id="btn-cancel-commodity-map" class="outline secondary small">✕</button>
+          <input type="hidden" id="cmap-edit-id" value="" />
+        </div>
+      </form>
+      <div id="commodity-map-list"></div>
+    </section>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

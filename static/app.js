@@ -1,0 +1,929 @@
+/* Rail Car Movement Simulator — frontend */
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let locations = [];
+let industries = [];
+let cars = [];
+let waybillPool = [];
+let commodityMap = [];
+let selectedCarId = null;
+let editingWaybillId = null;
+let photoPath = null;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const $ = (sel, ctx = document) => ctx.querySelector(sel);
+const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
+
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body && !(body instanceof FormData)) {
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  } else if (body) {
+    opts.body = body;
+  }
+  const res = await fetch(path, opts);
+  if (res.status === 204) return null;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Request failed");
+  return data;
+}
+
+function hide(el) { el.classList.add("hidden"); }
+function show(el) { el.classList.remove("hidden"); }
+
+// ── Tab navigation ────────────────────────────────────────────────────────────
+$$(".tab-link").forEach(link => {
+  link.addEventListener("click", e => {
+    e.preventDefault();
+    const tab = link.dataset.tab;
+    $$(".tab-link").forEach(l => l.classList.remove("active"));
+    $$(".tab-panel").forEach(p => p.classList.add("hidden"));
+    link.classList.add("active");
+    $(`#tab-${tab}`).classList.remove("hidden");
+    if (tab === "operations") loadOperations();
+    if (tab === "waybills") loadWaybillPool();
+    if (tab === "layout") loadLayout();
+  });
+});
+
+// ── Roster ────────────────────────────────────────────────────────────────────
+async function loadRoster() {
+  cars = await api("GET", "/api/cars");
+  renderCarGrid();
+}
+
+function renderCarGrid() {
+  const grid = $("#car-grid");
+  if (!cars.length) {
+    grid.innerHTML = "<p class='empty-msg'>No cars yet. Add one with the button above.</p>";
+    return;
+  }
+  grid.innerHTML = cars.map(car => `
+    <div class="car-card" data-id="${car.id}">
+      <div class="car-thumb">
+        ${car.photo_path
+          ? `<img src="/${car.photo_path}" alt="${car.reporting_marks} ${car.car_number}" />`
+          : `<div class="no-photo">${car.car_type}</div>`}
+      </div>
+      <div class="car-info">
+        <strong>${car.reporting_marks || "—"} ${car.car_number || ""}</strong>
+        <span class="car-type">${car.car_type}</span>
+        <span class="car-color">${car.color}</span>
+        <span class="car-location">${car.current_location_name || "No location"}</span>
+        ${car.active_waybill
+          ? `<span class="waybill-badge">${car.active_waybill.is_empty ? "Empty" : car.active_waybill.commodity || "Loaded"} → ${car.active_waybill.destination_name || "?"}</span>`
+          : `<span class="waybill-badge muted">No waybill</span>`}
+      </div>
+    </div>
+  `).join("");
+
+  $$(".car-card").forEach(card => {
+    card.addEventListener("click", () => openCarDetail(parseInt(card.dataset.id)));
+  });
+}
+
+// ── Add car via photo ─────────────────────────────────────────────────────────
+$("#btn-add-car").addEventListener("click", () => {
+  show($("#add-car-form"));
+  show($("#upload-zone"));
+  hide($("#car-fields"));
+  hide($("#upload-preview"));
+  hide($("#analyzing-msg"));
+  hide($("#vision-error"));
+  photoPath = null;
+  $("#photo-input").value = "";
+  $("#upload-label").textContent = "📷 Click or drop a photo of the car";
+});
+
+$("#btn-add-manual").addEventListener("click", () => {
+  show($("#add-car-form"));
+  hide($("#upload-zone"));
+  hide($("#upload-preview"));
+  hide($("#analyzing-msg"));
+  hide($("#vision-error"));
+  show($("#car-fields"));
+  photoPath = null;
+  $("#field-marks").value = "";
+  $("#field-number").value = "";
+  $("#field-type").value = "other";
+  $("#field-color").value = "";
+});
+
+$("#btn-cancel-car").addEventListener("click", () => {
+  hide($("#add-car-form"));
+});
+
+function applyAnalysis(result) {
+  if (result.photo_path) photoPath = result.photo_path;
+  $("#field-marks").value = result.reporting_marks || "";
+  $("#field-number").value = result.car_number || "";
+  $("#field-type").value  = result.car_type || "other";
+  $("#field-color").value = result.color || "";
+  if (result._error) {
+    $("#vision-error-msg").textContent =
+      "Vision analysis failed — please fill in details manually. (" + result._error + ")";
+    show($("#vision-error"));
+  } else {
+    hide($("#vision-error"));
+  }
+  hide($("#analyzing-msg"));
+  show($("#car-fields"));
+}
+
+$("#photo-input").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  $("#upload-label").textContent = file.name;
+  const previewImg = $("#preview-img");
+  previewImg.src = URL.createObjectURL(file);
+  show($("#upload-preview"));
+  hide($("#car-fields"));
+  show($("#analyzing-msg"));
+  hide($("#vision-error"));
+
+  const form = new FormData();
+  form.append("file", file);
+  try {
+    const result = await api("POST", "/api/cars/upload", form);
+    applyAnalysis(result);
+  } catch (err) {
+    hide($("#analyzing-msg"));
+    $("#vision-error-msg").textContent = "Upload failed: " + err.message;
+    show($("#vision-error"));
+    show($("#car-fields"));
+  }
+});
+
+$("#btn-retry-vision").addEventListener("click", async () => {
+  hide($("#vision-error"));
+  hide($("#car-fields"));
+  show($("#analyzing-msg"));
+  try {
+    const result = await api("POST", "/api/cars/analyze-photo", { photo_path: photoPath });
+    applyAnalysis(result);
+  } catch (err) {
+    $("#vision-error-msg").textContent = "Retry failed: " + err.message;
+    show($("#vision-error"));
+    show($("#car-fields"));
+    hide($("#analyzing-msg"));
+  }
+});
+
+$("#btn-save-car").addEventListener("click", async () => {
+  const body = {
+    car_type: $("#field-type").value,
+    color: $("#field-color").value.trim(),
+    car_number: $("#field-number").value.trim(),
+    reporting_marks: $("#field-marks").value.trim(),
+    photo_path: photoPath || "",
+  };
+  try {
+    await api("POST", "/api/cars", body);
+    hide($("#add-car-form"));
+    await loadRoster();
+  } catch (err) {
+    alert("Error saving car: " + err.message);
+  }
+});
+
+// ── Car detail dialog ─────────────────────────────────────────────────────────
+async function openCarDetail(carId) {
+  selectedCarId = carId;
+  const car = cars.find(c => c.id === carId);
+  if (!car) return;
+
+  $("#detail-title").textContent = `${car.reporting_marks || "—"} ${car.car_number || ""}  (${car.car_type})`;
+
+  const waybills = await api("GET", `/api/cars/${carId}/waybills`);
+  const activeSlot = car.active_waybill_slot;
+
+  const wbHtml = waybills.length
+    ? waybills.map(w => `
+        <div class="waybill-row ${w.slot_index === activeSlot ? "active-slot" : ""}">
+          <span class="slot-num">${w.slot_index + 1}</span>
+          <span><strong>${w.name || (w.is_empty ? "EMPTY" : (w.commodity || "Loaded"))}</strong></span>
+          <span>${w.origin_name || "?"} → ${w.destination_name || "?"}</span>
+          ${w.industry_name ? `<span class="industry-tag">${w.industry_name}</span>` : ""}
+        </div>
+      `).join("")
+    : "<p class='muted'>No waybill cards yet. Click Edit Waybills to assign from the pool.</p>";
+
+  $("#detail-body").innerHTML = `
+    <div class="detail-grid">
+      ${car.photo_path ? `<img src="/${car.photo_path}" class="detail-photo" />` : ""}
+      <div>
+        <p><strong>Type:</strong> ${car.car_type}</p>
+        <p><strong>Color:</strong> ${car.color || "—"}</p>
+        <p><strong>Location:</strong> ${car.current_location_name || "Unassigned"}</p>
+        <p><strong>Active Slot:</strong> ${activeSlot + 1} of ${Math.max(waybills.length, 1)}</p>
+      </div>
+    </div>
+    <h5>Waybill Cards</h5>
+    <div class="waybill-list">${wbHtml}</div>
+  `;
+
+  $("#car-detail-dialog").showModal();
+}
+
+$("#close-detail-dialog").addEventListener("click", () => $("#car-detail-dialog").close());
+
+$("#btn-advance-waybill").addEventListener("click", async () => {
+  if (!selectedCarId) return;
+  try {
+    const updated = await api("POST", `/api/cars/${selectedCarId}/advance`);
+    const idx = cars.findIndex(c => c.id === selectedCarId);
+    if (idx !== -1) cars[idx] = updated;
+    renderCarGrid();
+    await openCarDetail(selectedCarId);
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+});
+
+$("#btn-delete-car").addEventListener("click", async () => {
+  if (!selectedCarId) return;
+  if (!confirm("Delete this car?")) return;
+  try {
+    await api("DELETE", `/api/cars/${selectedCarId}`);
+    $("#car-detail-dialog").close();
+    await loadRoster();
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+});
+
+// ── Edit car dialog ───────────────────────────────────────────────────────────
+$("#btn-edit-car").addEventListener("click", () => {
+  const car = cars.find(c => c.id === selectedCarId);
+  if (!car) return;
+  $("#edit-field-marks").value = car.reporting_marks || "";
+  $("#edit-field-number").value = car.car_number || "";
+  $("#edit-field-type").value = car.car_type || "other";
+  $("#edit-field-color").value = car.color || "";
+  // photo section
+  const preview = $("#edit-photo-preview");
+  const btnText = $("#edit-photo-btn-text");
+  $("#edit-photo-path").value = car.photo_path || "";
+  if (car.photo_path) {
+    preview.src = "/" + car.photo_path;
+    preview.style.display = "block";
+    btnText.textContent = "📷 Replace Photo";
+  } else {
+    preview.style.display = "none";
+    btnText.textContent = "📷 Add Photo";
+  }
+  $("#edit-car-dialog").showModal();
+});
+
+$("#close-edit-car-dialog").addEventListener("click", () => $("#edit-car-dialog").close());
+$("#btn-cancel-edit-car").addEventListener("click", () => $("#edit-car-dialog").close());
+
+$("#edit-photo-input").addEventListener("change", async () => {
+  const file = $("#edit-photo-input").files[0];
+  if (!file) return;
+  const btnText = $("#edit-photo-btn-text");
+  btnText.textContent = "Uploading…";
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const result = await fetch("/api/cars/upload?skip_analysis=true", { method: "POST", body: fd })
+      .then(r => r.json());
+    if (result.photo_path) {
+      $("#edit-photo-path").value = result.photo_path;
+      const preview = $("#edit-photo-preview");
+      preview.src = "/" + result.photo_path;
+      preview.style.display = "block";
+      btnText.textContent = "📷 Replace Photo";
+    } else {
+      btnText.textContent = "📷 Add Photo";
+    }
+  } catch {
+    btnText.textContent = "📷 Upload failed";
+  }
+});
+
+$("#btn-save-edit-car").addEventListener("click", async () => {
+  try {
+    const body = {
+      car_type: $("#edit-field-type").value,
+      color: $("#edit-field-color").value.trim(),
+      car_number: $("#edit-field-number").value.trim(),
+      reporting_marks: $("#edit-field-marks").value.trim(),
+    };
+    const newPhoto = $("#edit-photo-path").value;
+    if (newPhoto) body.photo_path = newPhoto;
+    await api("PUT", `/api/cars/${selectedCarId}`, body);
+    $("#edit-car-dialog").close();
+    await loadRoster();
+    await openCarDetail(selectedCarId);
+  } catch (err) {
+    alert("Error saving car: " + err.message);
+  }
+});
+
+// ── Move car dialog ───────────────────────────────────────────────────────────
+$("#btn-move-car").addEventListener("click", () => {
+  const sel = $("#move-location-select");
+  sel.innerHTML = '<option value="">— unassigned —</option>' +
+    locations.map(l => `<option value="${l.id}">${l.name} (${l.location_type})</option>`).join("");
+  const car = cars.find(c => c.id === selectedCarId);
+  if (car?.current_location_id) sel.value = car.current_location_id;
+  $("#move-car-dialog").showModal();
+});
+
+$("#close-move-dialog").addEventListener("click", () => $("#move-car-dialog").close());
+$("#btn-cancel-move").addEventListener("click", () => $("#move-car-dialog").close());
+
+$("#btn-confirm-move").addEventListener("click", async () => {
+  const locId = $("#move-location-select").value;
+  try {
+    const updated = await api("PUT", `/api/cars/${selectedCarId}/location`, {
+      location_id: locId ? parseInt(locId) : null,
+    });
+    const idx = cars.findIndex(c => c.id === selectedCarId);
+    if (idx !== -1) cars[idx] = updated;
+    renderCarGrid();
+    await openCarDetail(selectedCarId);
+    $("#move-car-dialog").close();
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+});
+
+// ── Assign waybill slots dialog ───────────────────────────────────────────────
+const SLOT_COUNT = 4;
+
+$("#btn-edit-waybills").addEventListener("click", async () => {
+  if (!selectedCarId) return;
+  const car = cars.find(c => c.id === selectedCarId);
+  const assigned = await api("GET", `/api/cars/${selectedCarId}/waybills`);
+  const bySlot = {};
+  assigned.forEach(w => { bySlot[w.slot_index] = w; });
+
+  const activeSlot = car?.active_waybill_slot ?? 0;
+  $("#waybill-dialog-title").textContent = `Assign Waybills — ${car?.reporting_marks || ""} ${car?.car_number || ""}`;
+
+  const poolOptions = '<option value="">— empty —</option>' +
+    waybillPool.map(w => `<option value="${w.id}">${w.name || w.id}${w.origin_name ? ` (${w.origin_name} → ${w.destination_name || "?"})` : ""}</option>`).join("");
+
+  $("#waybill-slots").innerHTML = Array.from({ length: SLOT_COUNT }, (_, i) => {
+    const current = bySlot[i];
+    return `
+      <div class="slot-assign-row ${i === activeSlot ? "active-slot" : ""}">
+        <span class="slot-num">${i + 1}${i === activeSlot ? " ★" : ""}</span>
+        <select data-slot="${i}" class="slot-picker">${poolOptions}</select>
+      </div>
+    `;
+  }).join("");
+
+  // Pre-select currently assigned waybills
+  assigned.forEach(w => {
+    const sel = $(`[data-slot="${w.slot_index}"].slot-picker`, $("#waybill-slots"));
+    if (sel) sel.value = w.id;
+  });
+
+  $("#waybill-dialog").showModal();
+});
+
+$("#close-waybill-dialog").addEventListener("click", () => $("#waybill-dialog").close());
+$("#btn-cancel-waybills").addEventListener("click", () => $("#waybill-dialog").close());
+
+$("#btn-save-waybills").addEventListener("click", async () => {
+  const slots = Array.from({ length: SLOT_COUNT }, (_, i) => {
+    const sel = $(`[data-slot="${i}"].slot-picker`, $("#waybill-slots"));
+    return { slot_index: i, waybill_id: sel?.value ? parseInt(sel.value) : null };
+  });
+  try {
+    await api("PUT", `/api/cars/${selectedCarId}/slots`, { slots });
+    const updated = await api("GET", "/api/cars");
+    cars = updated;
+    renderCarGrid();
+    $("#waybill-dialog").close();
+    await openCarDetail(selectedCarId);
+  } catch (err) {
+    alert("Error saving waybills: " + err.message);
+  }
+});
+
+// ── Waybill pool ──────────────────────────────────────────────────────────────
+async function loadWaybillPool() {
+  waybillPool = await api("GET", "/api/waybills");
+  renderWaybillPool();
+}
+
+function renderWaybillPool() {
+  const list = $("#waybill-pool-list");
+  if (!waybillPool.length) {
+    list.innerHTML = "<p class='empty-msg'>No waybills yet. Create one with the button above.</p>";
+    return;
+  }
+  list.innerHTML = waybillPool.map(w => `
+    <div class="pool-item">
+      <div class="pool-item-info">
+        <strong>${w.name || "(unnamed)"}</strong>
+        <span class="muted">${w.origin_name || "?"} → ${w.destination_name || "?"}</span>
+        ${w.commodity ? `<span class="muted">${w.commodity}</span>` : ""}
+        ${w.is_empty ? `<span class="muted">Empty move</span>` : ""}
+        ${w.required_car_type ? `<span class="muted">Requires: ${w.required_car_type}</span>` : ""}
+      </div>
+      <div class="pool-item-meta">
+        ${w.car_id ? `<span class="waybill-badge">${w.car_name || "Car"} · Slot ${w.slot_index + 1}</span>` : `<span class="waybill-badge muted">Unassigned</span>`}
+      </div>
+      <div class="pool-item-actions">
+        <button class="outline small edit-wb" data-id="${w.id}">✏️</button>
+        <button class="outline small contrast del-wb" data-id="${w.id}">🗑</button>
+      </div>
+    </div>
+  `).join("");
+
+  $$(".edit-wb").forEach(btn => {
+    btn.addEventListener("click", () => openWaybillEditDialog(parseInt(btn.dataset.id)));
+  });
+  $$(".del-wb").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this waybill?")) return;
+      await api("DELETE", `/api/waybills/${btn.dataset.id}`);
+      await loadWaybillPool();
+    });
+  });
+}
+
+function openWaybillEditDialog(waybillId = null) {
+  editingWaybillId = waybillId;
+  const w = waybillId ? waybillPool.find(x => x.id === waybillId) : null;
+  $("#waybill-edit-title").textContent = w ? "Edit Waybill" : "New Waybill";
+
+  $("#we-name").value = w?.name || "";
+  $("#we-commodity").value = w?.commodity || "";
+  $("#we-empty").checked = w?.is_empty || false;
+
+  const locOptions = '<option value="">—</option>' +
+    locations.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+  const indOptions = '<option value="">—</option>' +
+    industries.map(i => `<option value="${i.id}">${i.name}</option>`).join("");
+
+  $("#we-origin").innerHTML = locOptions;
+  $("#we-destination").innerHTML = locOptions;
+  $("#we-industry").innerHTML = indOptions;
+
+  if (w?.origin_id) $("#we-origin").value = w.origin_id;
+  if (w?.destination_id) $("#we-destination").value = w.destination_id;
+  if (w?.industry_id) $("#we-industry").value = w.industry_id;
+  $("#we-car-type").value = w?.required_car_type || "";
+
+  $("#waybill-edit-dialog").showModal();
+}
+
+$("#btn-add-waybill").addEventListener("click", () => openWaybillEditDialog(null));
+$("#close-waybill-edit-dialog").addEventListener("click", () => $("#waybill-edit-dialog").close());
+$("#btn-cancel-waybill-edit").addEventListener("click", () => $("#waybill-edit-dialog").close());
+
+// ── Generate waybills dialog ──────────────────────────────────────────────────
+$("#btn-generate-waybills").addEventListener("click", () => {
+  const sel = $("#gen-origin-location");
+  sel.innerHTML = '<option value="">— pick a location —</option>' +
+    locations.map(l => `<option value="${l.id}">${l.name} (${l.location_type})</option>`).join("");
+  $("#generate-waybills-dialog").showModal();
+});
+
+$("#close-generate-dialog").addEventListener("click", () => $("#generate-waybills-dialog").close());
+$("#btn-cancel-generate").addEventListener("click", () => $("#generate-waybills-dialog").close());
+
+$("#btn-confirm-generate").addEventListener("click", async () => {
+  const originId = $("#gen-origin-location").value;
+  if (!originId) { alert("Please select an origin location."); return; }
+  const replace = document.querySelector('input[name="gen-mode"]:checked')?.value === "replace";
+  if (replace && !confirm("This will delete ALL existing waybills (including those assigned to cars). Continue?")) return;
+  try {
+    const result = await api("POST", "/api/generate-waybills", { origin_location_id: parseInt(originId), replace });
+    $("#generate-waybills-dialog").close();
+    alert(`Created ${result.created} waybill${result.created !== 1 ? "s" : ""}, skipped ${result.skipped} duplicate${result.skipped !== 1 ? "s" : ""}.`);
+    await loadWaybillPool();
+  } catch (err) {
+    alert("Error generating waybills: " + err.message);
+  }
+});
+
+// ── Auto-assign waybills ──────────────────────────────────────────────────────
+$("#btn-auto-assign").addEventListener("click", async () => {
+  if (!confirm("Auto-assign unassigned waybills to cars by car type?")) return;
+  try {
+    const result = await api("POST", "/api/auto-assign-waybills");
+    alert(`Assigned ${result.assigned} waybill${result.assigned !== 1 ? "s" : ""} to cars.`);
+    cars = result.cars_updated;
+    renderCarGrid();
+    await loadWaybillPool();
+  } catch (err) {
+    alert("Error during auto-assign: " + err.message);
+  }
+});
+
+$("#btn-save-waybill-edit").addEventListener("click", async () => {
+  const body = {
+    name: $("#we-name").value.trim(),
+    origin_id: $("#we-origin").value ? parseInt($("#we-origin").value) : null,
+    destination_id: $("#we-destination").value ? parseInt($("#we-destination").value) : null,
+    industry_id: $("#we-industry").value ? parseInt($("#we-industry").value) : null,
+    commodity: $("#we-commodity").value.trim(),
+    is_empty: $("#we-empty").checked,
+    required_car_type: $("#we-car-type").value || null,
+  };
+  try {
+    if (editingWaybillId) {
+      await api("PUT", `/api/waybills/${editingWaybillId}`, body);
+    } else {
+      await api("POST", "/api/waybills", body);
+    }
+    $("#waybill-edit-dialog").close();
+    await loadWaybillPool();
+  } catch (err) {
+    alert("Error saving waybill: " + err.message);
+  }
+});
+
+// ── Operations view ───────────────────────────────────────────────────────────
+async function loadOperations() {
+  const ops = await api("GET", "/api/operations");
+  const list = $("#ops-list");
+  if (!ops.length) {
+    list.innerHTML = "<p class='empty-msg'>No cars in the system yet.</p>";
+    return;
+  }
+  list.innerHTML = ops.map(car => {
+    const wb = car.active_waybill;
+    const instruction = wb
+      ? `${wb.is_empty ? "Move <strong>empty</strong>" : `Move with <strong>${wb.commodity || "load"}</strong>`} from <em>${wb.origin_name || "?"}</em> to <em>${wb.destination_name || "?"}</em>${wb.industry_name ? ` (${wb.industry_name})` : ""}`
+      : `<span class='muted'>No waybill assigned</span>`;
+    return `
+      <div class="ops-row">
+        <div class="ops-thumb">
+          ${car.photo_path ? `<img src="/${car.photo_path}" />` : `<div class="no-photo small">${car.car_type}</div>`}
+        </div>
+        <div class="ops-info">
+          <strong>${car.reporting_marks || "—"} ${car.car_number || ""}</strong>
+          <span class="car-type">${car.car_type} · ${car.color}</span>
+          <span>📍 ${car.current_location_name || "Unassigned"}</span>
+          <span class="instruction">${instruction}</span>
+        </div>
+        <div class="ops-actions">
+          <span class="slot-badge">Card ${(car.active_waybill_slot ?? 0) + 1}</span>
+          <button class="ops-advance outline small" data-id="${car.id}">▶ Advance</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  $$(".ops-advance").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const carId = parseInt(btn.dataset.id);
+      try {
+        const updated = await api("POST", `/api/cars/${carId}/advance`);
+        const idx = cars.findIndex(c => c.id === carId);
+        if (idx !== -1) cars[idx] = updated;
+        await loadOperations();
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    });
+  });
+}
+
+$("#btn-refresh-ops").addEventListener("click", loadOperations);
+
+// ── Layout setup ──────────────────────────────────────────────────────────────
+async function loadLayout() {
+  [locations, industries, commodityMap] = await Promise.all([
+    api("GET", "/api/locations"),
+    api("GET", "/api/industries"),
+    api("GET", "/api/commodity-car-type-map"),
+  ]);
+  renderLocationList();
+  renderIndustryList();
+  populateIndustryLocationSelect();
+  renderCommodityMapList();
+}
+
+function renderLocationList() {
+  const list = $("#location-list");
+  if (!locations.length) {
+    list.innerHTML = "<p class='empty-msg'>No locations yet.</p>";
+    return;
+  }
+  list.innerHTML = locations.map(l => `
+    <div class="layout-item">
+      <span><strong>${l.name}</strong> <em>${l.location_type}</em></span>
+      <span>
+        <button class="outline small edit-loc" data-id="${l.id}">✏️</button>
+        <button class="outline small contrast del-loc" data-id="${l.id}">🗑</button>
+      </span>
+    </div>
+  `).join("");
+
+  $$(".edit-loc").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const loc = locations.find(l => l.id === parseInt(btn.dataset.id));
+      if (!loc) return;
+      $("#loc-name").value = loc.name;
+      $("#loc-type").value = loc.location_type;
+      $("#loc-edit-id").value = loc.id;
+      show($("#location-form"));
+    });
+  });
+
+  $$(".del-loc").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this location?")) return;
+      await api("DELETE", `/api/locations/${btn.dataset.id}`);
+      await loadLayout();
+    });
+  });
+}
+
+function checkboxesToRole() {
+  const recv = $("#ind-receiver").checked;
+  const ship = $("#ind-shipper").checked;
+  if (recv && ship) return "transload";
+  if (ship)         return "producer";
+  return "consumer";
+}
+
+function roleToCheckboxes(role) {
+  $("#ind-receiver").checked = (role !== "producer");
+  $("#ind-shipper").checked  = (role === "producer" || role === "transload");
+}
+
+function renderIndustryList() {
+  const list = $("#industry-list");
+  if (!industries.length) {
+    list.innerHTML = "<p class='empty-msg'>No industries yet.</p>";
+    return;
+  }
+  const roleBadge = r => r === "producer" ? "producer" : r === "transload" ? "transload" : "";
+  list.innerHTML = industries.map(i => `
+    <div class="layout-item">
+      <span>
+        <strong>${i.name}</strong>
+        ${i.location_name ? `<em>@ ${i.location_name}</em>` : ""}
+        ${roleBadge(i.industry_role) ? `<span class='waybill-badge muted'>${roleBadge(i.industry_role)}</span>` : ""}
+        ${i.commodities ? `<span class='muted'>${i.commodities}</span>` : ""}
+      </span>
+      <span>
+        <button class="outline small edit-ind" data-id="${i.id}">✏️</button>
+        <button class="outline small contrast del-ind" data-id="${i.id}">🗑</button>
+      </span>
+    </div>
+  `).join("");
+
+  $$(".edit-ind").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
+      if (!ind) return;
+      $("#ind-name").value = ind.name;
+      $("#ind-location").value = ind.location_id || "";
+      $("#ind-car-types").value = ind.accepted_car_types;
+      $("#ind-commodities").value = ind.commodities;
+      $("#ind-edit-id").value = ind.id;
+      roleToCheckboxes(ind.industry_role || "consumer");
+      show($("#industry-form"));
+    });
+  });
+
+  $$(".del-ind").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this industry?")) return;
+      await api("DELETE", `/api/industries/${btn.dataset.id}`);
+      await loadLayout();
+    });
+  });
+}
+
+function populateIndustryLocationSelect() {
+  const sel = $("#ind-location");
+  sel.innerHTML = '<option value="">— no location —</option>' +
+    locations.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+}
+
+$("#btn-add-location").addEventListener("click", () => {
+  $("#loc-name").value = "";
+  $("#loc-type").value = "yard";
+  $("#loc-edit-id").value = "";
+  show($("#location-form"));
+});
+$("#btn-cancel-location").addEventListener("click", () => hide($("#location-form")));
+
+$("#location-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const editId = $("#loc-edit-id").value;
+  const body = {
+    name: $("#loc-name").value.trim(),
+    location_type: $("#loc-type").value,
+  };
+  if (editId) {
+    await api("PUT", `/api/locations/${editId}`, body);
+  } else {
+    await api("POST", "/api/locations", body);
+  }
+  hide($("#location-form"));
+  await loadLayout();
+});
+
+$("#btn-add-industry").addEventListener("click", () => {
+  $("#ind-name").value = "";
+  $("#ind-location").value = "";
+  $("#ind-car-types").value = "";
+  $("#ind-commodities").value = "";
+  $("#ind-edit-id").value = "";
+  roleToCheckboxes("consumer");
+  show($("#industry-form"));
+});
+$("#btn-cancel-industry").addEventListener("click", () => hide($("#industry-form")));
+
+$("#industry-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const editId = $("#ind-edit-id").value;
+  const locVal = $("#ind-location").value;
+  const body = {
+    name: $("#ind-name").value.trim(),
+    location_id: locVal ? parseInt(locVal) : null,
+    accepted_car_types: $("#ind-car-types").value.trim(),
+    commodities: $("#ind-commodities").value.trim(),
+    industry_role: checkboxesToRole(),
+  };
+  if (editId) {
+    await api("PUT", `/api/industries/${editId}`, body);
+  } else {
+    await api("POST", "/api/industries", body);
+  }
+  hide($("#industry-form"));
+  await loadLayout();
+});
+
+// ── Commodity autocomplete ────────────────────────────────────────────────────
+{
+  const input    = $("#ind-commodities");
+  const dropdown = $("#commodity-suggestions");
+  const warnEl   = $("#commodity-warn");
+
+  function currentToken() {
+    const val = input.value;
+    return val.slice(val.lastIndexOf(",") + 1).trim().toLowerCase();
+  }
+
+  function completeToken(commodity) {
+    const val = input.value;
+    const idx = val.lastIndexOf(",");
+    const prefix = idx >= 0 ? val.slice(0, idx + 1) + " " : "";
+    input.value = prefix + commodity + ", ";
+    dropdown.classList.add("hidden");
+    input.focus();
+  }
+
+  input.addEventListener("input", () => {
+    const token = currentToken();
+    warnEl.classList.add("hidden");
+    if (!token || !commodityMap.length) { dropdown.classList.add("hidden"); return; }
+    const matches = commodityMap.filter(m => m.commodity.includes(token));
+    if (!matches.length) { dropdown.classList.add("hidden"); return; }
+    dropdown.innerHTML = matches.map(m =>
+      `<li class="suggestion-item" data-commodity="${m.commodity}">
+        <span>${m.commodity}</span>
+        <span class="suggestion-car-type">${m.car_type}</span>
+      </li>`
+    ).join("");
+    dropdown.querySelectorAll(".suggestion-item").forEach(li =>
+      li.addEventListener("mousedown", e => { e.preventDefault(); completeToken(li.dataset.commodity); })
+    );
+    dropdown.classList.remove("hidden");
+  });
+
+  input.addEventListener("blur", () => {
+    dropdown.classList.add("hidden");
+    const tokens = input.value.split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+    const unknown = tokens.filter(t => !commodityMap.find(m => m.commodity === t));
+    if (unknown.length) {
+      warnEl.textContent = `⚠ Not in commodity map: ${unknown.join(", ")}`;
+      warnEl.classList.remove("hidden");
+    }
+  });
+}
+
+// ── Commodity → Car Type map ──────────────────────────────────────────────────
+function renderCommodityMapList() {
+  const list = $("#commodity-map-list");
+  if (!commodityMap.length) {
+    list.innerHTML = "<p class='empty-msg'>No mappings yet. Click ⚙ Seed Defaults to populate common commodities.</p>";
+    return;
+  }
+  list.innerHTML = commodityMap.map(m => `
+    <div class="layout-item">
+      <span><strong>${m.commodity}</strong> <em>→ ${m.car_type}</em></span>
+      <span>
+        <button class="outline small edit-cmap" data-id="${m.id}">✏️</button>
+        <button class="outline small contrast del-cmap" data-id="${m.id}">🗑</button>
+      </span>
+    </div>
+  `).join("");
+
+  $$(".edit-cmap").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const entry = commodityMap.find(m => m.id === parseInt(btn.dataset.id));
+      if (!entry) return;
+      $("#cmap-commodity").value = entry.commodity;
+      $("#cmap-car-type").value = entry.car_type;
+      $("#cmap-edit-id").value = entry.id;
+      $("#cmap-commodity").disabled = true;
+      show($("#commodity-map-form"));
+    });
+  });
+
+  $$(".del-cmap").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this commodity mapping?")) return;
+      await api("DELETE", `/api/commodity-car-type-map/${btn.dataset.id}`);
+      await loadLayout();
+    });
+  });
+}
+
+$("#btn-add-commodity-map").addEventListener("click", () => {
+  $("#cmap-commodity").value = "";
+  $("#cmap-car-type").value = "boxcar";
+  $("#cmap-edit-id").value = "";
+  $("#cmap-commodity").disabled = false;
+  show($("#commodity-map-form"));
+});
+
+$("#btn-cancel-commodity-map").addEventListener("click", () => {
+  hide($("#commodity-map-form"));
+  $("#cmap-commodity").disabled = false;
+});
+
+$("#commodity-map-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const editId = $("#cmap-edit-id").value;
+  try {
+    if (editId) {
+      await api("PUT", `/api/commodity-car-type-map/${editId}`, {
+        car_type: $("#cmap-car-type").value,
+      });
+    } else {
+      await api("POST", "/api/commodity-car-type-map", {
+        commodity: $("#cmap-commodity").value.trim(),
+        car_type: $("#cmap-car-type").value,
+      });
+    }
+    hide($("#commodity-map-form"));
+    $("#cmap-commodity").disabled = false;
+    await loadLayout();
+  } catch (err) {
+    alert("Error saving mapping: " + err.message);
+  }
+});
+
+$("#btn-seed-commodity-map").addEventListener("click", async () => {
+  if (!confirm("Seed default commodity → car type mappings? Existing entries will not be overwritten.")) return;
+  try {
+    const result = await api("POST", "/api/commodity-car-type-map/seed");
+    alert(`Added ${result.added} mapping${result.added !== 1 ? "s" : ""}, skipped ${result.skipped} already existing.`);
+    await loadLayout();
+  } catch (err) {
+    alert("Error seeding defaults: " + err.message);
+  }
+});
+
+// ── Export / Import ───────────────────────────────────────────────────────────
+$("#btn-import-trigger").addEventListener("click", () => $("#import-file-input").click());
+
+$("#import-file-input").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!confirm(`Import "${file.name}"? This will REPLACE ALL current data.`)) {
+    e.target.value = "";
+    return;
+  }
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    await api("POST", "/api/import", fd);
+    location.reload();
+  } catch (err) {
+    alert("Import failed: " + err.message);
+    e.target.value = "";
+  }
+});
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+(async function init() {
+  await Promise.all([
+    loadRoster(),
+    (async () => {
+      [locations, industries, waybillPool] = await Promise.all([
+        api("GET", "/api/locations"),
+        api("GET", "/api/industries"),
+        api("GET", "/api/waybills"),
+      ]);
+    })(),
+  ]);
+})();
