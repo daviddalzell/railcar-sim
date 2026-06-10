@@ -1,0 +1,25 @@
+# Secrets — keep local only
+.env
+
+# User data — stays on local machine
+railcar.db
+uploads/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+.DS_Store?
+
+# IDE
+.idea/
+.vscode/
+*.swp
