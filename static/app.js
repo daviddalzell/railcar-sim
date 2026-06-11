@@ -149,10 +149,12 @@ function renderCarGrid() {
 }
 
 // ── Add car via photo ─────────────────────────────────────────────────────────
+let addMode = "photo"; // "photo" | "manual"
+
 $("#btn-add-car").addEventListener("click", () => {
+  addMode = "photo";
   show($("#add-car-form"));
   show($("#upload-zone"));
-  hide($("#btn-library-manual"));
   hide($("#car-fields"));
   hide($("#upload-preview"));
   hide($("#analyzing-msg"));
@@ -163,14 +165,16 @@ $("#btn-add-car").addEventListener("click", () => {
 });
 
 $("#btn-add-manual").addEventListener("click", () => {
+  addMode = "manual";
   show($("#add-car-form"));
-  hide($("#upload-zone"));
-  show($("#btn-library-manual"));
+  show($("#upload-zone"));
   hide($("#upload-preview"));
   hide($("#analyzing-msg"));
   hide($("#vision-error"));
   show($("#car-fields"));
   photoPath = null;
+  $("#photo-input").value = "";
+  $("#upload-label").textContent = "📷 Click or drop a photo (optional)";
   $("#field-marks").value = "";
   $("#field-number").value = "";
   $("#field-type").value = "other";
@@ -198,34 +202,35 @@ function applyAnalysis(result) {
   show($("#car-fields"));
 }
 
-// Library → "Add via Photo" context (runs vision analysis on selection)
+// Library → add car (shared button; branches on addMode)
 $("#btn-library-add").addEventListener("click", () => {
-  openPhotoLibrary(async ({ path, url }) => {
-    $("#preview-img").src = url;
-    show($("#upload-preview"));
-    hide($("#car-fields"));
-    show($("#analyzing-msg"));
-    hide($("#vision-error"));
-    photoPath = path;
-    try {
-      const result = await api("POST", "/api/cars/analyze-photo", { photo_path: path });
-      applyAnalysis(result);
-    } catch (err) {
-      $("#vision-error-msg").textContent = "Analysis failed: " + err.message;
-      show($("#vision-error"));
-      show($("#car-fields"));
-      hide($("#analyzing-msg"));
-    }
-  });
-});
-
-// Library → "Add Manually" context (just sets photo, no analysis)
-$("#btn-library-manual").addEventListener("click", () => {
-  openPhotoLibrary(({ path, url }) => {
-    photoPath = path;
-    $("#preview-img").src = url;
-    show($("#upload-preview"));
-  });
+  if (addMode === "manual") {
+    // Manual mode: just set photo, no analysis
+    openPhotoLibrary(({ path, url }) => {
+      photoPath = path;
+      $("#preview-img").src = url;
+      show($("#upload-preview"));
+    });
+  } else {
+    // Photo mode: run vision analysis on selection
+    openPhotoLibrary(async ({ path, url }) => {
+      $("#preview-img").src = url;
+      show($("#upload-preview"));
+      hide($("#car-fields"));
+      show($("#analyzing-msg"));
+      hide($("#vision-error"));
+      photoPath = path;
+      try {
+        const result = await api("POST", "/api/cars/analyze-photo", { photo_path: path });
+        applyAnalysis(result);
+      } catch (err) {
+        $("#vision-error-msg").textContent = "Analysis failed: " + err.message;
+        show($("#vision-error"));
+        show($("#car-fields"));
+        hide($("#analyzing-msg"));
+      }
+    });
+  }
 });
 
 $("#photo-input").addEventListener("change", async e => {
@@ -233,15 +238,28 @@ $("#photo-input").addEventListener("change", async e => {
   if (!file) return;
 
   $("#upload-label").textContent = file.name;
-  const previewImg = $("#preview-img");
-  previewImg.src = URL.createObjectURL(file);
+  $("#preview-img").src = URL.createObjectURL(file);
   show($("#upload-preview"));
-  hide($("#car-fields"));
-  show($("#analyzing-msg"));
   hide($("#vision-error"));
 
   const form = new FormData();
   form.append("file", file);
+
+  if (addMode === "manual") {
+    // Just upload the file, no vision analysis
+    try {
+      const result = await api("POST", "/api/cars/upload", form);
+      if (result.photo_path) photoPath = result.photo_path;
+    } catch (err) {
+      $("#vision-error-msg").textContent = "Upload failed: " + err.message;
+      show($("#vision-error"));
+    }
+    return;
+  }
+
+  // Photo mode: upload then analyze
+  hide($("#car-fields"));
+  show($("#analyzing-msg"));
   try {
     const result = await api("POST", "/api/cars/upload", form);
     applyAnalysis(result);
