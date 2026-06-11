@@ -239,27 +239,27 @@
 
     <!-- ── OPERATIONS ─────────────────────────────────────────────────── -->
     <section id="tab-operations" class="tab-panel hidden">
-      <div class="section-header">
-        <h2>Operations</h2>
-        <div class="button-row">
-          <button id="btn-plan-session">🚆 Plan Session</button>
-          <button id="btn-refresh-ops" class="outline">↻ Refresh</button>
+      <div class="section-header" id="ops-header">
+        <h2 id="ops-title">Operations</h2>
+        <div class="button-row" id="ops-header-buttons">
+          <!-- swapped by JS between idle and active session states -->
         </div>
       </div>
+      <div id="session-warnings" class="hidden session-warnings"></div>
       <div id="ops-list"></div>
 
-      <!-- Operating session work-list dialog -->
-      <dialog id="session-dialog">
+      <!-- End session dialog: resolve CP car locations -->
+      <dialog id="end-session-dialog">
         <article>
           <header>
-            <button aria-label="Close" rel="prev" id="close-session-dialog"></button>
-            <h3>Operating Session</h3>
+            <button aria-label="Close" rel="prev" id="close-end-session-dialog"></button>
+            <h3>End Session — Place CP Cars</h3>
           </header>
-          <div id="session-warnings" class="hidden session-warnings"></div>
-          <p id="session-progress" class="session-progress muted"></p>
-          <div id="session-plan-body"></div>
+          <p class="muted">Select a temporary location for each car that couldn't be spotted:</p>
+          <div id="cp-car-list"></div>
           <footer>
-            <button id="btn-close-session" class="outline secondary">Close</button>
+            <button id="btn-confirm-end-session">Finish Session</button>
+            <button id="btn-cancel-end-session" class="outline secondary">Cancel</button>
           </footer>
         </article>
       </dialog>

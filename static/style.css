@@ -611,11 +611,9 @@ button.small {
   border-left: 4px solid var(--badge-orange);
 }
 
-/* ── Session dialog ──────────────────────────────────────────────────────── */
-#session-dialog article {
-  max-width: 640px;
-  max-height: 85vh;
-  overflow-y: auto;
+/* ── End-session dialog ──────────────────────────────────────────────────── */
+#end-session-dialog article {
+  max-width: 560px;
 }
 
 .session-warnings {
@@ -632,6 +630,11 @@ button.small {
   text-align: right;
   font-size: 0.8rem;
   margin-bottom: 0.5rem;
+}
+
+.session-progress-label {
+  font-size: 0.85rem;
+  align-self: center;
 }
 
 .session-section-title {
@@ -663,9 +666,30 @@ button.small {
 
 .session-car-row.done button { display: none; }
 
+.session-car-row.cp {
+  border-left: 4px solid var(--badge-orange);
+  background: #fef9e7;
+}
+
+.session-car-row .session-btn-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
 .session-car-info  { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .session-car-marks { font-weight: 600; }
 .session-car-move  { color: var(--text-muted); font-size: 0.8rem; }
+
+.cp-car-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.875rem;
+}
+.cp-car-row:last-child { border-bottom: none; }
+.cp-car-label { flex: 1; font-weight: 600; }
 
 /* ── Mobile (≤ 600px) ────────────────────────────────────────────────────── */
 @media (max-width: 600px) {

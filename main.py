@@ -922,22 +922,39 @@ def session_plan(db: Session = Depends(get_db)):
     return _build_session_plan(db)
 
 
-@app.post("/api/session/advance-car/{car_id}")
-def session_advance_car(car_id: int, db: Session = Depends(get_db)):
-    car = db.get(Car, car_id)
-    if not car:
-        raise HTTPException(404, "Car not found")
-    wb = _get_active_waybill(car)
-    if not wb or wb.destination_id is None:
-        raise HTTPException(400, "Car has no active waybill with a destination")
-    old_loc = car.current_location_id
-    car.current_location_id = wb.destination_id
-    car.active_waybill_slot = _advance_slot(car)
-    db.add(MovementLog(car_id=car.id, from_location_id=old_loc,
-                       to_location_id=wb.destination_id, note="Session move"))
-    db.commit()
-    db.refresh(car)
-    return car_to_dict(car)
+class SessionCarResult(BaseModel):
+    car_id: int
+    status: str                    # "done" or "cp"
+    location_id: Optional[int] = None  # required for cp cars
+
+
+class SessionEndRequest(BaseModel):
+    cars: list[SessionCarResult]
+
+
+@app.post("/api/session/end")
+def session_end(req: SessionEndRequest, db: Session = Depends(get_db)):
+    updated = []
+    for item in req.cars:
+        car = db.get(Car, item.car_id)
+        if not car:
+            continue
+        wb = _get_active_waybill(car)
+        old_loc = car.current_location_id
+        if item.status == "done" and wb and wb.destination_id:
+            car.current_location_id = wb.destination_id
+            db.add(MovementLog(car_id=car.id, from_location_id=old_loc,
+                               to_location_id=wb.destination_id, note="Session move"))
+            car.active_waybill_slot = _advance_slot(car)
+        elif item.status == "cp" and item.location_id:
+            car.current_location_id = item.location_id
+            db.add(MovementLog(car_id=car.id, from_location_id=old_loc,
+                               to_location_id=item.location_id, note="Session CP"))
+            # waybill NOT advanced for CP cars
+        db.commit()
+        db.refresh(car)
+        updated.append(car_to_dict(car))
+    return {"updated": updated}
 
 
 # ── Operations ────────────────────────────────────────────────────────────────

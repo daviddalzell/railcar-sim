@@ -619,6 +619,56 @@ $("#btn-save-waybill-edit").addEventListener("click", async () => {
 
 // ── Operations view ───────────────────────────────────────────────────────────
 async function loadOperations() {
+  loadSessionFromStorage();
+
+  if (session) {
+    // Active session: swap header buttons and render switch list
+    $("#ops-header-buttons").innerHTML = ""; // cleared by renderActiveSession
+    renderActiveSession();
+    return;
+  }
+
+  // Idle state: show Plan Session button + read-only amber list
+  $("#ops-header-buttons").innerHTML =
+    `<button id="btn-plan-session">🚆 Plan Session</button>`;
+  document.getElementById("btn-plan-session").addEventListener("click", async () => {
+    const btn = document.getElementById("btn-plan-session");
+    await withLoading(btn, "Planning…", async () => {
+      try {
+        const plan = await api("POST", "/api/session/plan");
+        session = {
+          warnings: plan.warnings || [],
+          cars: [
+            ...plan.arrivals.map(c => ({
+              id: c.id,
+              marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
+              carType: c.car_type,
+              fromLocation: c.session_from_location_name,
+              toLocation: c.session_to_location_name,
+              group: "arrivals",
+              status: "pending",
+            })),
+            ...plan.departures.map(c => ({
+              id: c.id,
+              marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
+              carType: c.car_type,
+              fromLocation: c.session_from_location_name,
+              toLocation: c.session_to_location_name,
+              group: "departures",
+              status: "pending",
+            })),
+          ],
+        };
+        saveSession();
+        renderActiveSession();
+      } catch (err) {
+        showToast("Error planning session: " + err.message, "error");
+      }
+    });
+  });
+
+  hide($("#session-warnings"));
+
   const ops = await api("GET", "/api/operations");
   const list = $("#ops-list");
   if (!ops.length) {
@@ -646,128 +696,185 @@ async function loadOperations() {
         </div>
         <div class="ops-actions">
           <span class="slot-badge">Card ${(car.active_waybill_slot ?? 0) + 1}</span>
-          <button class="ops-advance outline small" data-id="${car.id}">▶ Advance</button>
         </div>
       </div>
     `;
   }).join("");
-
-  $$(".ops-advance").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const carId = parseInt(btn.dataset.id);
-      try {
-        const updated = await api("POST", `/api/cars/${carId}/advance`);
-        const idx = cars.findIndex(c => c.id === carId);
-        if (idx !== -1) cars[idx] = updated;
-        await loadOperations();
-      } catch (err) {
-        showToast("Error: " + err.message, "error");
-      }
-    });
-  });
 }
-
-$("#btn-refresh-ops").addEventListener("click", loadOperations);
 
 // ── Operating Session ─────────────────────────────────────────────────────────
-let sessionCarIds = [];
-let sessionDoneIds = new Set();
+let session = null;
+// session = { cars: [{id, marks, carType, fromLocation, toLocation, status}], warnings: [] }
+// status: 'pending' | 'done' | 'cp'
 
-function updateSessionProgress() {
-  const total = sessionCarIds.length;
-  const done  = sessionDoneIds.size;
-  const el = $("#session-progress");
-  el.textContent = total
-    ? `${done} / ${total} done${done === total ? " — Session complete! ✓" : ""}`
-    : "";
+function saveSession() {
+  localStorage.setItem("railcar-session", session ? JSON.stringify(session) : "");
 }
 
-function renderSessionPlan(plan) {
+function loadSessionFromStorage() {
+  try { session = JSON.parse(localStorage.getItem("railcar-session") || "null"); }
+  catch { session = null; }
+}
+
+function sessionProgress() {
+  if (!session) return { total: 0, done: 0, cp: 0, pending: 0 };
+  const total   = session.cars.length;
+  const done    = session.cars.filter(c => c.status === "done").length;
+  const cp      = session.cars.filter(c => c.status === "cp").length;
+  const pending = session.cars.filter(c => c.status === "pending").length;
+  return { total, done, cp, pending };
+}
+
+function markCar(carId, status) {
+  const car = session && session.cars.find(c => c.id === carId);
+  if (!car) return;
+  // toggle: clicking the same status again resets to pending
+  car.status = car.status === status ? "pending" : status;
+  saveSession();
+  renderActiveSession();
+}
+
+function renderActiveSession() {
   const warnEl = $("#session-warnings");
-  if (plan.warnings?.length) {
-    warnEl.innerHTML = plan.warnings.map(w => `<p style="margin:0.2rem 0">⚠ ${w}</p>`).join("");
+  if (session.warnings?.length) {
+    warnEl.innerHTML = session.warnings.map(w => `<p style="margin:0.2rem 0">⚠ ${w}</p>`).join("");
     show(warnEl);
   } else {
     hide(warnEl);
   }
 
-  sessionCarIds = [
-    ...plan.arrivals.map(c => c.id),
-    ...plan.departures.map(c => c.id),
-  ];
-  sessionDoneIds = new Set();
-  updateSessionProgress();
+  const { total, done, cp, pending } = sessionProgress();
+  const allWorked = pending === 0;
+  const progressLabel = `${done + cp} / ${total} worked${allWorked ? " — ready to end session" : ""}`;
+
+  $("#ops-header-buttons").innerHTML = `
+    <span class="session-progress-label muted">${progressLabel}</span>
+    <button id="btn-cancel-session" class="outline secondary">✕ Cancel Session</button>
+    <button id="btn-end-session" class="contrast">⬛ End Session</button>
+  `;
+  document.getElementById("btn-end-session").addEventListener("click", handleEndSession);
+  document.getElementById("btn-cancel-session").addEventListener("click", () => {
+    const btn = document.getElementById("btn-cancel-session");
+    if (!btn.dataset.confirm) {
+      btn.dataset.confirm = "1";
+      const orig = btn.textContent;
+      btn.textContent = "Abandon session?";
+      setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; }, 3000);
+      return;
+    }
+    session = null;
+    saveSession();
+    loadOperations();
+  });
+
+  const arrivals   = session.cars.filter(c => c.group === "arrivals");
+  const departures = session.cars.filter(c => c.group === "departures");
 
   function carRow(car) {
-    const marks = `${car.reporting_marks || "—"} ${car.car_number || ""}`.trim();
+    const statusClass = car.status === "done" ? " done" : car.status === "cp" ? " cp" : "";
     return `
-      <div class="session-car-row" id="session-row-${car.id}">
+      <div class="session-car-row${statusClass}" id="session-row-${car.id}">
         <div class="session-car-info">
-          <span class="session-car-marks">${marks} <span class="muted">${car.car_type}</span></span>
-          <span class="session-car-move">📍 ${car.session_from_location_name || "?"} → ${car.session_to_location_name || "?"}</span>
+          <span class="session-car-marks">${car.marks} <span class="muted">${car.carType}</span></span>
+          <span class="session-car-move">📍 ${car.fromLocation || "?"} → ${car.toLocation || "?"}</span>
         </div>
-        <button class="outline small session-done-btn" data-id="${car.id}">✓ Done</button>
+        <div class="session-btn-row">
+          <button class="outline small session-done-btn${car.status === "done" ? " active-btn" : ""}" data-id="${car.id}">✓ Done</button>
+          <button class="outline small session-cp-btn${car.status === "cp" ? " active-btn" : ""}" data-id="${car.id}">✗ CP</button>
+        </div>
       </div>`;
   }
 
-  const noWork = !plan.arrivals.length && !plan.departures.length;
-  if (noWork) {
-    $("#session-plan-body").innerHTML =
-      `<p class="muted" style="text-align:center;padding:1.5rem">No cars to work this session.</p>`;
-    return;
-  }
-
+  const noWork = !arrivals.length && !departures.length;
   let html = "";
-  if (plan.arrivals.length) {
-    html += `<p class="session-section-title">Set out from staging (${plan.arrivals.length})</p>`;
-    html += plan.arrivals.map(c => carRow(c)).join("");
+  if (noWork) {
+    html = `<p class="muted" style="text-align:center;padding:1.5rem">No cars to work this session.</p>`;
+  } else {
+    if (arrivals.length) {
+      html += `<p class="session-section-title">Set out from staging (${arrivals.length})</p>`;
+      html += arrivals.map(carRow).join("");
+    }
+    if (departures.length) {
+      html += `<p class="session-section-title">Pick up for staging (${departures.length})</p>`;
+      html += departures.map(carRow).join("");
+    }
   }
-  if (plan.departures.length) {
-    html += `<p class="session-section-title">Pick up for staging (${plan.departures.length})</p>`;
-    html += plan.departures.map(c => carRow(c)).join("");
-  }
-  $("#session-plan-body").innerHTML = html;
+  $("#ops-list").innerHTML = html;
 
   $$(".session-done-btn").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const carId = parseInt(btn.dataset.id);
-      await withLoading(btn, "…", async () => {
-        try {
-          const updated = await api("POST", `/api/session/advance-car/${carId}`);
-          const row = $(`#session-row-${carId}`);
-          row.classList.add("done");
-          sessionDoneIds.add(carId);
-          updateSessionProgress();
-          const idx = cars.findIndex(c => c.id === carId);
-          if (idx !== -1) cars[idx] = updated;
-          renderCarGrid();
-        } catch (err) {
-          showToast("Error: " + err.message, "error");
-        }
-      });
-    });
+    btn.addEventListener("click", () => markCar(parseInt(btn.dataset.id), "done"));
+  });
+  $$(".session-cp-btn").forEach(btn => {
+    btn.addEventListener("click", () => markCar(parseInt(btn.dataset.id), "cp"));
   });
 }
 
-$("#btn-plan-session").addEventListener("click", async () => {
-  await withLoading($("#btn-plan-session"), "Planning…", async () => {
-    try {
-      const plan = await api("POST", "/api/session/plan");
-      renderSessionPlan(plan);
-      $("#session-dialog").showModal();
-    } catch (err) {
-      showToast("Error planning session: " + err.message, "error");
-    }
-  });
-});
+async function handleEndSession() {
+  const cpCars = session.cars.filter(c => c.status === "cp");
+  const doneCars = session.cars.filter(c => c.status === "done");
 
-$("#close-session-dialog").addEventListener("click", () => {
-  $("#session-dialog").close();
-  loadOperations();
-});
-$("#btn-close-session").addEventListener("click", () => {
-  $("#session-dialog").close();
-  loadOperations();
+  if (!doneCars.length && !cpCars.length) {
+    showToast("No cars have been marked — work some cars first.", "warn");
+    return;
+  }
+
+  if (cpCars.length) {
+    // Show CP resolution dialog
+    const locOptions = locations.map(l => `<option value="${l.id}">${l.name} (${l.location_type})</option>`).join("");
+    $("#cp-car-list").innerHTML = cpCars.map(car => `
+      <div class="cp-car-row">
+        <span class="cp-car-label">${car.marks} <span class="muted">${car.carType}</span></span>
+        <select class="cp-location-select" data-id="${car.id}">
+          <option value="">— pick location —</option>
+          ${locOptions}
+        </select>
+      </div>
+    `).join("");
+    $("#end-session-dialog").showModal();
+  } else {
+    await commitEndSession([]);
+  }
+}
+
+async function commitEndSession(cpCars) {
+  const payload = [
+    ...session.cars.filter(c => c.status === "done").map(c => ({ car_id: c.id, status: "done" })),
+    ...cpCars,
+  ];
+  const btn = $("#btn-confirm-end-session");
+  try {
+    await withLoading(btn || document.body, "Finishing…", async () => {
+      const result = await api("POST", "/api/session/end", { cars: payload });
+      session = null;
+      saveSession();
+      result.updated.forEach(updated => {
+        const idx = cars.findIndex(c => c.id === updated.id);
+        if (idx !== -1) cars[idx] = updated;
+      });
+      renderCarGrid();
+      if (btn) $("#end-session-dialog").close();
+      showToast(`Session complete — ${result.updated.length} car(s) updated.`, "success");
+      loadOperations();
+    });
+  } catch (err) {
+    showToast("Error ending session: " + err.message, "error");
+  }
+}
+
+$("#close-end-session-dialog").addEventListener("click", () => $("#end-session-dialog").close());
+$("#btn-cancel-end-session").addEventListener("click", () => $("#end-session-dialog").close());
+
+$("#btn-confirm-end-session").addEventListener("click", async () => {
+  const cpSelects = $$(".cp-location-select");
+  const cpCars = [];
+  for (const sel of cpSelects) {
+    if (!sel.value) {
+      showToast("Please select a location for every CP car.", "warn");
+      return;
+    }
+    cpCars.push({ car_id: parseInt(sel.dataset.id), status: "cp", location_id: parseInt(sel.value) });
+  }
+  await commitEndSession(cpCars);
 });
 
 // ── Layout setup ──────────────────────────────────────────────────────────────
