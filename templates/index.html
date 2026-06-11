@@ -46,6 +46,30 @@
         <div id="upload-preview" class="hidden">
           <img id="preview-img" src="" alt="Car preview" />
         </div>
+
+        <!-- Stylize section — shown after photo analysis completes -->
+        <div id="stylize-section" class="hidden">
+          <div id="stylize-idle">
+            <button type="button" id="btn-stylize" class="outline">✨ Generate Stylized Illustration</button>
+          </div>
+          <div id="stylize-processing" class="hidden">
+            <span class="spinner"></span>Generating illustration…
+          </div>
+          <div id="stylize-result" class="hidden">
+            <div class="stylize-compare">
+              <img id="stylize-preview" src="" alt="Stylized car illustration" />
+            </div>
+            <div class="button-row">
+              <button type="button" id="btn-use-stylized">✓ Use Stylized Image</button>
+              <button type="button" id="btn-regenerate" class="outline">↻ Regenerate</button>
+              <button type="button" id="btn-keep-original" class="outline secondary">Keep Original Photo</button>
+            </div>
+          </div>
+          <div id="stylize-error" class="hidden error-msg">
+            <span id="stylize-error-msg"></span>
+          </div>
+        </div>
+
         <div id="car-fields" class="hidden">
           <div class="grid">
             <label>Reporting Marks <input id="field-marks" type="text" placeholder="e.g. BNSF" /></label>
