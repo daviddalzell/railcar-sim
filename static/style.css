@@ -597,3 +597,147 @@ button.small {
   border: 1px solid var(--border-light);
   display: none;
 }
+
+/* ── Mobile (≤ 600px) ────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+
+  /* Navigation — scrollable pill row, no wrapping */
+  header nav ul:last-child {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+    padding-bottom: 0.25rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  header nav a {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    padding: 0.3rem 0.6rem;
+  }
+
+  /* Main container — tighter side padding */
+  main.container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  /* Car grid — 2 columns, smaller cards */
+  .car-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.65rem;
+  }
+
+  /* All dialogs — full-width bottom sheet */
+  dialog article {
+    max-width: 100% !important;
+    max-height: 90vh;
+    margin: 0;
+    border-radius: var(--card-radius) var(--card-radius) 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+
+  /* Car detail — stack photo above info */
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-photo {
+    width: 100%;
+    height: 180px;
+  }
+
+  /* Dialog footers — stack buttons vertically */
+  .dialog-footer-primary,
+  .dialog-footer-secondary {
+    flex-direction: column;
+  }
+
+  .dialog-footer-primary button,
+  .dialog-footer-secondary button {
+    width: 100%;
+  }
+
+  /* Two-column form grids → single column */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Layout setup: locations + industries stack */
+  .layout-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+
+  /* Operations row — thumbnail + info on top, actions span full width below */
+  .ops-row {
+    grid-template-columns: 72px 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .ops-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-subtle);
+    margin-top: 0.25rem;
+  }
+
+  /* Waybill pool — info on top row, meta below, actions span both rows */
+  .pool-item {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+  }
+
+  .pool-item-meta {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .pool-item-actions {
+    grid-row: 1 / 3;
+    align-self: center;
+  }
+
+  /* Touch targets — 44px minimum height */
+  button,
+  [role="button"],
+  a.outline {
+    min-height: 44px;
+  }
+
+  button.small {
+    min-height: 36px;
+    font-size: 0.85rem;
+  }
+
+  /* Toast — full width */
+  #toast-container {
+    left: 0.75rem;
+    right: 0.75rem;
+  }
+
+  .toast {
+    max-width: 100%;
+  }
+
+  /* Section headers — allow wrap */
+  .section-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .section-header .button-row {
+    margin-top: 0;
+  }
+
+  /* Upload zone — tighter */
+  .upload-zone {
+    padding: 1rem;
+  }
+}
