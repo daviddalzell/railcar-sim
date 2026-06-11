@@ -47,10 +47,7 @@ STYLIZE_PROMPT = _stylize_cfg.get(
     "body should be tinted with a single color that matches the image. The wheels and "
     "trucks should be tinted a brownish color. Tints should be around 30% darkness",
 )
-STYLIZE_MODEL = _stylize_cfg.get(
-    "model",
-    os.environ.get("GEMINI_STYLIZE_MODEL", "gemini-2.0-flash-preview-image-generation"),
-)
+STYLIZE_MODEL = _stylize_cfg.get("model", "gemini-2.5-flash-image")
 
 app = FastAPI(title="Rail Car Movement Simulator")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -300,28 +297,34 @@ def stylize_car_photo(data: StylizeRequest):
     if not src.exists():
         raise HTTPException(404, "Source photo not found")
 
-    client = genai.Client(api_key=api_key)
-    image_bytes = src.read_bytes()
+    try:
+        client = genai.Client(api_key=api_key)
+        image_bytes = src.read_bytes()
 
-    response = client.models.generate_content(
-        model=STYLIZE_MODEL,
-        contents=[
-            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-            STYLIZE_PROMPT,
-        ],
-        config=types.GenerateContentConfig(
-            response_modalities=["IMAGE", "TEXT"],
-        ),
-    )
+        response = client.models.generate_content(
+            model=STYLIZE_MODEL,
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                STYLIZE_PROMPT,
+            ],
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE", "TEXT"],
+            ),
+        )
 
-    img_bytes = None
-    for part in response.candidates[0].content.parts:
-        if part.inline_data:
-            img_bytes = part.inline_data.data
-            break
+        img_bytes = None
+        for part in response.candidates[0].content.parts:
+            if part.inline_data:
+                img_bytes = part.inline_data.data
+                break
 
-    if not img_bytes:
-        raise HTTPException(500, "Gemini did not return an image")
+        if not img_bytes:
+            raise HTTPException(500, "Gemini did not return an image")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
     out_path = UPLOADS_DIR / f"{uuid.uuid4().hex}_stylized.png"
     out_path.write_bytes(img_bytes)

@@ -24,7 +24,12 @@ async function api(method, path, body) {
   }
   const res = await fetch(path, opts);
   if (res.status === 204) return null;
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Server error (${res.status})`);
+  }
   if (!res.ok) throw new Error(data.detail || "Request failed");
   return data;
 }
