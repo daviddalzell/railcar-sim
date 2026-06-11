@@ -955,6 +955,20 @@ def purge_uploads(db: Session = Depends(get_db)):
     return {"deleted": deleted}
 
 
+class DeleteUploadRequest(BaseModel):
+    path: str
+
+@app.post("/api/uploads/delete", status_code=204)
+def delete_upload(data: DeleteUploadRequest):
+    target = Path(data.path).resolve()
+    uploads_resolved = UPLOADS_DIR.resolve()
+    if not str(target).startswith(str(uploads_resolved)):
+        raise HTTPException(400, "Path outside uploads directory")
+    if not target.name.endswith("_stylized.png"):
+        raise HTTPException(400, "Only stylized images may be deleted this way")
+    target.unlink(missing_ok=True)
+
+
 # ── Operating Session ────────────────────────────────────────────────────────
 
 def _get_active_waybill(car: Car):

@@ -215,10 +215,10 @@ $("#btn-add-manual").addEventListener("click", () => {
   $("#field-color").value = "";
 });
 
-$("#btn-cancel-car").addEventListener("click", () => {
+$("#btn-cancel-car").addEventListener("click", async () => {
+  await discardStylized();
   hide($("#add-car-form"));
   hide($("#stylize-section"));
-  stylizedPath = null;
 });
 
 function applyAnalysis(result) {
@@ -244,18 +244,31 @@ function applyAnalysis(result) {
 }
 
 // ── Stylize handlers ──────────────────────────────────────────────────────────
+async function discardStylized() {
+  if (!stylizedPath) return;
+  const path = stylizedPath;
+  stylizedPath = null;
+  try { await api("POST", "/api/uploads/delete", { path }); } catch { /* best-effort */ }
+}
+
 $("#btn-stylize").addEventListener("click", runStylize);
-$("#btn-regenerate").addEventListener("click", runStylize);
+
+$("#btn-regenerate").addEventListener("click", async () => {
+  await discardStylized();
+  runStylize();
+});
 
 $("#btn-use-stylized").addEventListener("click", () => {
   if (stylizedPath) {
     photoPath = stylizedPath;
     $("#preview-img").src = $("#stylize-preview").src;
   }
+  stylizedPath = null;
   hide($("#stylize-section"));
 });
 
-$("#btn-keep-original").addEventListener("click", () => {
+$("#btn-keep-original").addEventListener("click", async () => {
+  await discardStylized();
   hide($("#stylize-section"));
 });
 
