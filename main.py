@@ -857,6 +857,89 @@ def auto_assign_waybills(db: Session = Depends(get_db)):
     return {"assigned": assigned, "cars_updated": [car_to_dict(c) for c in cars]}
 
 
+# ── Operating Session ────────────────────────────────────────────────────────
+
+def _get_active_waybill(car: Car):
+    return next((w for w in car.waybills if w.slot_index == car.active_waybill_slot), None)
+
+
+def _advance_slot(car: Car) -> int:
+    assigned = sorted(w.slot_index for w in car.waybills if w.slot_index is not None)
+    if not assigned:
+        return car.active_waybill_slot
+    try:
+        idx = assigned.index(car.active_waybill_slot)
+        return assigned[(idx + 1) % len(assigned)]
+    except ValueError:
+        return assigned[0]
+
+
+def _build_session_plan(db: Session) -> dict:
+    # staging + yard both act as dispatch points (trains originate/terminate there)
+    dispatch_ids = {l.id for l in db.query(Location).filter(
+        Location.location_type.in_(["staging", "yard"])
+    ).all()}
+    arrivals, departures, warnings = [], [], []
+
+    for car in db.query(Car).all():
+        wb = _get_active_waybill(car)
+        if not wb or wb.destination_id is None:
+            continue
+        if car.current_location_id != wb.destination_id:
+            if car.current_location_id in dispatch_ids:
+                arrivals.append(car)
+            else:
+                departures.append(car)
+
+    arrivals   = sorted(arrivals,   key=lambda c: c.id)[:5]
+    departures = sorted(departures, key=lambda c: c.id)[:min(5, max(len(arrivals), len(departures)))]
+
+    if len(departures) < len(arrivals):
+        warnings.append(
+            f"Only {len(departures)} outbound car(s) available but {len(arrivals)} arrival(s) planned."
+        )
+    if not arrivals:
+        warnings.append("No inbound cars (cars at yard/staging needing a move) available.")
+    if not departures:
+        warnings.append("No outbound cars (cars at industries needing a move) available.")
+
+    def _enrich(car):
+        d = car_to_dict(car)
+        wb = _get_active_waybill(car)
+        d["session_from_location_name"] = car.current_location.name if car.current_location else None
+        d["session_to_location_name"]   = wb.destination.name if wb and wb.destination else None
+        return d
+
+    return {
+        "arrivals":   [_enrich(c) for c in arrivals],
+        "departures": [_enrich(c) for c in departures],
+        "warnings":   warnings,
+    }
+
+
+@app.post("/api/session/plan")
+def session_plan(db: Session = Depends(get_db)):
+    return _build_session_plan(db)
+
+
+@app.post("/api/session/advance-car/{car_id}")
+def session_advance_car(car_id: int, db: Session = Depends(get_db)):
+    car = db.get(Car, car_id)
+    if not car:
+        raise HTTPException(404, "Car not found")
+    wb = _get_active_waybill(car)
+    if not wb or wb.destination_id is None:
+        raise HTTPException(400, "Car has no active waybill with a destination")
+    old_loc = car.current_location_id
+    car.current_location_id = wb.destination_id
+    car.active_waybill_slot = _advance_slot(car)
+    db.add(MovementLog(car_id=car.id, from_location_id=old_loc,
+                       to_location_id=wb.destination_id, note="Session move"))
+    db.commit()
+    db.refresh(car)
+    return car_to_dict(car)
+
+
 # ── Operations ────────────────────────────────────────────────────────────────
 
 @app.get("/api/operations")

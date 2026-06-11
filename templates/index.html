@@ -241,9 +241,28 @@
     <section id="tab-operations" class="tab-panel hidden">
       <div class="section-header">
         <h2>Operations</h2>
-        <button id="btn-refresh-ops" class="outline">↻ Refresh</button>
+        <div class="button-row">
+          <button id="btn-plan-session">🚆 Plan Session</button>
+          <button id="btn-refresh-ops" class="outline">↻ Refresh</button>
+        </div>
       </div>
       <div id="ops-list"></div>
+
+      <!-- Operating session work-list dialog -->
+      <dialog id="session-dialog">
+        <article>
+          <header>
+            <button aria-label="Close" rel="prev" id="close-session-dialog"></button>
+            <h3>Operating Session</h3>
+          </header>
+          <div id="session-warnings" class="hidden session-warnings"></div>
+          <p id="session-progress" class="session-progress muted"></p>
+          <div id="session-plan-body"></div>
+          <footer>
+            <button id="btn-close-session" class="outline secondary">Close</button>
+          </footer>
+        </article>
+      </dialog>
     </section>
 
     <!-- ── LAYOUT SETUP ───────────────────────────────────────────────── -->

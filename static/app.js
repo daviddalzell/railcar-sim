@@ -86,8 +86,12 @@ function renderCarGrid() {
     grid.innerHTML = emptyState("🚃", "No cars yet — add one with the buttons above.");
     return;
   }
-  grid.innerHTML = cars.map(car => `
-    <div class="car-card" data-id="${car.id}">
+  grid.innerHTML = cars.map(car => {
+    const needsMove = car.active_waybill
+      && car.active_waybill.destination_id != null
+      && car.current_location_id !== car.active_waybill.destination_id;
+    return `
+    <div class="car-card${needsMove ? ' car-needs-move' : ''}" data-id="${car.id}">
       <div class="car-thumb">
         ${car.photo_path
           ? `<img src="/${car.photo_path}" alt="${car.reporting_marks} ${car.car_number}" />`
@@ -103,7 +107,7 @@ function renderCarGrid() {
           : `<span class="waybill-badge muted">No waybill</span>`}
       </div>
     </div>
-  `).join("");
+  `; }).join("");
 
   $$(".car-card").forEach(card => {
     card.addEventListener("click", () => openCarDetail(parseInt(card.dataset.id)));
@@ -623,11 +627,14 @@ async function loadOperations() {
   }
   list.innerHTML = ops.map(car => {
     const wb = car.active_waybill;
+    const needsMove = wb
+      && wb.destination_id != null
+      && car.current_location_id !== wb.destination_id;
     const instruction = wb
       ? `${wb.is_empty ? "Move <strong>empty</strong>" : `Move with <strong>${wb.commodity || "load"}</strong>`} from <em>${wb.origin_name || "?"}</em> to <em>${wb.destination_name || "?"}</em>${wb.industry_name ? ` (${wb.industry_name})` : ""}`
       : `<span class='muted'>No waybill assigned</span>`;
     return `
-      <div class="ops-row">
+      <div class="ops-row${needsMove ? ' car-needs-move' : ''}">
         <div class="ops-thumb">
           ${car.photo_path ? `<img src="/${car.photo_path}" />` : `<div class="no-photo small">${car.car_type}</div>`}
         </div>
@@ -661,6 +668,107 @@ async function loadOperations() {
 }
 
 $("#btn-refresh-ops").addEventListener("click", loadOperations);
+
+// ── Operating Session ─────────────────────────────────────────────────────────
+let sessionCarIds = [];
+let sessionDoneIds = new Set();
+
+function updateSessionProgress() {
+  const total = sessionCarIds.length;
+  const done  = sessionDoneIds.size;
+  const el = $("#session-progress");
+  el.textContent = total
+    ? `${done} / ${total} done${done === total ? " — Session complete! ✓" : ""}`
+    : "";
+}
+
+function renderSessionPlan(plan) {
+  const warnEl = $("#session-warnings");
+  if (plan.warnings?.length) {
+    warnEl.innerHTML = plan.warnings.map(w => `<p style="margin:0.2rem 0">⚠ ${w}</p>`).join("");
+    show(warnEl);
+  } else {
+    hide(warnEl);
+  }
+
+  sessionCarIds = [
+    ...plan.arrivals.map(c => c.id),
+    ...plan.departures.map(c => c.id),
+  ];
+  sessionDoneIds = new Set();
+  updateSessionProgress();
+
+  function carRow(car) {
+    const marks = `${car.reporting_marks || "—"} ${car.car_number || ""}`.trim();
+    return `
+      <div class="session-car-row" id="session-row-${car.id}">
+        <div class="session-car-info">
+          <span class="session-car-marks">${marks} <span class="muted">${car.car_type}</span></span>
+          <span class="session-car-move">📍 ${car.session_from_location_name || "?"} → ${car.session_to_location_name || "?"}</span>
+        </div>
+        <button class="outline small session-done-btn" data-id="${car.id}">✓ Done</button>
+      </div>`;
+  }
+
+  const noWork = !plan.arrivals.length && !plan.departures.length;
+  if (noWork) {
+    $("#session-plan-body").innerHTML =
+      `<p class="muted" style="text-align:center;padding:1.5rem">No cars to work this session.</p>`;
+    return;
+  }
+
+  let html = "";
+  if (plan.arrivals.length) {
+    html += `<p class="session-section-title">Set out from staging (${plan.arrivals.length})</p>`;
+    html += plan.arrivals.map(c => carRow(c)).join("");
+  }
+  if (plan.departures.length) {
+    html += `<p class="session-section-title">Pick up for staging (${plan.departures.length})</p>`;
+    html += plan.departures.map(c => carRow(c)).join("");
+  }
+  $("#session-plan-body").innerHTML = html;
+
+  $$(".session-done-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const carId = parseInt(btn.dataset.id);
+      await withLoading(btn, "…", async () => {
+        try {
+          const updated = await api("POST", `/api/session/advance-car/${carId}`);
+          const row = $(`#session-row-${carId}`);
+          row.classList.add("done");
+          sessionDoneIds.add(carId);
+          updateSessionProgress();
+          const idx = cars.findIndex(c => c.id === carId);
+          if (idx !== -1) cars[idx] = updated;
+          renderCarGrid();
+        } catch (err) {
+          showToast("Error: " + err.message, "error");
+        }
+      });
+    });
+  });
+}
+
+$("#btn-plan-session").addEventListener("click", async () => {
+  await withLoading($("#btn-plan-session"), "Planning…", async () => {
+    try {
+      const plan = await api("POST", "/api/session/plan");
+      renderSessionPlan(plan);
+      $("#session-dialog").showModal();
+    } catch (err) {
+      showToast("Error planning session: " + err.message, "error");
+    }
+  });
+});
+
+$("#close-session-dialog").addEventListener("click", () => {
+  $("#session-dialog").close();
+  loadOperations();
+});
+$("#btn-close-session").addEventListener("click", () => {
+  $("#session-dialog").close();
+  loadOperations();
+});
 
 // ── Layout setup ──────────────────────────────────────────────────────────────
 async function loadLayout() {

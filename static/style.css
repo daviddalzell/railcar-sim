@@ -598,6 +598,75 @@ button.small {
   display: none;
 }
 
+/* ── Needs-move highlight ────────────────────────────────────────────────── */
+.car-needs-move {
+  border-left: 4px solid var(--badge-orange);
+}
+
+.car-needs-move .waybill-badge {
+  background: var(--badge-orange);
+}
+
+.ops-row.car-needs-move {
+  border-left: 4px solid var(--badge-orange);
+}
+
+/* ── Session dialog ──────────────────────────────────────────────────────── */
+#session-dialog article {
+  max-width: 640px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.session-warnings {
+  background: #fef9e7;
+  border: 1px solid var(--badge-orange);
+  border-radius: var(--card-radius);
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: #7d6608;
+}
+
+.session-progress {
+  text-align: right;
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.session-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 0.75rem 0 0.4rem;
+}
+
+.session-car-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  background: var(--pico-card-background-color, #f9f9f9);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 0.4rem;
+  font-size: 0.875rem;
+  transition: opacity 0.2s;
+}
+
+.session-car-row.done {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.session-car-row.done button { display: none; }
+
+.session-car-info  { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.session-car-marks { font-weight: 600; }
+.session-car-move  { color: var(--text-muted); font-size: 0.8rem; }
+
 /* ── Mobile (≤ 600px) ────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
 
