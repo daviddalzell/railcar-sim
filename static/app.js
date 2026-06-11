@@ -59,6 +59,40 @@ function withLoading(btn, label, fn) {
   });
 }
 
+// ── Photo library ─────────────────────────────────────────────────────────────
+let photoLibraryCallback = null;
+
+async function openPhotoLibrary(onSelect) {
+  photoLibraryCallback = onSelect;
+  const grid = $("#photo-library-grid");
+  grid.innerHTML = `<p class="muted" style="text-align:center;padding:1rem"><span class="spinner"></span>Loading…</p>`;
+  $("#photo-library-dialog").showModal();
+  try {
+    const files = await api("GET", "/api/uploads");
+    if (!files.length) {
+      grid.innerHTML = emptyState("🖼", "No photos uploaded yet.");
+    } else {
+      grid.innerHTML = files.map(f => `
+        <div class="lib-thumb${f.assigned ? " lib-assigned" : ""}" data-path="${f.path}" data-url="${f.url}">
+          <img src="${f.url}" alt="" loading="lazy" />
+          ${f.assigned ? '<span class="lib-badge">in use</span>' : ""}
+        </div>
+      `).join("");
+      $$(".lib-thumb").forEach(el => {
+        el.addEventListener("click", () => {
+          photoLibraryCallback({ path: el.dataset.path, url: el.dataset.url });
+          $("#photo-library-dialog").close();
+        });
+      });
+    }
+  } catch (err) {
+    grid.innerHTML = `<p class="muted" style="text-align:center">Failed to load library: ${err.message}</p>`;
+  }
+}
+
+$("#close-photo-library-dialog").addEventListener("click", () => $("#photo-library-dialog").close());
+$("#btn-close-library").addEventListener("click", () => $("#photo-library-dialog").close());
+
 // ── Tab navigation ────────────────────────────────────────────────────────────
 $$(".tab-link").forEach(link => {
   link.addEventListener("click", e => {
@@ -118,6 +152,7 @@ function renderCarGrid() {
 $("#btn-add-car").addEventListener("click", () => {
   show($("#add-car-form"));
   show($("#upload-zone"));
+  hide($("#btn-library-manual"));
   hide($("#car-fields"));
   hide($("#upload-preview"));
   hide($("#analyzing-msg"));
@@ -130,6 +165,7 @@ $("#btn-add-car").addEventListener("click", () => {
 $("#btn-add-manual").addEventListener("click", () => {
   show($("#add-car-form"));
   hide($("#upload-zone"));
+  show($("#btn-library-manual"));
   hide($("#upload-preview"));
   hide($("#analyzing-msg"));
   hide($("#vision-error"));
@@ -161,6 +197,36 @@ function applyAnalysis(result) {
   hide($("#analyzing-msg"));
   show($("#car-fields"));
 }
+
+// Library → "Add via Photo" context (runs vision analysis on selection)
+$("#btn-library-add").addEventListener("click", () => {
+  openPhotoLibrary(async ({ path, url }) => {
+    $("#preview-img").src = url;
+    show($("#upload-preview"));
+    hide($("#car-fields"));
+    show($("#analyzing-msg"));
+    hide($("#vision-error"));
+    photoPath = path;
+    try {
+      const result = await api("POST", "/api/cars/analyze-photo", { photo_path: path });
+      applyAnalysis(result);
+    } catch (err) {
+      $("#vision-error-msg").textContent = "Analysis failed: " + err.message;
+      show($("#vision-error"));
+      show($("#car-fields"));
+      hide($("#analyzing-msg"));
+    }
+  });
+});
+
+// Library → "Add Manually" context (just sets photo, no analysis)
+$("#btn-library-manual").addEventListener("click", () => {
+  openPhotoLibrary(({ path, url }) => {
+    photoPath = path;
+    $("#preview-img").src = url;
+    show($("#upload-preview"));
+  });
+});
 
 $("#photo-input").addEventListener("change", async e => {
   const file = e.target.files[0];
@@ -316,16 +382,27 @@ $("#btn-edit-car").addEventListener("click", () => {
   if (car.photo_path) {
     preview.src = "/" + car.photo_path;
     preview.style.display = "block";
-    btnText.textContent = "📷 Replace Photo";
+    btnText.textContent = "📷 Upload Image";
   } else {
     preview.style.display = "none";
-    btnText.textContent = "📷 Add Photo";
+    btnText.textContent = "📷 Upload Image";
   }
   $("#edit-car-dialog").showModal();
 });
 
 $("#close-edit-car-dialog").addEventListener("click", () => $("#edit-car-dialog").close());
 $("#btn-cancel-edit-car").addEventListener("click", () => $("#edit-car-dialog").close());
+
+// Library → edit car context
+$("#btn-library-edit").addEventListener("click", () => {
+  openPhotoLibrary(({ path, url }) => {
+    $("#edit-photo-path").value = path;
+    const preview = $("#edit-photo-preview");
+    preview.src = url;
+    preview.style.display = "block";
+    $("#edit-photo-btn-text").textContent = "📷 Upload Image";
+  });
+});
 
 $("#edit-photo-input").addEventListener("change", async () => {
   const file = $("#edit-photo-input").files[0];
@@ -342,9 +419,9 @@ $("#edit-photo-input").addEventListener("change", async () => {
       const preview = $("#edit-photo-preview");
       preview.src = "/" + result.photo_path;
       preview.style.display = "block";
-      btnText.textContent = "📷 Replace Photo";
+      btnText.textContent = "📷 Upload Image";
     } else {
-      btnText.textContent = "📷 Add Photo";
+      btnText.textContent = "📷 Upload Image";
     }
   } catch {
     btnText.textContent = "📷 Upload failed";
@@ -1226,6 +1303,26 @@ $("#btn-import-trigger").addEventListener("click", () => {
   delete btn.dataset.confirm;
   btn.textContent = "⬆ Import Backup";
   $("#import-file-input").click();
+});
+
+$("#btn-purge-uploads").addEventListener("click", async () => {
+  const btn = $("#btn-purge-uploads");
+  if (!btn.dataset.confirm) {
+    btn.dataset.confirm = "1";
+    const orig = btn.textContent;
+    btn.textContent = "⚠ Delete unassigned? Click again.";
+    setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; }, 4000);
+    return;
+  }
+  delete btn.dataset.confirm;
+  try {
+    await withLoading(btn, "Purging…", async () => {
+      const result = await api("POST", "/api/uploads/purge");
+      showToast(`Deleted ${result.deleted} unassigned photo${result.deleted !== 1 ? "s" : ""}.`, "success");
+    });
+  } catch (err) {
+    showToast("Purge failed: " + err.message, "error");
+  }
 });
 
 $("#import-file-input").addEventListener("change", async e => {

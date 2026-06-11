@@ -857,6 +857,33 @@ def auto_assign_waybills(db: Session = Depends(get_db)):
     return {"assigned": assigned, "cars_updated": [car_to_dict(c) for c in cars]}
 
 
+# ── Upload library ───────────────────────────────────────────────────────────
+
+@app.get("/api/uploads")
+def list_uploads(db: Session = Depends(get_db)):
+    assigned = {car.photo_path for car in db.query(Car).all() if car.photo_path}
+    files = []
+    for f in sorted(UPLOADS_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+        if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+            files.append({
+                "path": str(f),
+                "url": "/" + str(f),
+                "assigned": str(f) in assigned,
+            })
+    return files
+
+
+@app.post("/api/uploads/purge")
+def purge_uploads(db: Session = Depends(get_db)):
+    assigned = {car.photo_path for car in db.query(Car).all() if car.photo_path}
+    deleted = 0
+    for f in UPLOADS_DIR.iterdir():
+        if f.is_file() and str(f) not in assigned:
+            f.unlink(missing_ok=True)
+            deleted += 1
+    return {"deleted": deleted}
+
+
 # ── Operating Session ────────────────────────────────────────────────────────
 
 def _get_active_waybill(car: Car):

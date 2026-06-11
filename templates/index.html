@@ -35,10 +35,15 @@
         <h4>Add New Car</h4>
         <div class="upload-zone" id="upload-zone">
           <input type="file" id="photo-input" accept="image/*" />
-          <label for="photo-input">
-            <span id="upload-label">📷 Click or drop a photo of the car</span>
-          </label>
+          <div class="upload-zone-actions">
+            <label for="photo-input">
+              <span id="upload-label">📷 Click or drop a photo of the car</span>
+            </label>
+            <span class="upload-zone-sep">or</span>
+            <button type="button" id="btn-library-add" class="outline small">🖼 Choose from Library</button>
+          </div>
         </div>
+        <button type="button" id="btn-library-manual" class="outline small hidden">🖼 Choose from Library</button>
         <div id="upload-preview" class="hidden">
           <img id="preview-img" src="" alt="Car preview" />
         </div>
@@ -121,10 +126,13 @@
           </header>
           <div class="edit-photo-row">
             <img id="edit-photo-preview" class="edit-thumb" alt="Car photo" />
-            <label class="edit-photo-label">
-              <input type="file" id="edit-photo-input" accept="image/*" style="display:none" />
-              <span id="edit-photo-btn-text" class="outline small">📷 Add Photo</span>
-            </label>
+            <div class="edit-photo-buttons">
+              <label class="edit-photo-label">
+                <input type="file" id="edit-photo-input" accept="image/*" style="display:none" />
+                <span id="edit-photo-btn-text" class="outline small">📷 Upload Image</span>
+              </label>
+              <button type="button" id="btn-library-edit" class="outline small">🖼 Select From Library</button>
+            </div>
           </div>
           <input type="hidden" id="edit-photo-path" value="" />
           <div class="grid">
@@ -275,6 +283,7 @@
           <a href="/api/export" download class="outline small">⬇ Export Backup</a>
           <button id="btn-import-trigger" class="outline small">⬆ Import Backup</button>
           <input type="file" id="import-file-input" accept=".zip" class="hidden" />
+          <button id="btn-purge-uploads" class="outline small contrast">🗑 Purge Unused Photos</button>
         </div>
       </div>
       <hr />
@@ -366,6 +375,20 @@
     </section>
 
   </main>
+
+  <!-- ── Photo Library Dialog ─────────────────────────────────────────────── -->
+  <dialog id="photo-library-dialog">
+    <article>
+      <header>
+        <button aria-label="Close" rel="prev" id="close-photo-library-dialog"></button>
+        <h3>Photo Library</h3>
+      </header>
+      <div id="photo-library-grid" class="photo-library-grid"></div>
+      <footer>
+        <button id="btn-close-library" class="outline secondary">Cancel</button>
+      </footer>
+    </article>
+  </dialog>
 
   <div id="toast-container"></div>
   <script src="/static/app.js"></script>
