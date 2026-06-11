@@ -32,6 +32,33 @@ async function api(method, path, body) {
 function hide(el) { el.classList.add("hidden"); }
 function show(el) { el.classList.remove("hidden"); }
 
+function showToast(message, type = "info", duration = 3500) {
+  const container = $("#toast-container");
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => { requestAnimationFrame(() => toast.classList.add("show")); });
+  setTimeout(() => {
+    toast.classList.remove("show");
+    toast.addEventListener("transitionend", () => toast.remove(), { once: true });
+  }, duration);
+}
+
+function emptyState(icon, message) {
+  return `<div class="empty-state"><span class="empty-state-icon">${icon}</span><p>${message}</p></div>`;
+}
+
+function withLoading(btn, label, fn) {
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>${label}`;
+  return fn().finally(() => {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  });
+}
+
 // ── Tab navigation ────────────────────────────────────────────────────────────
 $$(".tab-link").forEach(link => {
   link.addEventListener("click", e => {
@@ -56,7 +83,7 @@ async function loadRoster() {
 function renderCarGrid() {
   const grid = $("#car-grid");
   if (!cars.length) {
-    grid.innerHTML = "<p class='empty-msg'>No cars yet. Add one with the button above.</p>";
+    grid.innerHTML = emptyState("🚃", "No cars yet — add one with the buttons above.");
     return;
   }
   grid.innerHTML = cars.map(car => `
@@ -179,12 +206,16 @@ $("#btn-save-car").addEventListener("click", async () => {
     reporting_marks: $("#field-marks").value.trim(),
     photo_path: photoPath || "",
   };
+  const btn = $("#btn-save-car");
   try {
-    await api("POST", "/api/cars", body);
-    hide($("#add-car-form"));
-    await loadRoster();
+    await withLoading(btn, "Saving…", async () => {
+      await api("POST", "/api/cars", body);
+      hide($("#add-car-form"));
+      await loadRoster();
+      showToast("Car saved.", "success");
+    });
   } catch (err) {
-    alert("Error saving car: " + err.message);
+    showToast("Error saving car: " + err.message, "error");
   }
 });
 
@@ -231,26 +262,38 @@ $("#close-detail-dialog").addEventListener("click", () => $("#car-detail-dialog"
 
 $("#btn-advance-waybill").addEventListener("click", async () => {
   if (!selectedCarId) return;
+  const btn = $("#btn-advance-waybill");
   try {
-    const updated = await api("POST", `/api/cars/${selectedCarId}/advance`);
-    const idx = cars.findIndex(c => c.id === selectedCarId);
-    if (idx !== -1) cars[idx] = updated;
-    renderCarGrid();
-    await openCarDetail(selectedCarId);
+    await withLoading(btn, "Advancing…", async () => {
+      const updated = await api("POST", `/api/cars/${selectedCarId}/advance`);
+      const idx = cars.findIndex(c => c.id === selectedCarId);
+      if (idx !== -1) cars[idx] = updated;
+      renderCarGrid();
+      await openCarDetail(selectedCarId);
+    });
   } catch (err) {
-    alert("Error: " + err.message);
+    showToast("Error: " + err.message, "error");
   }
 });
 
 $("#btn-delete-car").addEventListener("click", async () => {
   if (!selectedCarId) return;
-  if (!confirm("Delete this car?")) return;
+  const btn = $("#btn-delete-car");
+  if (!btn.dataset.confirm) {
+    btn.dataset.confirm = "1";
+    const orig = btn.textContent;
+    btn.textContent = "Confirm delete?";
+    setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; }, 3000);
+    return;
+  }
+  delete btn.dataset.confirm;
   try {
     await api("DELETE", `/api/cars/${selectedCarId}`);
     $("#car-detail-dialog").close();
     await loadRoster();
+    showToast("Car deleted.", "warn");
   } catch (err) {
-    alert("Error: " + err.message);
+    showToast("Error: " + err.message, "error");
   }
 });
 
@@ -305,21 +348,25 @@ $("#edit-photo-input").addEventListener("change", async () => {
 });
 
 $("#btn-save-edit-car").addEventListener("click", async () => {
+  const btn = $("#btn-save-edit-car");
   try {
-    const body = {
-      car_type: $("#edit-field-type").value,
-      color: $("#edit-field-color").value.trim(),
-      car_number: $("#edit-field-number").value.trim(),
-      reporting_marks: $("#edit-field-marks").value.trim(),
-    };
-    const newPhoto = $("#edit-photo-path").value;
-    if (newPhoto) body.photo_path = newPhoto;
-    await api("PUT", `/api/cars/${selectedCarId}`, body);
-    $("#edit-car-dialog").close();
-    await loadRoster();
-    await openCarDetail(selectedCarId);
+    await withLoading(btn, "Saving…", async () => {
+      const body = {
+        car_type: $("#edit-field-type").value,
+        color: $("#edit-field-color").value.trim(),
+        car_number: $("#edit-field-number").value.trim(),
+        reporting_marks: $("#edit-field-marks").value.trim(),
+      };
+      const newPhoto = $("#edit-photo-path").value;
+      if (newPhoto) body.photo_path = newPhoto;
+      await api("PUT", `/api/cars/${selectedCarId}`, body);
+      $("#edit-car-dialog").close();
+      await loadRoster();
+      await openCarDetail(selectedCarId);
+      showToast("Car updated.", "success");
+    });
   } catch (err) {
-    alert("Error saving car: " + err.message);
+    showToast("Error saving car: " + err.message, "error");
   }
 });
 
@@ -348,7 +395,7 @@ $("#btn-confirm-move").addEventListener("click", async () => {
     await openCarDetail(selectedCarId);
     $("#move-car-dialog").close();
   } catch (err) {
-    alert("Error: " + err.message);
+    showToast("Error: " + err.message, "error");
   }
 });
 
@@ -403,7 +450,7 @@ $("#btn-save-waybills").addEventListener("click", async () => {
     $("#waybill-dialog").close();
     await openCarDetail(selectedCarId);
   } catch (err) {
-    alert("Error saving waybills: " + err.message);
+    showToast("Error saving waybills: " + err.message, "error");
   }
 });
 
@@ -416,7 +463,7 @@ async function loadWaybillPool() {
 function renderWaybillPool() {
   const list = $("#waybill-pool-list");
   if (!waybillPool.length) {
-    list.innerHTML = "<p class='empty-msg'>No waybills yet. Create one with the button above.</p>";
+    list.innerHTML = emptyState("📋", "No waybills yet — generate from industries or add one manually.");
     return;
   }
   list.innerHTML = waybillPool.map(w => `
@@ -443,9 +490,20 @@ function renderWaybillPool() {
   });
   $$(".del-wb").forEach(btn => {
     btn.addEventListener("click", async () => {
-      if (!confirm("Delete this waybill?")) return;
-      await api("DELETE", `/api/waybills/${btn.dataset.id}`);
-      await loadWaybillPool();
+      if (!btn.dataset.confirm) {
+        btn.dataset.confirm = "1";
+        const orig = btn.innerHTML;
+        btn.textContent = "Sure?";
+        setTimeout(() => { delete btn.dataset.confirm; btn.innerHTML = orig; }, 3000);
+        return;
+      }
+      delete btn.dataset.confirm;
+      try {
+        await api("DELETE", `/api/waybills/${btn.dataset.id}`);
+        await loadWaybillPool();
+      } catch (err) {
+        showToast("Error: " + err.message, "error");
+      }
     });
   });
 }
@@ -493,30 +551,42 @@ $("#btn-cancel-generate").addEventListener("click", () => $("#generate-waybills-
 
 $("#btn-confirm-generate").addEventListener("click", async () => {
   const originId = $("#gen-origin-location").value;
-  if (!originId) { alert("Please select an origin location."); return; }
+  if (!originId) { showToast("Please select an origin location.", "warn"); return; }
   const replace = document.querySelector('input[name="gen-mode"]:checked')?.value === "replace";
-  if (replace && !confirm("This will delete ALL existing waybills (including those assigned to cars). Continue?")) return;
+  const btn = $("#btn-confirm-generate");
+  if (replace && !btn.dataset.confirm) {
+    btn.dataset.confirm = "1";
+    const orig = btn.textContent;
+    btn.textContent = "Replace all — confirm?";
+    setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; }, 4000);
+    return;
+  }
+  delete btn.dataset.confirm;
   try {
-    const result = await api("POST", "/api/generate-waybills", { origin_location_id: parseInt(originId), replace });
-    $("#generate-waybills-dialog").close();
-    alert(`Created ${result.created} waybill${result.created !== 1 ? "s" : ""}, skipped ${result.skipped} duplicate${result.skipped !== 1 ? "s" : ""}.`);
-    await loadWaybillPool();
+    await withLoading(btn, "Generating…", async () => {
+      const result = await api("POST", "/api/generate-waybills", { origin_location_id: parseInt(originId), replace });
+      $("#generate-waybills-dialog").close();
+      showToast(`Created ${result.created} waybill${result.created !== 1 ? "s" : ""}, skipped ${result.skipped}.`, "success");
+      await loadWaybillPool();
+    });
   } catch (err) {
-    alert("Error generating waybills: " + err.message);
+    showToast("Error generating waybills: " + err.message, "error");
   }
 });
 
 // ── Auto-assign waybills ──────────────────────────────────────────────────────
 $("#btn-auto-assign").addEventListener("click", async () => {
-  if (!confirm("Auto-assign unassigned waybills to cars by car type?")) return;
+  const btn = $("#btn-auto-assign");
   try {
-    const result = await api("POST", "/api/auto-assign-waybills");
-    alert(`Assigned ${result.assigned} waybill${result.assigned !== 1 ? "s" : ""} to cars.`);
-    cars = result.cars_updated;
-    renderCarGrid();
-    await loadWaybillPool();
+    await withLoading(btn, "Assigning…", async () => {
+      const result = await api("POST", "/api/auto-assign-waybills");
+      showToast(`Assigned ${result.assigned} waybill${result.assigned !== 1 ? "s" : ""} to cars.`, "success");
+      cars = result.cars_updated;
+      renderCarGrid();
+      await loadWaybillPool();
+    });
   } catch (err) {
-    alert("Error during auto-assign: " + err.message);
+    showToast("Error during auto-assign: " + err.message, "error");
   }
 });
 
@@ -539,7 +609,7 @@ $("#btn-save-waybill-edit").addEventListener("click", async () => {
     $("#waybill-edit-dialog").close();
     await loadWaybillPool();
   } catch (err) {
-    alert("Error saving waybill: " + err.message);
+    showToast("Error saving waybill: " + err.message, "error");
   }
 });
 
@@ -548,7 +618,7 @@ async function loadOperations() {
   const ops = await api("GET", "/api/operations");
   const list = $("#ops-list");
   if (!ops.length) {
-    list.innerHTML = "<p class='empty-msg'>No cars in the system yet.</p>";
+    list.innerHTML = emptyState("🚂", "No cars in the system yet — add some from the Car Roster tab.");
     return;
   }
   list.innerHTML = ops.map(car => {
@@ -584,7 +654,7 @@ async function loadOperations() {
         if (idx !== -1) cars[idx] = updated;
         await loadOperations();
       } catch (err) {
-        alert("Error: " + err.message);
+        showToast("Error: " + err.message, "error");
       }
     });
   });
@@ -608,7 +678,7 @@ async function loadLayout() {
 function renderLocationList() {
   const list = $("#location-list");
   if (!locations.length) {
-    list.innerHTML = "<p class='empty-msg'>No locations yet.</p>";
+    list.innerHTML = emptyState("📍", "No locations yet — add one with the + button.");
     return;
   }
   list.innerHTML = locations.map(l => `
@@ -634,9 +704,20 @@ function renderLocationList() {
 
   $$(".del-loc").forEach(btn => {
     btn.addEventListener("click", async () => {
-      if (!confirm("Delete this location?")) return;
-      await api("DELETE", `/api/locations/${btn.dataset.id}`);
-      await loadLayout();
+      if (!btn.dataset.confirm) {
+        btn.dataset.confirm = "1";
+        const orig = btn.innerHTML;
+        btn.textContent = "Sure?";
+        setTimeout(() => { delete btn.dataset.confirm; btn.innerHTML = orig; }, 3000);
+        return;
+      }
+      delete btn.dataset.confirm;
+      try {
+        await api("DELETE", `/api/locations/${btn.dataset.id}`);
+        await loadLayout();
+      } catch (err) {
+        showToast("Error: " + err.message, "error");
+      }
     });
   });
 }
@@ -657,7 +738,7 @@ function roleToCheckboxes(role) {
 function renderIndustryList() {
   const list = $("#industry-list");
   if (!industries.length) {
-    list.innerHTML = "<p class='empty-msg'>No industries yet.</p>";
+    list.innerHTML = emptyState("🏭", "No industries yet — add one with the + button.");
     return;
   }
   const roleBadge = r => r === "producer" ? "producer" : r === "transload" ? "transload" : "";
@@ -692,9 +773,20 @@ function renderIndustryList() {
 
   $$(".del-ind").forEach(btn => {
     btn.addEventListener("click", async () => {
-      if (!confirm("Delete this industry?")) return;
-      await api("DELETE", `/api/industries/${btn.dataset.id}`);
-      await loadLayout();
+      if (!btn.dataset.confirm) {
+        btn.dataset.confirm = "1";
+        const orig = btn.innerHTML;
+        btn.textContent = "Sure?";
+        setTimeout(() => { delete btn.dataset.confirm; btn.innerHTML = orig; }, 3000);
+        return;
+      }
+      delete btn.dataset.confirm;
+      try {
+        await api("DELETE", `/api/industries/${btn.dataset.id}`);
+        await loadLayout();
+      } catch (err) {
+        showToast("Error: " + err.message, "error");
+      }
     });
   });
 }
@@ -813,7 +905,7 @@ $("#industry-form").addEventListener("submit", async e => {
 function renderCommodityMapList() {
   const list = $("#commodity-map-list");
   if (!commodityMap.length) {
-    list.innerHTML = "<p class='empty-msg'>No mappings yet. Click ⚙ Seed Defaults to populate common commodities.</p>";
+    list.innerHTML = emptyState("🗂", "No mappings yet — click ⚙ Seed Defaults to populate common commodities.");
     return;
   }
   list.innerHTML = commodityMap.map(m => `
@@ -840,9 +932,20 @@ function renderCommodityMapList() {
 
   $$(".del-cmap").forEach(btn => {
     btn.addEventListener("click", async () => {
-      if (!confirm("Delete this commodity mapping?")) return;
-      await api("DELETE", `/api/commodity-car-type-map/${btn.dataset.id}`);
-      await loadLayout();
+      if (!btn.dataset.confirm) {
+        btn.dataset.confirm = "1";
+        const orig = btn.innerHTML;
+        btn.textContent = "Sure?";
+        setTimeout(() => { delete btn.dataset.confirm; btn.innerHTML = orig; }, 3000);
+        return;
+      }
+      delete btn.dataset.confirm;
+      try {
+        await api("DELETE", `/api/commodity-car-type-map/${btn.dataset.id}`);
+        await loadLayout();
+      } catch (err) {
+        showToast("Error: " + err.message, "error");
+      }
     });
   });
 }
@@ -878,38 +981,51 @@ $("#commodity-map-form").addEventListener("submit", async e => {
     $("#cmap-commodity").disabled = false;
     await loadLayout();
   } catch (err) {
-    alert("Error saving mapping: " + err.message);
+    showToast("Error saving mapping: " + err.message, "error");
   }
 });
 
 $("#btn-seed-commodity-map").addEventListener("click", async () => {
-  if (!confirm("Seed default commodity → car type mappings? Existing entries will not be overwritten.")) return;
+  const btn = $("#btn-seed-commodity-map");
   try {
-    const result = await api("POST", "/api/commodity-car-type-map/seed");
-    alert(`Added ${result.added} mapping${result.added !== 1 ? "s" : ""}, skipped ${result.skipped} already existing.`);
-    await loadLayout();
+    await withLoading(btn, "Seeding…", async () => {
+      const result = await api("POST", "/api/commodity-car-type-map/seed");
+      showToast(`Added ${result.added} mapping${result.added !== 1 ? "s" : ""}, skipped ${result.skipped}.`, "success");
+      await loadLayout();
+    });
   } catch (err) {
-    alert("Error seeding defaults: " + err.message);
+    showToast("Error seeding defaults: " + err.message, "error");
   }
 });
 
 // ── Export / Import ───────────────────────────────────────────────────────────
-$("#btn-import-trigger").addEventListener("click", () => $("#import-file-input").click());
+$("#btn-import-trigger").addEventListener("click", () => {
+  const btn = $("#btn-import-trigger");
+  if (!btn.dataset.confirm) {
+    btn.dataset.confirm = "1";
+    const orig = btn.textContent;
+    btn.textContent = "⚠ Replace ALL data? Click again.";
+    setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; }, 5000);
+    return;
+  }
+  delete btn.dataset.confirm;
+  btn.textContent = "⬆ Import Backup";
+  $("#import-file-input").click();
+});
 
 $("#import-file-input").addEventListener("change", async e => {
   const file = e.target.files[0];
   if (!file) return;
-  if (!confirm(`Import "${file.name}"? This will REPLACE ALL current data.`)) {
-    e.target.value = "";
-    return;
-  }
+  const btn = $("#btn-import-trigger");
   const fd = new FormData();
   fd.append("file", file);
   try {
-    await api("POST", "/api/import", fd);
-    location.reload();
+    await withLoading(btn, "Importing…", async () => {
+      await api("POST", "/api/import", fd);
+      location.reload();
+    });
   } catch (err) {
-    alert("Import failed: " + err.message);
+    showToast("Import failed: " + err.message, "error");
     e.target.value = "";
   }
 });

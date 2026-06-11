@@ -10,7 +10,7 @@
 <body>
   <header class="container-fluid">
     <nav>
-      <ul><li><strong>🚂 Rail Car Sim</strong></li></ul>
+      <ul><li><strong class="brand">🚂 Rail&nbsp;<span class="brand-rail">Car</span>&nbsp;Sim</strong></li></ul>
       <ul>
         <li><a href="#" data-tab="roster" class="tab-link active">Car Roster</a></li>
         <li><a href="#" data-tab="operations" class="tab-link">Operations</a></li>
@@ -60,14 +60,14 @@
           </div>
           <div id="vision-error" class="hidden error-msg">
             <span id="vision-error-msg"></span>
-            <button id="btn-retry-vision" class="outline small" style="margin-left:0.5rem">↻ Retry</button>
+            <button id="btn-retry-vision" class="outline small ml-sm">↻ Retry</button>
           </div>
           <div class="button-row">
             <button id="btn-save-car">Save Car</button>
             <button id="btn-cancel-car" class="outline secondary">Cancel</button>
           </div>
         </div>
-        <div id="analyzing-msg" class="hidden">Analyzing photo with {{ vision_label }}…</div>
+        <div id="analyzing-msg" class="hidden"><span class="spinner"></span>Analyzing photo with {{ vision_label }}…</div>
       </article>
 
       <!-- Car grid -->
@@ -82,11 +82,15 @@
           </header>
           <div id="detail-body"></div>
           <footer>
-            <button id="btn-advance-waybill">▶ Advance Waybill</button>
-            <button id="btn-move-car" class="outline">Move Car…</button>
-            <button id="btn-edit-waybills" class="outline secondary">Edit Waybills</button>
-            <button id="btn-edit-car" class="outline secondary">Edit Car…</button>
-            <button id="btn-delete-car" class="outline contrast">Delete Car</button>
+            <div class="dialog-footer-primary">
+              <button id="btn-advance-waybill">▶ Advance Waybill</button>
+              <button id="btn-move-car" class="outline">Move Car…</button>
+            </div>
+            <div class="dialog-footer-secondary">
+              <button id="btn-edit-waybills" class="outline secondary">Edit Waybills</button>
+              <button id="btn-edit-car" class="outline secondary">Edit Car…</button>
+              <button id="btn-delete-car" class="outline contrast">Delete Car</button>
+            </div>
           </footer>
         </article>
       </dialog>
@@ -117,7 +121,7 @@
           </header>
           <div class="edit-photo-row">
             <img id="edit-photo-preview" class="edit-thumb" alt="Car photo" />
-            <label style="cursor:pointer;align-self:center">
+            <label class="edit-photo-label">
               <input type="file" id="edit-photo-input" accept="image/*" style="display:none" />
               <span id="edit-photo-btn-text" class="outline small">📷 Add Photo</span>
             </label>
@@ -221,7 +225,7 @@
                 <option>passenger car</option><option>other</option>
               </select>
             </label>
-            <label class="checkbox-label" style="align-self:flex-end;padding-bottom:0.5rem">
+            <label class="checkbox-label we-empty-label">
               <input type="checkbox" id="we-empty" /> Empty / return move
             </label>
           </div>
@@ -246,7 +250,7 @@
     <section id="tab-layout" class="tab-panel hidden">
 
       <!-- Data export / import -->
-      <div class="section-header" style="margin-bottom:1rem">
+      <div class="section-header mb-md">
         <h3>Data</h3>
         <div class="button-row">
           <a href="/api/export" download class="outline small">⬇ Export Backup</a>
@@ -344,6 +348,7 @@
 
   </main>
 
+  <div id="toast-container"></div>
   <script src="/static/app.js"></script>
 </body>
 </html>
