@@ -618,6 +618,34 @@ button.small {
   box-sizing: border-box;
 }
 
+/* ── Stylize section ─────────────────────────────────────────────────────── */
+#stylize-section {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--card-radius);
+  background: var(--bg-muted);
+}
+
+#stylize-idle,
+#stylize-processing {
+  text-align: center;
+  padding: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.stylize-compare {
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+
+#stylize-preview {
+  max-height: 220px;
+  max-width: 100%;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-light);
+}
+
 /* ── Photo library ───────────────────────────────────────────────────────── */
 #photo-library-dialog article {
   max-width: 720px;

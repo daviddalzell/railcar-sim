@@ -29,6 +29,29 @@ from vision import analyze_car_photo, get_provider, OllamaVisionProvider
 UPLOADS_DIR = Path("uploads")
 UPLOADS_DIR.mkdir(exist_ok=True)
 
+_PROMPTS_DIR = Path("prompts")
+
+def _load_stylize_config() -> dict:
+    p = _PROMPTS_DIR / "stylize_car.json"
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+_stylize_cfg = _load_stylize_config()
+STYLIZE_PROMPT = _stylize_cfg.get(
+    "prompt",
+    "Illustration of the side view of a railway car based on the reference image. "
+    "The image should be on a background of color #FAF0E6 and look like a simplified "
+    "blueprint without dimensional lines. The lines are antialiased. The railway car "
+    "body should be tinted with a single color that matches the image. The wheels and "
+    "trucks should be tinted a brownish color. Tints should be around 30% darkness",
+)
+STYLIZE_MODEL = _stylize_cfg.get(
+    "model",
+    os.environ.get("GEMINI_STYLIZE_MODEL", "gemini-2.0-flash-preview-image-generation"),
+)
+
 app = FastAPI(title="Rail Car Movement Simulator")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -258,6 +281,51 @@ def analyze_existing_photo(data: AnalyzePhotoRequest):
         analysis["_error"] = str(e)
     analysis["photo_path"] = data.photo_path
     return analysis
+
+
+class StylizeRequest(BaseModel):
+    photo_path: str
+
+
+@app.post("/api/cars/stylize")
+def stylize_car_photo(data: StylizeRequest):
+    from google import genai
+    from google.genai import types
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(400, "GEMINI_API_KEY is not configured")
+
+    src = Path(data.photo_path)
+    if not src.exists():
+        raise HTTPException(404, "Source photo not found")
+
+    client = genai.Client(api_key=api_key)
+    image_bytes = src.read_bytes()
+
+    response = client.models.generate_content(
+        model=STYLIZE_MODEL,
+        contents=[
+            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+            STYLIZE_PROMPT,
+        ],
+        config=types.GenerateContentConfig(
+            response_modalities=["IMAGE", "TEXT"],
+        ),
+    )
+
+    img_bytes = None
+    for part in response.candidates[0].content.parts:
+        if part.inline_data:
+            img_bytes = part.inline_data.data
+            break
+
+    if not img_bytes:
+        raise HTTPException(500, "Gemini did not return an image")
+
+    out_path = UPLOADS_DIR / f"{uuid.uuid4().hex}_stylized.png"
+    out_path.write_bytes(img_bytes)
+    return {"stylized_path": str(out_path), "url": "/" + str(out_path)}
 
 
 @app.post("/api/cars", status_code=201)

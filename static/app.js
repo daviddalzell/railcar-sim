@@ -150,6 +150,33 @@ function renderCarGrid() {
 
 // ── Add car via photo ─────────────────────────────────────────────────────────
 let addMode = "photo"; // "photo" | "manual"
+let stylizedPath = null;
+
+function showStylizeIdle() {
+  show($("#stylize-idle"));
+  hide($("#stylize-processing"));
+  hide($("#stylize-result"));
+  hide($("#stylize-error"));
+}
+
+async function runStylize() {
+  hide($("#stylize-idle"));
+  hide($("#stylize-result"));
+  hide($("#stylize-error"));
+  show($("#stylize-processing"));
+  try {
+    const result = await api("POST", "/api/cars/stylize", { photo_path: photoPath });
+    stylizedPath = result.stylized_path;
+    $("#stylize-preview").src = result.url;
+    hide($("#stylize-processing"));
+    show($("#stylize-result"));
+  } catch (err) {
+    hide($("#stylize-processing"));
+    $("#stylize-error-msg").textContent = "Stylize failed: " + err.message;
+    show($("#stylize-error"));
+    show($("#stylize-idle"));
+  }
+}
 
 $("#btn-add-car").addEventListener("click", () => {
   addMode = "photo";
@@ -159,6 +186,8 @@ $("#btn-add-car").addEventListener("click", () => {
   hide($("#upload-preview"));
   hide($("#analyzing-msg"));
   hide($("#vision-error"));
+  hide($("#stylize-section"));
+  stylizedPath = null;
   photoPath = null;
   $("#photo-input").value = "";
   $("#upload-label").textContent = "📷 Click or drop a photo of the car";
@@ -183,6 +212,8 @@ $("#btn-add-manual").addEventListener("click", () => {
 
 $("#btn-cancel-car").addEventListener("click", () => {
   hide($("#add-car-form"));
+  hide($("#stylize-section"));
+  stylizedPath = null;
 });
 
 function applyAnalysis(result) {
@@ -200,7 +231,28 @@ function applyAnalysis(result) {
   }
   hide($("#analyzing-msg"));
   show($("#car-fields"));
+  if (addMode === "photo") {
+    stylizedPath = null;
+    showStylizeIdle();
+    show($("#stylize-section"));
+  }
 }
+
+// ── Stylize handlers ──────────────────────────────────────────────────────────
+$("#btn-stylize").addEventListener("click", runStylize);
+$("#btn-regenerate").addEventListener("click", runStylize);
+
+$("#btn-use-stylized").addEventListener("click", () => {
+  if (stylizedPath) {
+    photoPath = stylizedPath;
+    $("#preview-img").src = $("#stylize-preview").src;
+  }
+  hide($("#stylize-section"));
+});
+
+$("#btn-keep-original").addEventListener("click", () => {
+  hide($("#stylize-section"));
+});
 
 // Library → add car (shared button; branches on addMode)
 $("#btn-library-add").addEventListener("click", () => {

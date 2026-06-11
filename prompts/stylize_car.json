@@ -1,0 +1,4 @@
+{
+  "prompt": "Illustration of the side view of a railway car based on the reference image. The image should be on a background of color #FAF0E6 and look like a simplified blueprint without dimensional lines. The lines are antialiased. The railway car body should be tinted with a single color that matches the image. The wheels and trucks should be tinted a brownish color. Tints should be around 30% darkness",
+  "model": "gemini-2.0-flash-preview-image-generation"
+}
