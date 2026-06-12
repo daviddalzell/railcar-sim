@@ -244,7 +244,7 @@ class GeminiVisionProvider(VisionProvider):
         from google.genai import types
 
         api_key = os.environ.get("GEMINI_API_KEY")
-        model_name = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+        model_name = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
         client = genai.Client(api_key=api_key)
         image_bytes = Path(image_path).read_bytes()

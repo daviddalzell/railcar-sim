@@ -47,7 +47,7 @@ STYLIZE_PROMPT = _stylize_cfg.get(
     "body should be tinted with a single color that matches the image. The wheels and "
     "trucks should be tinted a brownish color. Tints should be around 30% darkness",
 )
-STYLIZE_MODEL = _stylize_cfg.get("model", "gemini-2.5-flash-image")
+STYLIZE_MODEL = _stylize_cfg.get("model", "gemini-3.1-flash-image")
 
 app = FastAPI(title="Rail Car Movement Simulator")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -72,7 +72,7 @@ _PROVIDER_LABELS = {
     "anthropic": "Claude Vision",
     "openai": "OpenAI Vision",
     "ollama": f"Ollama ({os.environ.get('OLLAMA_MODEL', 'llava')})",
-    "gemini": f"Gemini ({os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')})",
+    "gemini": f"Gemini ({os.environ.get('GEMINI_MODEL', 'gemini-3.1-flash-lite')})",
 }
 
 @app.get("/")

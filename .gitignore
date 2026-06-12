@@ -5,6 +5,9 @@
 railcar.db
 uploads/
 
+# Dev / scratch scripts
+list_models.py
+
 # Python bytecode
 __pycache__/
 *.pyc
