@@ -359,60 +359,15 @@ header nav a.active {
 
 /* ── Operations view ─────────────────────────────────────────────────────── */
 .ops-row {
-  display: grid;
-  grid-template-columns: 80px 1fr auto;
-  gap: 1rem;
+  display: flex;
   align-items: center;
-  padding: 0.75rem;
-  border: 1px solid var(--pico-muted-border-color, #ddd);
-  border-radius: var(--card-radius);
-  margin-bottom: 0.5rem;
-}
-
-.ops-thumb {
-  width: 80px;
-  height: 60px;
-  overflow: hidden;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
   border-radius: 6px;
-  background: var(--bg-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ops-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.ops-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 0.9rem;
-}
-
-.instruction {
-  margin-top: 4px;
-  font-size: 0.85rem;
-  color: var(--text-strong);
-}
-
-.ops-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.4rem;
-}
-
-.slot-badge {
-  font-size: 0.75rem;
-  background: var(--badge-purple);
-  color: white;
-  border-radius: 4px;
-  padding: 2px 8px;
-  white-space: nowrap;
+  background: var(--pico-card-background-color, #f9f9f9);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 0.4rem;
+  font-size: 0.875rem;
 }
 
 /* ── Layout setup ────────────────────────────────────────────────────────── */

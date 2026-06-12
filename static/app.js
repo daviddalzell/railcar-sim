@@ -847,22 +847,16 @@ async function loadOperations() {
     const needsMove = wb
       && wb.destination_id != null
       && car.current_location_id !== wb.destination_id;
-    const instruction = wb
-      ? `${wb.is_empty ? "Move <strong>empty</strong>" : `Move with <strong>${wb.commodity || "load"}</strong>`} from <em>${wb.origin_name || "?"}</em> to <em>${wb.destination_name || "?"}</em>${wb.industry_name ? ` (${wb.industry_name})` : ""}`
-      : `<span class='muted'>No waybill assigned</span>`;
+    const dest = wb?.destination_name;
+    const thumb = car.photo_path
+      ? `<img class="session-car-thumb" src="/${car.photo_path}" alt="" />`
+      : `<div class="session-car-thumb no-photo-thumb">${car.car_type}</div>`;
     return `
       <div class="ops-row${needsMove ? ' car-needs-move' : ''}">
-        <div class="ops-thumb">
-          ${car.photo_path ? `<img src="/${car.photo_path}" />` : `<div class="no-photo small">${car.car_type}</div>`}
-        </div>
-        <div class="ops-info">
-          <strong>${car.reporting_marks || "—"} ${car.car_number || ""}</strong>
-          <span class="car-type">${car.car_type} · ${car.color}</span>
-          <span>📍 ${car.current_location_name || "Unassigned"}</span>
-          <span class="instruction">${instruction}</span>
-        </div>
-        <div class="ops-actions">
-          <span class="slot-badge">Card ${(car.active_waybill_slot ?? 0) + 1}</span>
+        ${thumb}
+        <div class="session-car-info">
+          <span class="session-car-marks">${car.reporting_marks || "—"} ${car.car_number || ""} <span class="muted">${car.car_type}</span></span>
+          <span class="session-car-move">📍 ${car.current_location_name || "Unassigned"}${dest ? ` → ${dest}` : ""}</span>
         </div>
       </div>
     `;
