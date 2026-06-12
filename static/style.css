@@ -1,5 +1,25 @@
 /* Rail Car Movement Simulator */
 
+body {
+  font-family: "Red Rose", system-ui, sans-serif;
+}
+
+.brand {
+  font-family: "Montserrat Alternates", system-ui, sans-serif;
+}
+
+#car-detail-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#close-detail-dialog {
+  margin-left: auto;
+  width: auto;
+}
+
+
 :root {
   --rail-accent:    #c0392b;
   --rail-accent-bg: #fdf3f2;
@@ -162,8 +182,8 @@ header nav a.active {
 
 .car-thumb img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  display: block;
   transition: transform 0.2s;
 }
 
@@ -265,13 +285,24 @@ header nav a.active {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
-  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .dialog-footer-secondary {
   display: flex;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.dialog-footer-primary button,
+.dialog-footer-secondary button {
+  flex: 1;
+  max-width: 160px;
+}
+
+#btn-advance-waybill,
+#btn-edit-waybills {
+  max-width: 240px;
 }
 
 .detail-grid {
@@ -326,6 +357,11 @@ header nav a.active {
   color: white;
   border-radius: 4px;
   padding: 2px 6px;
+  min-width: 110px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Waybill editor dialog ───────────────────────────────────────────────── */
@@ -547,8 +583,7 @@ button.small {
 
 .edit-thumb {
   width: 100px;
-  height: 72px;
-  object-fit: cover;
+  height: auto;
   border-radius: var(--card-radius);
   border: 1px solid var(--border-light);
   display: none;
@@ -630,8 +665,7 @@ button.small {
 
 .lib-thumb img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
   display: block;
 }
 
@@ -744,9 +778,8 @@ button.small {
 
 .session-car-thumb {
   width: 52px;
-  height: 40px;
+  height: auto;
   border-radius: 4px;
-  object-fit: cover;
   flex-shrink: 0;
 }
 

@@ -49,7 +49,7 @@ STYLIZE_PROMPT = _stylize_cfg.get(
 )
 STYLIZE_MODEL = _stylize_cfg.get("model", "gemini-3.1-flash-image")
 
-app = FastAPI(title="Rail Car Movement Simulator")
+app = FastAPI(title="Waypoint")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 templates = Jinja2Templates(directory="templates")

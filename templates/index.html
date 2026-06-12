@@ -3,14 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rail Car Movement Simulator</title>
+  <title>Waypoint</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Rose:wght@300;400;500;600;700&family=Montserrat+Alternates:wght@400;500;600;700;800;900&display=swap" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <header class="container-fluid">
     <nav>
-      <ul><li><strong class="brand">🚂 Rail&nbsp;<span class="brand-rail">Car</span>&nbsp;Sim</strong></li></ul>
+      <ul><li><strong class="brand">🔀 WAYPOINT</strong></li></ul>
       <ul>
         <li><a href="#" data-tab="roster" class="tab-link active">Car Roster</a></li>
         <li><a href="#" data-tab="operations" class="tab-link">Operations</a></li>
@@ -105,8 +108,8 @@
       <dialog id="car-detail-dialog">
         <article>
           <header>
-            <button aria-label="Close" rel="prev" id="close-detail-dialog"></button>
             <h3 id="detail-title"></h3>
+            <button class="outline secondary" id="close-detail-dialog">Close</button>
           </header>
           <div id="detail-body"></div>
           <footer>
