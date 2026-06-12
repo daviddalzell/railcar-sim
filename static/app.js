@@ -810,6 +810,7 @@ async function loadOperations() {
               carType: c.car_type,
               fromLocation: c.session_from_location_name,
               toLocation: c.session_to_location_name,
+              photoPath: c.photo_path || null,
               group: "arrivals",
               status: "pending",
             })),
@@ -819,6 +820,7 @@ async function loadOperations() {
               carType: c.car_type,
               fromLocation: c.session_from_location_name,
               toLocation: c.session_to_location_name,
+              photoPath: c.photo_path || null,
               group: "departures",
               status: "pending",
             })),
@@ -937,8 +939,12 @@ function renderActiveSession() {
 
   function carRow(car) {
     const statusClass = car.status === "done" ? " done" : car.status === "cp" ? " cp" : "";
+    const thumb = car.photoPath
+      ? `<img class="session-car-thumb" src="/${car.photoPath}" alt="" />`
+      : `<div class="session-car-thumb no-photo-thumb">${car.carType}</div>`;
     return `
       <div class="session-car-row${statusClass}" id="session-row-${car.id}">
+        ${thumb}
         <div class="session-car-info">
           <span class="session-car-marks">${car.marks} <span class="muted">${car.carType}</span></span>
           <span class="session-car-move">📍 ${car.fromLocation || "?"} → ${car.toLocation || "?"}</span>
