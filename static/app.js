@@ -413,6 +413,7 @@ async function openCarDetail(carId) {
     <div class="waybill-list">${wbHtml}</div>
   `;
 
+  hide($("#detail-error"));
   $("#car-detail-dialog").showModal();
 }
 
@@ -451,7 +452,10 @@ $("#btn-delete-car").addEventListener("click", async () => {
     await loadRoster();
     showToast("Car deleted.", "warn");
   } catch (err) {
-    showToast("Error: " + err.message, "error");
+    const errEl = $("#detail-error");
+    errEl.textContent = "Delete failed: " + err.message;
+    show(errEl);
+    btn.textContent = "Delete Car";
   }
 });
 

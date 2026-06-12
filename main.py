@@ -361,6 +361,10 @@ def delete_car(car_id: int, db: Session = Depends(get_db)):
     car = db.get(Car, car_id)
     if not car:
         raise HTTPException(404, "Car not found")
+    for w in car.waybills:
+        w.car_id = None
+        w.slot_index = None
+    db.query(MovementLog).filter(MovementLog.car_id == car_id).delete(synchronize_session=False)
     if car.photo_path:
         Path(car.photo_path).unlink(missing_ok=True)
     db.delete(car)
