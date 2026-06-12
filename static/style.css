@@ -282,9 +282,10 @@ header nav a.active {
 }
 
 .detail-photo {
-  width: 180px;
-  height: 130px;
-  object-fit: cover;
+  width: 270px;
+  height: 195px;
+  object-fit: contain;
+  background: #FAF0E6;
   border-radius: var(--card-radius);
   border: 1px solid var(--border-light);
 }
