@@ -440,11 +440,13 @@ $("#btn-delete-car").addEventListener("click", async () => {
   const btn = $("#btn-delete-car");
   if (!btn.dataset.confirm) {
     btn.dataset.confirm = "1";
+    btn.classList.add("btn-confirming");
     const orig = btn.textContent;
     btn.textContent = "Confirm delete?";
-    setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; }, 3000);
+    setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.textContent = orig; }, 3000);
     return;
   }
+  btn.classList.remove("btn-confirming");
   delete btn.dataset.confirm;
   try {
     await api("DELETE", `/api/cars/${selectedCarId}`);
@@ -665,11 +667,13 @@ function renderWaybillPool() {
     btn.addEventListener("click", async () => {
       if (!btn.dataset.confirm) {
         btn.dataset.confirm = "1";
+        btn.classList.add("btn-confirming");
         const orig = btn.innerHTML;
         btn.textContent = "Sure?";
-        setTimeout(() => { delete btn.dataset.confirm; btn.innerHTML = orig; }, 3000);
+        setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.innerHTML = orig; }, 3000);
         return;
       }
+      btn.classList.remove("btn-confirming");
       delete btn.dataset.confirm;
       try {
         await api("DELETE", `/api/waybills/${btn.dataset.id}`);
@@ -729,11 +733,13 @@ $("#btn-confirm-generate").addEventListener("click", async () => {
   const btn = $("#btn-confirm-generate");
   if (replace && !btn.dataset.confirm) {
     btn.dataset.confirm = "1";
+    btn.classList.add("btn-confirming");
     const orig = btn.textContent;
     btn.textContent = "Replace all — confirm?";
-    setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; }, 4000);
+    setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.textContent = orig; }, 4000);
     return;
   }
+  btn.classList.remove("btn-confirming");
   delete btn.dataset.confirm;
   try {
     await withLoading(btn, "Generating…", async () => {
@@ -936,11 +942,13 @@ function renderActiveSession() {
     const btn = document.getElementById("btn-cancel-session");
     if (!btn.dataset.confirm) {
       btn.dataset.confirm = "1";
+      btn.classList.add("btn-confirming");
       const orig = btn.textContent;
       btn.textContent = "Abandon session?";
-      setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; }, 3000);
+      setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.textContent = orig; }, 3000);
       return;
     }
+    btn.classList.remove("btn-confirming");
     session = null;
     saveSession();
     loadOperations();
@@ -1110,11 +1118,13 @@ function renderLocationList() {
     btn.addEventListener("click", async () => {
       if (!btn.dataset.confirm) {
         btn.dataset.confirm = "1";
+        btn.classList.add("btn-confirming");
         const orig = btn.innerHTML;
         btn.textContent = "Sure?";
-        setTimeout(() => { delete btn.dataset.confirm; btn.innerHTML = orig; }, 3000);
+        setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.innerHTML = orig; }, 3000);
         return;
       }
+      btn.classList.remove("btn-confirming");
       delete btn.dataset.confirm;
       try {
         await api("DELETE", `/api/locations/${btn.dataset.id}`);
@@ -1179,11 +1189,13 @@ function renderIndustryList() {
     btn.addEventListener("click", async () => {
       if (!btn.dataset.confirm) {
         btn.dataset.confirm = "1";
+        btn.classList.add("btn-confirming");
         const orig = btn.innerHTML;
         btn.textContent = "Sure?";
-        setTimeout(() => { delete btn.dataset.confirm; btn.innerHTML = orig; }, 3000);
+        setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.innerHTML = orig; }, 3000);
         return;
       }
+      btn.classList.remove("btn-confirming");
       delete btn.dataset.confirm;
       try {
         await api("DELETE", `/api/industries/${btn.dataset.id}`);
@@ -1338,11 +1350,13 @@ function renderCommodityMapList() {
     btn.addEventListener("click", async () => {
       if (!btn.dataset.confirm) {
         btn.dataset.confirm = "1";
+        btn.classList.add("btn-confirming");
         const orig = btn.innerHTML;
         btn.textContent = "Sure?";
-        setTimeout(() => { delete btn.dataset.confirm; btn.innerHTML = orig; }, 3000);
+        setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.innerHTML = orig; }, 3000);
         return;
       }
+      btn.classList.remove("btn-confirming");
       delete btn.dataset.confirm;
       try {
         await api("DELETE", `/api/commodity-car-type-map/${btn.dataset.id}`);
@@ -1407,11 +1421,13 @@ $("#btn-import-trigger").addEventListener("click", () => {
   const btn = $("#btn-import-trigger");
   if (!btn.dataset.confirm) {
     btn.dataset.confirm = "1";
+    btn.classList.add("btn-confirming");
     const orig = btn.textContent;
     btn.textContent = "⚠ Replace ALL data? Click again.";
-    setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; }, 5000);
+    setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.textContent = orig; }, 5000);
     return;
   }
+  btn.classList.remove("btn-confirming");
   delete btn.dataset.confirm;
   btn.textContent = "⬆ Import Backup";
   $("#import-file-input").click();
@@ -1421,11 +1437,13 @@ $("#btn-purge-uploads").addEventListener("click", async () => {
   const btn = $("#btn-purge-uploads");
   if (!btn.dataset.confirm) {
     btn.dataset.confirm = "1";
+    btn.classList.add("btn-confirming");
     const orig = btn.textContent;
     btn.textContent = "⚠ Delete unassigned? Click again.";
-    setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; }, 4000);
+    setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.textContent = orig; }, 4000);
     return;
   }
+  btn.classList.remove("btn-confirming");
   delete btn.dataset.confirm;
   try {
     await withLoading(btn, "Purging…", async () => {

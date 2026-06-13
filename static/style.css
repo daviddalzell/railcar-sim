@@ -524,6 +524,12 @@ button.small {
   padding: 0.25rem 0.6rem;
 }
 
+.btn-confirming {
+  background-color: var(--rail-accent) !important;
+  border-color: var(--rail-accent) !important;
+  color: white !important;
+}
+
 .edit-photo-label {
   cursor: pointer;
   align-self: center;
