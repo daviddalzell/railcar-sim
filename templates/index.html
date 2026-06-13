@@ -104,29 +104,6 @@
       <!-- Car grid -->
       <div id="car-grid" class="car-grid"></div>
 
-      <!-- Car detail panel -->
-      <dialog id="car-detail-dialog">
-        <article>
-          <header>
-            <h3 id="detail-title"></h3>
-            <button class="outline secondary" id="close-detail-dialog">Close</button>
-          </header>
-          <div id="detail-body"></div>
-          <footer>
-            <p id="detail-error" class="error-msg hidden" style="margin:0 0 0.5rem;font-size:0.85rem;"></p>
-            <div class="dialog-footer-primary">
-              <button id="btn-advance-waybill">▶ Advance Waybill</button>
-              <button id="btn-move-car" class="outline">Move Car…</button>
-            </div>
-            <div class="dialog-footer-secondary">
-              <button id="btn-edit-waybills" class="outline secondary">Edit Waybills</button>
-              <button id="btn-edit-car" class="outline secondary">Edit Car…</button>
-              <button id="btn-delete-car" class="outline contrast">Delete Car</button>
-            </div>
-          </footer>
-        </article>
-      </dialog>
-
       <!-- Move car dialog -->
       <dialog id="move-car-dialog">
         <article>
@@ -402,6 +379,29 @@
     </section>
 
   </main>
+
+  <!-- Car detail dialog — lives outside tab sections so showModal() works from any tab -->
+  <dialog id="car-detail-dialog">
+    <article>
+      <header>
+        <h3 id="detail-title"></h3>
+        <button class="outline secondary" id="close-detail-dialog">Close</button>
+      </header>
+      <div id="detail-body"></div>
+      <footer>
+        <p id="detail-error" class="error-msg hidden" style="margin:0 0 0.5rem;font-size:0.85rem;"></p>
+        <div class="dialog-footer-primary">
+          <button id="btn-advance-waybill">▶ Advance Waybill</button>
+          <button id="btn-move-car" class="outline">Move Car…</button>
+        </div>
+        <div class="dialog-footer-secondary">
+          <button id="btn-edit-waybills" class="outline secondary">Edit Waybills</button>
+          <button id="btn-edit-car" class="outline secondary">Edit Car…</button>
+          <button id="btn-delete-car" class="outline contrast">Delete Car</button>
+        </div>
+      </footer>
+    </article>
+  </dialog>
 
   <!-- ── Photo Library Dialog ─────────────────────────────────────────────── -->
   <dialog id="photo-library-dialog">

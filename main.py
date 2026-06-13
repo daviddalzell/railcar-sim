@@ -995,7 +995,10 @@ def _build_session_plan(db: Session) -> dict:
     dispatch_ids = {l.id for l in db.query(Location).filter(
         Location.location_type.in_(["staging", "yard"])
     ).all()}
-    arrivals, departures, warnings = [], [], []
+    storage_ids = {l.id for l in db.query(Location).filter(
+        Location.location_type == "storage"
+    ).all()}
+    arrivals, departures, spots, warnings = [], [], [], []
 
     for car in db.query(Car).all():
         wb = _get_active_waybill(car)
@@ -1004,11 +1007,16 @@ def _build_session_plan(db: Session) -> dict:
         if car.current_location_id != wb.destination_id:
             if car.current_location_id in dispatch_ids:
                 arrivals.append(car)
+            elif wb.destination_id in dispatch_ids:
+                departures.append(car)
+            elif car.current_location_id in storage_ids:
+                spots.append(car)
             else:
                 departures.append(car)
 
     arrivals   = sorted(arrivals,   key=lambda c: c.id)[:5]
     departures = sorted(departures, key=lambda c: c.id)[:min(5, max(len(arrivals), len(departures)))]
+    spots      = sorted(spots,      key=lambda c: c.id)[:5]
 
     if len(departures) < len(arrivals):
         warnings.append(
@@ -1029,6 +1037,7 @@ def _build_session_plan(db: Session) -> dict:
     return {
         "arrivals":   [_enrich(c) for c in arrivals],
         "departures": [_enrich(c) for c in departures],
+        "spots":      [_enrich(c) for c in spots],
         "warnings":   warnings,
     }
 

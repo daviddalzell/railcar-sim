@@ -777,10 +777,30 @@ button.small {
 .session-car-move  { color: var(--text-muted); font-size: 0.8rem; }
 
 .session-car-thumb {
-  width: 52px;
-  height: auto;
+  width: 60px;
+  height: 48px;
   border-radius: 4px;
   flex-shrink: 0;
+  background: #FAF0E6;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.session-car-thumb.clickable-thumb {
+  cursor: pointer;
+}
+.session-car-thumb.clickable-thumb:hover {
+  outline: 2px solid var(--rail-accent);
+  outline-offset: 1px;
+}
+
+.session-car-thumb img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .no-photo-thumb {

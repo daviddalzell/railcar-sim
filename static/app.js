@@ -636,7 +636,7 @@ async function loadWaybillPool() {
 function renderWaybillPool() {
   const list = $("#waybill-pool-list");
   if (!waybillPool.length) {
-    list.innerHTML = emptyState("📋", "No waybills yet — generate from industries or add one manually.");
+    list.innerHTML = emptyState("➡️", "No waybills yet — generate from industries or add one manually.");
     return;
   }
   list.innerHTML = waybillPool.map(w => `
@@ -815,6 +815,7 @@ async function loadOperations() {
               fromLocation: c.session_from_location_name,
               toLocation: c.session_to_location_name,
               photoPath: c.photo_path || null,
+              industryName: c.active_waybill?.industry_name || null,
               group: "arrivals",
               status: "pending",
             })),
@@ -825,7 +826,19 @@ async function loadOperations() {
               fromLocation: c.session_from_location_name,
               toLocation: c.session_to_location_name,
               photoPath: c.photo_path || null,
+              industryName: c.active_waybill?.industry_name || null,
               group: "departures",
+              status: "pending",
+            })),
+            ...(plan.spots || []).map(c => ({
+              id: c.id,
+              marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
+              carType: c.car_type,
+              fromLocation: c.session_from_location_name,
+              toLocation: c.session_to_location_name,
+              photoPath: c.photo_path || null,
+              industryName: c.active_waybill?.industry_name || null,
+              group: "spots",
               status: "pending",
             })),
           ],
@@ -853,15 +866,16 @@ async function loadOperations() {
       && car.current_location_id !== wb.destination_id;
     const dest = wb?.destination_name;
     const thumb = car.photo_path
-      ? `<img class="session-car-thumb" src="/${car.photo_path}" alt="" />`
-      : `<div class="session-car-thumb no-photo-thumb">${car.car_type}</div>`;
+      ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="/${car.photo_path}" alt="" /></div>`
+      : `<div class="session-car-thumb no-photo-thumb clickable-thumb" data-id="${car.id}">${car.car_type}</div>`;
     return `
       <div class="ops-row${needsMove ? ' car-needs-move' : ''}">
         ${thumb}
         <div class="session-car-info">
           <span class="session-car-marks">${car.reporting_marks || "—"} ${car.car_number || ""} <span class="muted">${car.car_type}</span></span>
-          <span class="session-car-move">📍 ${car.current_location_name || "Unassigned"}${dest ? ` → ${dest}` : ""}</span>
+          <span class="session-car-move">${needsMove ? `➡️ ${car.current_location_name || "Unassigned"} → ${dest}` : `📍 ${car.current_location_name || "Unassigned"}`}</span>
         </div>
+        ${wb?.industry_name ? `<span class="industry-tag">${wb.industry_name}</span>` : ''}
       </div>
     `;
   }).join("");
@@ -934,19 +948,21 @@ function renderActiveSession() {
 
   const arrivals   = session.cars.filter(c => c.group === "arrivals");
   const departures = session.cars.filter(c => c.group === "departures");
+  const spots      = session.cars.filter(c => c.group === "spots");
 
   function carRow(car) {
     const statusClass = car.status === "done" ? " done" : car.status === "cp" ? " cp" : "";
     const thumb = car.photoPath
-      ? `<img class="session-car-thumb" src="/${car.photoPath}" alt="" />`
-      : `<div class="session-car-thumb no-photo-thumb">${car.carType}</div>`;
+      ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="/${car.photoPath}" alt="" /></div>`
+      : `<div class="session-car-thumb no-photo-thumb clickable-thumb" data-id="${car.id}">${car.carType}</div>`;
     return `
       <div class="session-car-row${statusClass}" id="session-row-${car.id}">
         ${thumb}
         <div class="session-car-info">
           <span class="session-car-marks">${car.marks} <span class="muted">${car.carType}</span></span>
-          <span class="session-car-move">📍 ${car.fromLocation || "?"} → ${car.toLocation || "?"}</span>
+          <span class="session-car-move">${car.fromLocation !== car.toLocation ? `➡️ ${car.fromLocation || "?"} → ${car.toLocation || "?"}` : `📍 ${car.fromLocation || "?"}`}</span>
         </div>
+        ${car.industryName ? `<span class="industry-tag">${car.industryName}</span>` : ''}
         <div class="session-btn-row">
           <button class="outline small session-done-btn${car.status === "done" ? " active-btn" : ""}" data-id="${car.id}">✓ Done</button>
           <button class="outline small session-cp-btn${car.status === "cp" ? " active-btn" : ""}" data-id="${car.id}">✗ CP</button>
@@ -954,7 +970,7 @@ function renderActiveSession() {
       </div>`;
   }
 
-  const noWork = !arrivals.length && !departures.length;
+  const noWork = !arrivals.length && !departures.length && !spots.length;
   let html = "";
   if (noWork) {
     html = `<p class="muted" style="text-align:center;padding:1.5rem">No cars to work this session.</p>`;
@@ -962,6 +978,10 @@ function renderActiveSession() {
     if (arrivals.length) {
       html += `<p class="session-section-title">Set out from staging (${arrivals.length})</p>`;
       html += arrivals.map(carRow).join("");
+    }
+    if (spots.length) {
+      html += `<p class="session-section-title">Cars to spot (${spots.length})</p>`;
+      html += spots.map(carRow).join("");
     }
     if (departures.length) {
       html += `<p class="session-section-title">Pick up for staging (${departures.length})</p>`;
@@ -1432,6 +1452,12 @@ $("#import-file-input").addEventListener("change", async e => {
     showToast("Import failed: " + err.message, "error");
     e.target.value = "";
   }
+});
+
+// ── Ops/session thumbnail click → car detail ─────────────────────────────────
+$("#ops-list").addEventListener("click", e => {
+  const thumb = e.target.closest(".clickable-thumb");
+  if (thumb) openCarDetail(parseInt(thumb.dataset.id));
 });
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
