@@ -1465,6 +1465,13 @@ function renderCommodityMapList() {
   });
 }
 
+$("#btn-toggle-commodity-map").addEventListener("click", () => {
+  const body = $("#commodity-map-body");
+  const btn  = $("#btn-toggle-commodity-map");
+  const collapsed = body.classList.toggle("hidden");
+  btn.textContent = collapsed ? "▶" : "▼";
+});
+
 $("#btn-add-commodity-map").addEventListener("click", () => {
   $("#cmap-commodity").value = "";
   $("#cmap-car-type").value = "boxcar";

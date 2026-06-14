@@ -356,35 +356,38 @@
       <div class="section-header" style="margin-top:1rem">
         <h3>Commodity → Car Type</h3>
         <div class="button-row">
+          <button id="btn-toggle-commodity-map" class="outline small" title="Collapse / expand">▼</button>
           <button id="btn-seed-commodity-map" class="outline small">⚙ Seed Defaults</button>
           <button id="btn-add-commodity-map" class="outline small">+</button>
         </div>
       </div>
-      <form id="commodity-map-form" class="hidden inline-form">
-        <div class="grid">
-          <label>Commodity
-            <div class="suggest-row">
-              <input id="cmap-commodity" type="text" placeholder="e.g. grain" required />
-              <button type="button" id="btn-suggest-cmap" class="outline ai-suggest-btn">✨</button>
-            </div>
-          </label>
-          <label>Car Type
-            <select id="cmap-car-type">
-              <option value="boxcar">boxcar</option><option value="flatcar">flatcar</option>
-              <option value="gondola">gondola</option><option value="tank car">tank car</option>
-              <option value="hopper">hopper</option><option value="covered hopper">covered hopper</option>
-              <option value="refrigerator car">refrigerator car</option><option value="caboose">caboose</option>
-              <option value="passenger car">passenger car</option><option value="other">other</option>
-            </select>
-          </label>
-        </div>
-        <div class="button-row">
-          <button type="submit" class="small">Save</button>
-          <button type="button" id="btn-cancel-commodity-map" class="outline secondary small">✕</button>
-          <input type="hidden" id="cmap-edit-id" value="" />
-        </div>
-      </form>
-      <div id="commodity-map-list"></div>
+      <div id="commodity-map-body">
+        <form id="commodity-map-form" class="hidden inline-form">
+          <div class="grid">
+            <label>Commodity
+              <div class="suggest-row">
+                <input id="cmap-commodity" type="text" placeholder="e.g. grain" required />
+                <button type="button" id="btn-suggest-cmap" class="outline ai-suggest-btn">✨</button>
+              </div>
+            </label>
+            <label>Car Type
+              <select id="cmap-car-type">
+                <option value="boxcar">boxcar</option><option value="flatcar">flatcar</option>
+                <option value="gondola">gondola</option><option value="tank car">tank car</option>
+                <option value="hopper">hopper</option><option value="covered hopper">covered hopper</option>
+                <option value="refrigerator car">refrigerator car</option><option value="caboose">caboose</option>
+                <option value="passenger car">passenger car</option><option value="other">other</option>
+              </select>
+            </label>
+          </div>
+          <div class="button-row">
+            <button type="submit" class="small">Save</button>
+            <button type="button" id="btn-cancel-commodity-map" class="outline secondary small">✕</button>
+            <input type="hidden" id="cmap-edit-id" value="" />
+          </div>
+        </form>
+        <div id="commodity-map-list"></div>
+      </div>
 
       <hr />
       <div class="section-header">
