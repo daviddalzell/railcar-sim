@@ -24,7 +24,7 @@ from starlette.requests import Request
 
 from database import get_db, init_db
 from models import Car, CommodityCarTypeMap, Industry, Location, MovementLog, Waybill
-from vision import analyze_car_photo, get_provider, OllamaVisionProvider
+from vision import analyze_car_photo, get_provider, OllamaVisionProvider, call_with_retry
 
 UPLOADS_DIR = Path("uploads")
 UPLOADS_DIR.mkdir(exist_ok=True)
@@ -301,7 +301,7 @@ def stylize_car_photo(data: StylizeRequest):
         client = genai.Client(api_key=api_key)
         image_bytes = src.read_bytes()
 
-        response = client.models.generate_content(
+        response = call_with_retry(lambda: client.models.generate_content(
             model=STYLIZE_MODEL,
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
@@ -310,7 +310,7 @@ def stylize_car_photo(data: StylizeRequest):
             config=types.GenerateContentConfig(
                 response_modalities=["IMAGE", "TEXT"],
             ),
-        )
+        ))
 
         img_bytes = None
         for part in response.candidates[0].content.parts:
