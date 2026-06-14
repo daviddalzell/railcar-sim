@@ -1250,6 +1250,26 @@ $("#btn-add-industry").addEventListener("click", () => {
 });
 $("#btn-cancel-industry").addEventListener("click", () => hide($("#industry-form")));
 
+$("#btn-suggest-industry").addEventListener("click", async () => {
+  const description = $("#ind-name").value.trim();
+  if (!description) { showToast("Enter an industry name first", "warning"); return; }
+  const btn = $("#btn-suggest-industry");
+  const original = btn.textContent;
+  btn.textContent = "⏳ Thinking…";
+  btn.disabled = true;
+  try {
+    const result = await api("POST", "/api/industries/suggest", { description });
+    if (result.commodities)      $("#ind-commodities").value  = result.commodities;
+    if (result.accepted_car_types) $("#ind-car-types").value  = result.accepted_car_types;
+    if (result.industry_role) roleToCheckboxes(result.industry_role);
+  } catch (err) {
+    showToast("AI suggestion failed — check ANTHROPIC_API_KEY", "error");
+  } finally {
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+});
+
 $("#industry-form").addEventListener("submit", async e => {
   e.preventDefault();
   const editId = $("#ind-edit-id").value;

@@ -577,6 +577,27 @@ def delete_industry(ind_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
+class IndustrySuggestRequest(BaseModel):
+    description: str
+
+
+@app.post("/api/industries/suggest")
+def suggest_industry_endpoint(data: IndustrySuggestRequest, db: Session = Depends(get_db)):
+    if not get_provider().is_available():
+        raise HTTPException(503, "No AI provider available — check your API key settings")
+    existing = [r.name for r in db.query(Industry).all()]
+    try:
+        from vision import suggest_industry
+        result = suggest_industry(data.description, existing)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    return {
+        "commodities": result.get("commodities", ""),
+        "accepted_car_types": result.get("accepted_car_types", ""),
+        "industry_role": result.get("industry_role", "consumer"),
+    }
+
+
 # ── Commodity Car Type Map ────────────────────────────────────────────────────
 
 _DEFAULT_COMMODITY_MAP = [

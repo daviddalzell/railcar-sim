@@ -280,3 +280,87 @@ def get_provider() -> VisionProvider:
 
 def analyze_car_photo(image_path: str) -> dict:
     return get_provider().analyze(image_path)
+
+
+def _text_complete(prompt: str) -> str:
+    """Run a text-only prompt using the configured VISION_PROVIDER."""
+    provider = os.environ.get("VISION_PROVIDER", "anthropic")
+
+    if provider == "anthropic":
+        import anthropic
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY not set")
+        client = anthropic.Anthropic(api_key=api_key)
+        model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+        msg = client.messages.create(
+            model=model, max_tokens=512,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return msg.content[0].text
+
+    if provider == "openai":
+        import openai
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY not set")
+        client = openai.OpenAI(api_key=api_key)
+        model = os.environ.get("OPENAI_MODEL", "gpt-4o")
+        resp = client.chat.completions.create(
+            model=model, max_tokens=512,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.choices[0].message.content
+
+    if provider == "ollama":
+        import openai
+        base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+        model = os.environ.get("OLLAMA_MODEL", "llava")
+        client = openai.OpenAI(api_key="ollama", base_url=base_url)
+        resp = client.chat.completions.create(
+            model=model, max_tokens=512,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.choices[0].message.content
+
+    if provider == "gemini":
+        from google import genai
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY not set")
+        model_name = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
+        client = genai.Client(api_key=api_key)
+        resp = client.models.generate_content(model=model_name, contents=[prompt])
+        return resp.text
+
+    raise ValueError(f"Unknown VISION_PROVIDER '{provider}'")
+
+
+def suggest_industry(description: str, existing_industries: list[str]) -> dict:
+    """Return AI-suggested commodities, accepted_car_types, and industry_role for a new industry."""
+    car_types_str = ", ".join(CAR_TYPES)
+    existing_str = (", ".join(existing_industries)) if existing_industries else "none yet"
+
+    prompt = f"""You are a model railroad operations expert. A user is adding a new industry to their layout.
+
+Industry name / description: "{description}"
+
+Existing industries on this layout: {existing_str}
+
+Suggest realistic railroad commodities, car types, and role for this industry.
+
+Valid car types (use only these): {car_types_str}
+Valid industry_role values: consumer, producer, transload
+
+Return ONLY a JSON object with these fields (no markdown, no explanation):
+{{
+  "commodities": "<comma-separated list of commodities this industry handles>",
+  "accepted_car_types": "<comma-separated car types from the valid list above>",
+  "industry_role": "<consumer, producer, or transload>"
+}}
+
+consumer = receives loaded cars (e.g. factory consuming raw materials)
+producer = ships loaded cars (e.g. mine, grain elevator)
+transload = both receives and ships (e.g. distribution center)"""
+
+    return _parse_json_response(_text_complete(prompt))
