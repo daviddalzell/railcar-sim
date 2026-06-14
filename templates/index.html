@@ -323,7 +323,10 @@
             <button id="btn-add-industry" class="outline small">+</button>
           </div>
           <form id="industry-form" class="hidden inline-form">
-            <input id="ind-name" type="text" placeholder="Industry name" required />
+            <div class="suggest-row">
+              <input id="ind-name" type="text" placeholder="Industry name" required />
+              <button type="button" id="btn-suggest-industry" class="outline ai-suggest-btn">✨ AI Suggest</button>
+            </div>
             <select id="ind-location">
               <option value="">— no location —</option>
             </select>
