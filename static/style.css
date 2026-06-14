@@ -796,6 +796,50 @@ button.small {
   min-width: 4.5ch;
 }
 
+.help-section {
+  border: 1px solid var(--border-light);
+  border-radius: var(--card-radius);
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.help-section-header {
+  width: 100%;
+  text-align: left;
+  background: var(--pico-card-background-color, #fafafa);
+  border: none;
+  padding: 0.6rem 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--rail-dark);
+  margin-bottom: 0;
+}
+
+.help-section-header:hover {
+  background: var(--bg-muted);
+}
+
+.help-section-body {
+  padding: 0.75rem 1rem 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  border-top: 1px solid var(--border-light);
+}
+
+.help-section-body p {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.help-section-body ul {
+  margin: 0 0 0.5rem 1.2rem;
+  padding: 0;
+}
+
+.help-section-body li {
+  margin-bottom: 0.25rem;
+}
+
 .clock-btn {
   padding: 0.15rem 0.4rem;
   font-size: 0.8rem;

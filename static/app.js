@@ -1600,6 +1600,45 @@ $("#ops-list").addEventListener("click", e => {
   if (thumb) openCarDetail(parseInt(thumb.dataset.id));
 });
 
+// ── Help tab ──────────────────────────────────────────────────────────────────
+$$(".help-section-header").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const body = btn.nextElementSibling;
+    const collapsed = body.classList.toggle("hidden");
+    btn.textContent = (collapsed ? "▶" : "▼") + btn.textContent.slice(1);
+  });
+});
+
+$("#help-search").addEventListener("input", e => {
+  const q = e.target.value.trim().toLowerCase();
+  $$(".help-section").forEach(section => {
+    if (!q) {
+      section.classList.remove("hidden");
+      section.querySelector(".help-section-body").classList.add("hidden");
+      const hdr = section.querySelector(".help-section-header");
+      hdr.textContent = "▶" + hdr.textContent.slice(1);
+    } else {
+      const match = section.textContent.toLowerCase().includes(q);
+      section.classList.toggle("hidden", !match);
+      if (match) {
+        section.querySelector(".help-section-body").classList.remove("hidden");
+        const hdr = section.querySelector(".help-section-header");
+        hdr.textContent = "▼" + hdr.textContent.slice(1);
+      }
+    }
+  });
+});
+
+let helpAllExpanded = false;
+$("#btn-help-expand-all").addEventListener("click", () => {
+  helpAllExpanded = !helpAllExpanded;
+  $$(".help-section-body").forEach(b => b.classList.toggle("hidden", !helpAllExpanded));
+  $$(".help-section-header").forEach(h => {
+    h.textContent = (helpAllExpanded ? "▼" : "▶") + h.textContent.slice(1);
+  });
+  $("#btn-help-expand-all").textContent = helpAllExpanded ? "Collapse All" : "Expand All";
+});
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 (async function init() {
   await Promise.all([
