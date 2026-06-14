@@ -691,9 +691,7 @@ _ALWAYS_EMPTY_RETURN_TYPES = {"tank car", "hopper", "covered hopper"}
 def _car_type_matches(required: Optional[str], car_type: str) -> bool:
     if not required or required.lower() in _WILDCARD_TYPES:
         return True
-    r = required.lower()
-    c = car_type.lower()
-    return r == c or r in c or c in r
+    return required.lower() == car_type.lower()
 
 
 def _find_loaded_from(unassigned, location_id, car_type):
