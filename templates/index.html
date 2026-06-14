@@ -19,6 +19,7 @@
         <li><a href="#" data-tab="operations" class="tab-link">Operations</a></li>
         <li><a href="#" data-tab="waybills" class="tab-link">Waybills</a></li>
         <li><a href="#" data-tab="layout" class="tab-link">Layout Setup</a></li>
+        <li><a href="#" data-tab="help" class="tab-link">Help</a></li>
       </ul>
     </nav>
   </header>
@@ -410,6 +411,125 @@
         </div>
         <button type="submit" class="small">Save Clock Settings</button>
       </form>
+    </section>
+
+    <!-- ── Help ──────────────────────────────────────────────────────────── -->
+    <section id="tab-help" class="tab-panel hidden">
+      <div class="section-header">
+        <h2>Help</h2>
+        <div class="button-row">
+          <input id="help-search" type="search" placeholder="🔍 Search help…" style="width:16rem" />
+          <button id="btn-help-expand-all" class="outline small">Expand All</button>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <button class="help-section-header">▶ Car Roster</button>
+        <div class="help-section-body hidden">
+          <p>Build your fleet by photographing each car — AI instantly identifies the car type, reporting marks, road number, and color.</p>
+          <ul>
+            <li>Click <strong>+ Add Car via Photo</strong> to photograph or upload an image. AI fills in all fields automatically.</li>
+            <li>Click <strong>🗄️ Select From Library</strong> to pick from previously uploaded photos.</li>
+            <li>Use <strong>✨ Generate Stylized Illustration</strong> to create an artistic rendering of your car.</li>
+            <li>Click any car card to open its full details: waybills, movement history, location.</li>
+            <li>Edit or delete a car from its detail view. Deleting a car removes all associated waybills and movement history.</li>
+            <li>Cars can be added manually if you prefer not to use a photo.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <button class="help-section-header">▶ Waybill System</button>
+        <div class="help-section-body hidden">
+          <p>Waybills route cars between locations. Each car can have up to 4 sequential waybill slots — a full operating cycle.</p>
+          <ul>
+            <li>Open a car's detail view and use the <strong>Waybills</strong> tab to add, edit, or reorder waybill slots.</li>
+            <li>Each waybill defines: origin, destination, industry, commodity, and whether the car travels loaded or empty.</li>
+            <li>Use <strong>Generate Waybills</strong> (Waybills tab) to automatically create waybills from your layout industries.</li>
+            <li>Use <strong>Auto-Assign</strong> to match unassigned waybills to available cars by type and routing logic.</li>
+            <li>Define commodity rules (e.g. grain → covered hopper) in Layout Setup to guide auto-assignment.</li>
+            <li>At session end, each car's active waybill slot advances automatically to the next slot.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <button class="help-section-header">▶ Layout Setup</button>
+        <div class="help-section-body hidden">
+          <p>Define the geography of your model railroad: locations, industries, and commodity rules.</p>
+          <ul>
+            <li><strong>Locations</strong> have four types: <em>Yard</em> (staging hub), <em>Industry</em> (car destination), <em>Staging</em> (off-layout staging), <em>Storage</em> (parked cars awaiting assignment).</li>
+            <li><strong>Industries</strong> are attached to locations and have a role: <em>Consumer</em> (receives loaded cars), <em>Producer</em> (ships loaded cars), or <em>Transload</em> (both).</li>
+            <li>Use <strong>✨ AI Suggest</strong> next to any industry name to let AI fill in commodities, accepted car types, and role automatically.</li>
+            <li><strong>Commodity → Car Type</strong> mappings tell the auto-assign system which car type to use for each commodity.</li>
+            <li>Use <strong>✨</strong> next to any commodity to get an AI suggestion for the correct car type.</li>
+            <li>Use <strong>⚙ Seed Defaults</strong> to populate a starter set of commodity→car-type mappings.</li>
+            <li>Configure the <strong>Fast Clock</strong> start time and speed in the Fast Clock section at the bottom.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <button class="help-section-header">▶ Operating Sessions</button>
+        <div class="help-section-body hidden">
+          <p>Run a realistic ops session from plan to wrap-up. The Operations tab drives the session lifecycle.</p>
+          <ul>
+            <li>Click <strong>🚆 Plan Session</strong> to generate the session's switch list from current car positions and waybills.</li>
+            <li>The switch list is divided into three groups: <em>Set out from staging</em> (cars arriving at industries), <em>Cars to spot</em> (storage cars needing placement), and <em>Pick up for staging</em> (cars departing industries).</li>
+            <li>For each car, tap <strong>Done</strong> when the car has been moved to its destination, or <strong>CP</strong> (Car Placement) to temporarily park it at another location.</li>
+            <li>Click any car thumbnail to open its full detail view mid-session.</li>
+            <li>When all cars are worked, click <strong>⬛ End Session</strong>. Waybill slots auto-advance and car locations update.</li>
+            <li>CP cars require you to assign a location before the session can end.</li>
+            <li>Use <strong>✕ Cancel Session</strong> to abandon a session without saving any moves.</li>
+            <li>Session state persists across browser refresh — pick up where you left off.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <button class="help-section-header">▶ Fast Clock</button>
+        <div class="help-section-body hidden">
+          <p>The fast clock simulates prototypical railroad time during a session. A 4× clock means 15 real minutes = 1 model hour.</p>
+          <ul>
+            <li>Configure <strong>Start Time</strong> and <strong>Speed</strong> in Layout Setup → Fast Clock section.</li>
+            <li>Speed options: 1× (real time), 2×, 4×, 6×, or 12×.</li>
+            <li>The clock starts automatically when you plan a session and appears in the session header.</li>
+            <li>Click <strong>⏸</strong> to pause the clock; click <strong>▶</strong> to resume.</li>
+            <li>Clock state is stored on the server — refreshing the page resumes the clock from the correct model time.</li>
+            <li>The clock stops automatically when the session ends or is cancelled.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <button class="help-section-header">▶ AI Features</button>
+        <div class="help-section-body hidden">
+          <p>WAYPOINT uses AI in several places to reduce manual data entry. All AI features require an API key configured in your <code>.env</code> file.</p>
+          <ul>
+            <li><strong>Car identification</strong> — Upload a photo of a car and AI identifies type, reporting marks, road number, and color.</li>
+            <li><strong>Stylized illustration</strong> — The <strong>✨ AI</strong> panel on the car add/edit form generates an artistic rendering using an image-generation model.</li>
+            <li><strong>Industry suggest</strong> — The <strong>✨ AI Suggest</strong> button in the industry form fills in commodities, car types, and role based on the industry name.</li>
+            <li><strong>Commodity suggest</strong> — The <strong>✨</strong> button in the commodity mapping form suggests the correct car type for any commodity.</li>
+            <li>Supported providers: Gemini (default), Claude (Anthropic), GPT-4o (OpenAI), or a local Ollama model. Set <code>VISION_PROVIDER</code> in <code>.env</code>.</li>
+            <li>AI calls automatically retry on transient provider errors (rate limits, overloads) before failing.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <button class="help-section-header">▶ Data &amp; Backup</button>
+        <div class="help-section-body hidden">
+          <p>Export and restore your entire layout — locations, industries, cars, waybills, photos, and movement logs — in a single ZIP file.</p>
+          <ul>
+            <li>Use <strong>Export Backup</strong> (bottom of any screen, or via the Layout Setup tab) to download a complete snapshot.</li>
+            <li>Use <strong>Import Backup</strong> to restore from a ZIP. This replaces all current data.</li>
+            <li>Backups are useful for sharing layouts with other operators or recovering from errors.</li>
+            <li>Use <strong>Purge Orphaned Photos</strong> to remove uploaded images no longer attached to any car.</li>
+            <li>Each car's detail view shows its last 5 movements with timestamps and notes.</li>
+          </ul>
+        </div>
+      </div>
+
     </section>
 
   </main>
