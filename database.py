@@ -20,7 +20,7 @@ def get_db():
 
 
 def init_db():
-    from models import Car, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap  # noqa: F401
+    from models import Car, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock  # noqa: F401
     Base.metadata.create_all(bind=engine)
     with engine.connect() as conn:
         try:

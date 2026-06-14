@@ -778,6 +778,33 @@ button.small {
   align-self: center;
 }
 
+.fast-clock {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--rail-dark);
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem 0.2rem 0.7rem;
+}
+
+#clock-time {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #e8f5e9;
+  min-width: 4.5ch;
+}
+
+.clock-btn {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.8rem;
+  margin-bottom: 0;
+  border-color: rgba(255,255,255,0.3) !important;
+  color: rgba(255,255,255,0.8) !important;
+  background: transparent !important;
+}
+
 .session-section-title {
   font-size: 0.8rem;
   font-weight: 700;

@@ -2,6 +2,7 @@ import io
 import json
 import os
 import shutil
+import time
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +24,7 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request
 
 from database import get_db, init_db
-from models import Car, CommodityCarTypeMap, Industry, Location, MovementLog, Waybill
+from models import Car, CommodityCarTypeMap, Industry, LayoutSettings, Location, MovementLog, SessionClock, Waybill
 from vision import analyze_car_photo, get_provider, OllamaVisionProvider, call_with_retry
 
 UPLOADS_DIR = Path("uploads")
@@ -1080,9 +1081,110 @@ def _build_session_plan(db: Session) -> dict:
     }
 
 
+# ── Layout settings ───────────────────────────────────────────────────────────
+
+def _get_or_create_settings(db: Session) -> LayoutSettings:
+    s = db.get(LayoutSettings, 1)
+    if not s:
+        s = LayoutSettings(id=1)
+        db.add(s)
+        db.commit()
+        db.refresh(s)
+    return s
+
+
+def _settings_to_dict(s: LayoutSettings) -> dict:
+    return {"clock_start_time": s.clock_start_time, "clock_speed": s.clock_speed}
+
+
+@app.get("/api/settings")
+def get_settings(db: Session = Depends(get_db)):
+    return _settings_to_dict(_get_or_create_settings(db))
+
+
+class LayoutSettingsUpdate(BaseModel):
+    clock_start_time: str = "08:00"
+    clock_speed: int = 4
+
+
+@app.put("/api/settings")
+def update_settings(data: LayoutSettingsUpdate, db: Session = Depends(get_db)):
+    s = _get_or_create_settings(db)
+    s.clock_start_time = data.clock_start_time
+    s.clock_speed = data.clock_speed
+    db.commit()
+    return _settings_to_dict(s)
+
+
+# ── Session clock ─────────────────────────────────────────────────────────────
+
+def _clock_to_dict(c: SessionClock) -> dict:
+    return {
+        "started_at": c.started_at,
+        "paused_at": c.paused_at,
+        "paused_accum_s": c.paused_accum_s,
+        "start_time": c.start_time,
+        "speed": c.speed,
+    }
+
+
+def _start_session_clock(db: Session):
+    s = _get_or_create_settings(db)
+    c = db.get(SessionClock, 1)
+    if not c:
+        c = SessionClock(id=1)
+        db.add(c)
+    c.started_at = time.time()
+    c.paused_at = None
+    c.paused_accum_s = 0.0
+    c.start_time = s.clock_start_time
+    c.speed = s.clock_speed
+    db.commit()
+
+
+def _clear_session_clock(db: Session):
+    c = db.get(SessionClock, 1)
+    if c:
+        db.delete(c)
+        db.commit()
+
+
+@app.get("/api/session/clock")
+def get_session_clock(db: Session = Depends(get_db)):
+    c = db.get(SessionClock, 1)
+    if not c or c.started_at is None:
+        return None
+    return _clock_to_dict(c)
+
+
+@app.post("/api/session/clock/pause")
+def pause_session_clock(db: Session = Depends(get_db)):
+    c = db.get(SessionClock, 1)
+    if not c or c.paused_at is not None:
+        return {"status": "already paused or no clock"}
+    c.paused_at = time.time()
+    db.commit()
+    return _clock_to_dict(c)
+
+
+@app.post("/api/session/clock/resume")
+def resume_session_clock(db: Session = Depends(get_db)):
+    c = db.get(SessionClock, 1)
+    if not c or c.paused_at is None:
+        return {"status": "not paused"}
+    c.paused_accum_s += time.time() - c.paused_at
+    c.paused_at = None
+    db.commit()
+    return _clock_to_dict(c)
+
+
+# ── Session ───────────────────────────────────────────────────────────────────
+
 @app.post("/api/session/plan")
 def session_plan(db: Session = Depends(get_db)):
-    return _build_session_plan(db)
+    plan = _build_session_plan(db)
+    _start_session_clock(db)
+    return plan
 
 
 class SessionCarResult(BaseModel):
@@ -1117,6 +1219,7 @@ def session_end(req: SessionEndRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(car)
         updated.append(car_to_dict(car))
+    _clear_session_clock(db)
     return {"updated": updated}
 
 
