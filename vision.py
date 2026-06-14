@@ -336,6 +336,33 @@ def _text_complete(prompt: str) -> str:
     raise ValueError(f"Unknown VISION_PROVIDER '{provider}'")
 
 
+def suggest_commodity_car_type(commodity: str, existing_map: dict[str, str]) -> dict:
+    """Return AI-suggested car type for a commodity, constrained to CAR_TYPES."""
+    car_types_str = ", ".join(CAR_TYPES)
+    existing_str = (
+        "; ".join(f"{c} → {t}" for c, t in existing_map.items())
+    ) if existing_map else "none yet"
+
+    prompt = f"""You are a model railroad operations expert.
+
+The user wants to add a commodity-to-car-type mapping for their layout.
+
+Commodity: "{commodity}"
+
+Existing mappings on this layout: {existing_str}
+
+What is the correct car type for this commodity?
+
+Valid car types (pick exactly one): {car_types_str}
+
+Return ONLY a JSON object with no markdown, no explanation:
+{{
+  "car_type": "<one of the valid car types above>"
+}}"""
+
+    return _parse_json_response(_text_complete(prompt))
+
+
 def suggest_industry(description: str, existing_industries: list[str]) -> dict:
     """Return AI-suggested commodities, accepted_car_types, and industry_role for a new industry."""
     car_types_str = ", ".join(CAR_TYPES)

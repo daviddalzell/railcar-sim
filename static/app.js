@@ -1403,6 +1403,24 @@ $("#btn-cancel-commodity-map").addEventListener("click", () => {
   $("#cmap-commodity").disabled = false;
 });
 
+$("#btn-suggest-cmap").addEventListener("click", async () => {
+  const commodity = $("#cmap-commodity").value.trim();
+  if (!commodity) { showToast("Enter a commodity name first", "warning"); return; }
+  const btn = $("#btn-suggest-cmap");
+  const original = btn.textContent;
+  btn.textContent = "⏳";
+  btn.disabled = true;
+  try {
+    const result = await api("POST", "/api/commodity-car-type-map/suggest", { commodity });
+    if (result.car_type) $("#cmap-car-type").value = result.car_type;
+  } catch (err) {
+    showToast("AI suggestion failed — check your AI provider settings", "error");
+  } finally {
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+});
+
 $("#commodity-map-form").addEventListener("submit", async e => {
   e.preventDefault();
   const editId = $("#cmap-edit-id").value;

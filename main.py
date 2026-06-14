@@ -664,6 +664,23 @@ def delete_commodity_map(map_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
+class CommoditySuggestRequest(BaseModel):
+    commodity: str
+
+
+@app.post("/api/commodity-car-type-map/suggest")
+def suggest_commodity_endpoint(data: CommoditySuggestRequest, db: Session = Depends(get_db)):
+    if not get_provider().is_available():
+        raise HTTPException(503, "No AI provider available — check your API key settings")
+    existing = {r.commodity: r.car_type for r in db.query(CommodityCarTypeMap).all()}
+    try:
+        from vision import suggest_commodity_car_type
+        result = suggest_commodity_car_type(data.commodity, existing)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    return {"car_type": result.get("car_type", "boxcar")}
+
+
 # ── Automation ───────────────────────────────────────────────────────────────
 
 _WILDCARD_TYPES = {"all", "any", ""}
