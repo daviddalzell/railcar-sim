@@ -88,3 +88,22 @@ class CommodityCarTypeMap(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     commodity: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     car_type: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class LayoutSettings(Base):
+    __tablename__ = "layout_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    clock_start_time: Mapped[str] = mapped_column(String, default="08:00")
+    clock_speed: Mapped[int] = mapped_column(Integer, default=4)
+
+
+class SessionClock(Base):
+    __tablename__ = "session_clock"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    started_at: Mapped[Optional[float]] = mapped_column(nullable=True)
+    paused_at: Mapped[Optional[float]] = mapped_column(nullable=True)
+    paused_accum_s: Mapped[float] = mapped_column(default=0.0)
+    start_time: Mapped[str] = mapped_column(String, default="08:00")
+    speed: Mapped[int] = mapped_column(Integer, default=4)

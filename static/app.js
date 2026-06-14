@@ -10,6 +10,54 @@ let selectedCarId = null;
 let editingWaybillId = null;
 let photoPath = null;
 
+// ── Fast clock ────────────────────────────────────────────────────────────────
+let clockInterval = null;
+let clockState = null;
+
+async function fetchAndStartClock() {
+  clockState = await api("GET", "/api/session/clock");
+  if (clockState?.started_at) startClockTick();
+}
+
+function startClockTick() {
+  clearInterval(clockInterval);
+  clockInterval = setInterval(updateClock, 1000);
+  updateClock();
+}
+
+function updateClock() {
+  if (!clockState?.started_at) return;
+  const { start_time, speed, started_at, paused_at, paused_accum_s } = clockState;
+  if (paused_at) return;
+  const elapsedRealS = Date.now() / 1000 - started_at - paused_accum_s;
+  const [h, m] = start_time.split(":").map(Number);
+  const startMin = h * 60 + m;
+  const modelMin = (startMin + Math.floor(elapsedRealS * speed / 60)) % (24 * 60);
+  const dh = String(Math.floor(modelMin / 60)).padStart(2, "0");
+  const dm = String(modelMin % 60).padStart(2, "0");
+  const el = $("#clock-time");
+  if (el) el.textContent = `${dh}:${dm}`;
+}
+
+function stopClock() {
+  clearInterval(clockInterval);
+  clockInterval = null;
+  clockState = null;
+}
+
+async function toggleClockPause() {
+  const btn = $("#btn-clock-pause");
+  if (!clockState) return;
+  if (clockState.paused_at) {
+    clockState = await api("POST", "/api/session/clock/resume");
+    startClockTick();
+    if (btn) btn.textContent = "⏸";
+  } else {
+    clockState = await api("POST", "/api/session/clock/pause");
+    if (btn) btn.textContent = "▶";
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
@@ -805,6 +853,7 @@ async function loadOperations() {
     return;
   }
 
+  $("#ops-title").textContent = "Operations";
   // Idle state: show Plan Session button + read-only amber list
   $("#ops-header-buttons").innerHTML =
     `<button id="btn-plan-session">🚆 Plan Session</button>`;
@@ -922,6 +971,7 @@ function markCar(carId, status) {
 }
 
 function renderActiveSession() {
+  $("#ops-title").textContent = "Active Session";
   const warnEl = $("#session-warnings");
   if (session.warnings?.length) {
     warnEl.innerHTML = session.warnings.map(w => `<p style="margin:0.2rem 0">⚠ ${w}</p>`).join("");
@@ -936,10 +986,15 @@ function renderActiveSession() {
 
   $("#ops-header-buttons").innerHTML = `
     <span class="session-progress-label muted">${progressLabel}</span>
+    <div class="fast-clock">
+      <span id="clock-time">--:--</span>
+      <button id="btn-clock-pause" class="outline clock-btn" title="Pause / Resume clock">⏸</button>
+    </div>
     <button id="btn-cancel-session" class="outline secondary">✕ Cancel Session</button>
     <button id="btn-end-session" class="contrast">⬛ End Session</button>
   `;
   document.getElementById("btn-end-session").addEventListener("click", handleEndSession);
+  document.getElementById("btn-clock-pause").addEventListener("click", toggleClockPause);
   document.getElementById("btn-cancel-session").addEventListener("click", () => {
     const btn = document.getElementById("btn-cancel-session");
     if (!btn.dataset.confirm) {
@@ -951,6 +1006,7 @@ function renderActiveSession() {
       return;
     }
     btn.classList.remove("btn-confirming");
+    stopClock();
     session = null;
     saveSession();
     loadOperations();
@@ -1006,6 +1062,8 @@ function renderActiveSession() {
   $$(".session-cp-btn").forEach(btn => {
     btn.addEventListener("click", () => markCar(parseInt(btn.dataset.id), "cp"));
   });
+
+  fetchAndStartClock();
 }
 
 async function handleEndSession() {
@@ -1044,6 +1102,7 @@ async function commitEndSession(cpCars) {
   try {
     await withLoading(btn || document.body, "Finishing…", async () => {
       const result = await api("POST", "/api/session/end", { cars: payload });
+      stopClock();
       session = null;
       saveSession();
       result.updated.forEach(updated => {
@@ -1078,16 +1137,32 @@ $("#btn-confirm-end-session").addEventListener("click", async () => {
 
 // ── Layout setup ──────────────────────────────────────────────────────────────
 async function loadLayout() {
-  [locations, industries, commodityMap] = await Promise.all([
-    api("GET", "/api/locations"),
-    api("GET", "/api/industries"),
-    api("GET", "/api/commodity-car-type-map"),
+  [[locations, industries, commodityMap], settings] = await Promise.all([
+    Promise.all([
+      api("GET", "/api/locations"),
+      api("GET", "/api/industries"),
+      api("GET", "/api/commodity-car-type-map"),
+    ]),
+    api("GET", "/api/settings"),
   ]);
   renderLocationList();
   renderIndustryList();
   populateIndustryLocationSelect();
   renderCommodityMapList();
+  if (settings) {
+    $("#clock-start-time").value = settings.clock_start_time;
+    $("#clock-speed").value = String(settings.clock_speed);
+  }
 }
+
+$("#clock-settings-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  await api("PUT", "/api/settings", {
+    clock_start_time: $("#clock-start-time").value,
+    clock_speed: parseInt($("#clock-speed").value),
+  });
+  showToast("Clock settings saved.", "success");
+});
 
 function renderLocationList() {
   const list = $("#location-list");

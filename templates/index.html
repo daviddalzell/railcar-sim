@@ -385,6 +385,28 @@
         </div>
       </form>
       <div id="commodity-map-list"></div>
+
+      <hr />
+      <div class="section-header">
+        <h3>Fast Clock</h3>
+      </div>
+      <form id="clock-settings-form" class="inline-form">
+        <div class="grid">
+          <label>Start Time
+            <input id="clock-start-time" type="time" value="08:00" />
+          </label>
+          <label>Speed
+            <select id="clock-speed">
+              <option value="1">1× (real time)</option>
+              <option value="2">2×</option>
+              <option value="4" selected>4×</option>
+              <option value="6">6×</option>
+              <option value="12">12×</option>
+            </select>
+          </label>
+        </div>
+        <button type="submit" class="small">Save Clock Settings</button>
+      </form>
     </section>
 
   </main>
