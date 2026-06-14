@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import random
 import shutil
 import subprocess
 import time
@@ -32,6 +33,55 @@ _MEDIA_TYPES = {
     ".gif": "image/gif",
     ".webp": "image/webp",
 }
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """Return True if this exception is a transient provider error worth retrying."""
+    try:
+        import anthropic
+        if isinstance(exc, (anthropic.RateLimitError, anthropic.OverloadedError,
+                            anthropic.InternalServerError)):
+            return True
+    except ImportError:
+        pass
+    try:
+        import openai
+        if isinstance(exc, (openai.RateLimitError, openai.InternalServerError)):
+            return True
+    except ImportError:
+        pass
+    try:
+        from google.genai import errors as _ge
+        if isinstance(exc, _ge.APIError):
+            code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+            if code in (429, 500, 503):
+                return True
+    except ImportError:
+        pass
+    return False
+
+
+def call_with_retry(fn, max_attempts: int | None = None, base_delay: float | None = None):
+    """Call fn() retrying transient AI errors with exponential backoff + jitter.
+
+    Retryable: 429 rate-limit, 529 Anthropic overload, 503 unavailable, 500 server error.
+    Non-retryable (fail fast): 400 bad request, 401 auth, 403 permission, 404 not found.
+    Configurable via AI_MAX_RETRIES and AI_RETRY_BASE_DELAY env vars.
+    """
+    attempts = max_attempts or int(os.environ.get("AI_MAX_RETRIES", "3"))
+    delay    = base_delay   or float(os.environ.get("AI_RETRY_BASE_DELAY", "1.0"))
+    last_exc: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return fn()
+        except Exception as exc:
+            if not _is_retryable(exc):
+                raise
+            last_exc = exc
+            if attempt < attempts - 1:
+                wait = delay * (2 ** attempt) * (0.5 + random.random() * 0.5)
+                time.sleep(wait)
+    raise last_exc  # type: ignore[misc]
 
 
 def _load_image(image_path: str, max_px: int = 0) -> tuple[str, str]:
@@ -104,7 +154,7 @@ class AnthropicVisionProvider(VisionProvider):
         client = anthropic.Anthropic(api_key=api_key)
         model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 
-        message = client.messages.create(
+        message = call_with_retry(lambda: client.messages.create(
             model=model,
             max_tokens=512,
             messages=[{
@@ -114,7 +164,7 @@ class AnthropicVisionProvider(VisionProvider):
                     {"type": "text", "text": PROMPT},
                 ],
             }],
-        )
+        ))
         return _normalize(_parse_json_response(message.content[0].text))
 
 
@@ -134,7 +184,7 @@ class OpenAIVisionProvider(VisionProvider):
         client = openai.OpenAI(api_key=api_key)
         model = os.environ.get("OPENAI_MODEL", "gpt-4o")
 
-        response = client.chat.completions.create(
+        response = call_with_retry(lambda: client.chat.completions.create(
             model=model,
             max_tokens=512,
             messages=[{
@@ -144,7 +194,7 @@ class OpenAIVisionProvider(VisionProvider):
                     {"type": "text", "text": PROMPT},
                 ],
             }],
-        )
+        ))
         return _normalize(_parse_json_response(response.choices[0].message.content))
 
 
@@ -218,7 +268,7 @@ class OllamaVisionProvider(VisionProvider):
         client = openai.OpenAI(api_key="ollama", base_url=base_url)
 
         num_ctx = int(os.environ.get("OLLAMA_NUM_CTX", "8192"))
-        response = client.chat.completions.create(
+        response = call_with_retry(lambda: client.chat.completions.create(
             model=model,
             max_tokens=512,
             extra_body={"options": {"num_ctx": num_ctx}},
@@ -229,7 +279,7 @@ class OllamaVisionProvider(VisionProvider):
                     {"type": "text", "text": PROMPT},
                 ],
             }],
-        )
+        ))
         return _normalize(_parse_json_response(response.choices[0].message.content))
 
 
@@ -250,13 +300,13 @@ class GeminiVisionProvider(VisionProvider):
         image_bytes = Path(image_path).read_bytes()
         media_type = _MEDIA_TYPES.get(Path(image_path).suffix.lower(), "image/jpeg")
 
-        response = client.models.generate_content(
+        response = call_with_retry(lambda: client.models.generate_content(
             model=model_name,
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type=media_type),
                 PROMPT,
             ],
-        )
+        ))
         return _normalize(_parse_json_response(response.text))
 
 
@@ -293,10 +343,10 @@ def _text_complete(prompt: str) -> str:
             raise RuntimeError("ANTHROPIC_API_KEY not set")
         client = anthropic.Anthropic(api_key=api_key)
         model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-        msg = client.messages.create(
+        msg = call_with_retry(lambda: client.messages.create(
             model=model, max_tokens=512,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
         return msg.content[0].text
 
     if provider == "openai":
@@ -306,10 +356,10 @@ def _text_complete(prompt: str) -> str:
             raise RuntimeError("OPENAI_API_KEY not set")
         client = openai.OpenAI(api_key=api_key)
         model = os.environ.get("OPENAI_MODEL", "gpt-4o")
-        resp = client.chat.completions.create(
+        resp = call_with_retry(lambda: client.chat.completions.create(
             model=model, max_tokens=512,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
         return resp.choices[0].message.content
 
     if provider == "ollama":
@@ -317,10 +367,10 @@ def _text_complete(prompt: str) -> str:
         base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
         model = os.environ.get("OLLAMA_MODEL", "llava")
         client = openai.OpenAI(api_key="ollama", base_url=base_url)
-        resp = client.chat.completions.create(
+        resp = call_with_retry(lambda: client.chat.completions.create(
             model=model, max_tokens=512,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
         return resp.choices[0].message.content
 
     if provider == "gemini":
@@ -330,7 +380,7 @@ def _text_complete(prompt: str) -> str:
             raise RuntimeError("GEMINI_API_KEY not set")
         model_name = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
         client = genai.Client(api_key=api_key)
-        resp = client.models.generate_content(model=model_name, contents=[prompt])
+        resp = call_with_retry(lambda: client.models.generate_content(model=model_name, contents=[prompt]))
         return resp.text
 
     raise ValueError(f"Unknown VISION_PROVIDER '{provider}'")
