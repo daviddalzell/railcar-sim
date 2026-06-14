@@ -362,7 +362,12 @@
       </div>
       <form id="commodity-map-form" class="hidden inline-form">
         <div class="grid">
-          <label>Commodity <input id="cmap-commodity" type="text" placeholder="e.g. grain" required /></label>
+          <label>Commodity
+            <div class="suggest-row">
+              <input id="cmap-commodity" type="text" placeholder="e.g. grain" required />
+              <button type="button" id="btn-suggest-cmap" class="outline ai-suggest-btn">✨</button>
+            </div>
+          </label>
           <label>Car Type
             <select id="cmap-car-type">
               <option value="boxcar">boxcar</option><option value="flatcar">flatcar</option>
