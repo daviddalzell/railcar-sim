@@ -617,11 +617,33 @@ button.small {
 
 /* ── Stylize section ─────────────────────────────────────────────────────── */
 #stylize-section {
+  position: relative;
   margin: 0.75rem 0;
   padding: 0.75rem;
-  border: 1px solid var(--border-subtle);
+  padding-top: 1.6rem;
+  border: 1px solid var(--pico-form-element-border-color);
   border-radius: var(--card-radius);
-  background: var(--bg-muted);
+  background: var(--pico-form-element-background-color);
+}
+
+.ai-badge {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: gold;
+  background: transparent;
+  border: none;
+  padding: 1px 6px;
+  line-height: 1.4;
+}
+
+#btn-stylize {
+  background: var(--badge-blue) !important;
+  color: gold !important;
+  border-color: gold !important;
 }
 
 #stylize-idle,

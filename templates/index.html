@@ -43,7 +43,7 @@
               <span id="upload-label">📷 Click or drop a photo of the car</span>
             </label>
             <span class="upload-zone-sep">or</span>
-            <button type="button" id="btn-library-add" class="outline small">🖼 Select From Library</button>
+            <button type="button" id="btn-library-add" class="outline small">🗄️ Select From Library</button>
           </div>
         </div>
         <div id="upload-preview" class="hidden">
@@ -52,6 +52,7 @@
 
         <!-- Stylize section — shown after photo analysis completes -->
         <div id="stylize-section" class="hidden">
+          <span class="ai-badge">✨ AI</span>
           <div id="stylize-idle">
             <button type="button" id="btn-stylize" class="outline">✨ Generate Stylized Illustration</button>
           </div>
@@ -135,7 +136,7 @@
                 <input type="file" id="edit-photo-input" accept="image/*" style="display:none" />
                 <span id="edit-photo-btn-text" class="outline small">📷 Upload Image</span>
               </label>
-              <button type="button" id="btn-library-edit" class="outline small">🖼 Select From Library</button>
+              <button type="button" id="btn-library-edit" class="outline small">🗄️ Select From Library</button>
             </div>
           </div>
           <input type="hidden" id="edit-photo-path" value="" />

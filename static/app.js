@@ -303,8 +303,7 @@ $("#btn-library-add").addEventListener("click", () => {
   }
 });
 
-$("#photo-input").addEventListener("change", async e => {
-  const file = e.target.files[0];
+async function processPhotoFile(file) {
   if (!file) return;
 
   $("#upload-label").textContent = file.name;
@@ -316,7 +315,6 @@ $("#photo-input").addEventListener("change", async e => {
   form.append("file", file);
 
   if (addMode === "manual") {
-    // Just upload the file, no vision analysis
     try {
       const result = await api("POST", "/api/cars/upload", form);
       if (result.photo_path) photoPath = result.photo_path;
@@ -327,7 +325,6 @@ $("#photo-input").addEventListener("change", async e => {
     return;
   }
 
-  // Photo mode: upload then analyze
   hide($("#car-fields"));
   show($("#analyzing-msg"));
   try {
@@ -339,7 +336,12 @@ $("#photo-input").addEventListener("change", async e => {
     show($("#vision-error"));
     show($("#car-fields"));
   }
-});
+}
+
+$("#photo-input").addEventListener("change", e => processPhotoFile(e.target.files[0]));
+
+$("#upload-zone").addEventListener("dragover", e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+$("#upload-zone").addEventListener("drop", e => { e.preventDefault(); processPhotoFile(e.dataTransfer.files[0]); });
 
 $("#btn-retry-vision").addEventListener("click", async () => {
   hide($("#vision-error"));
