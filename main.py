@@ -885,6 +885,147 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
     return {"created": created, "skipped": skipped, "waybills": [waybill_to_dict(w) for w in new_waybills]}
 
 
+def _clone_waybill(source, car, slot: int, db: Session):
+    clone = Waybill(
+        name=source.name,
+        origin_id=source.origin_id,
+        destination_id=source.destination_id,
+        industry_id=source.industry_id,
+        commodity=source.commodity,
+        required_car_type=source.required_car_type,
+        is_empty=source.is_empty,
+        car_id=car.id,
+        slot_index=slot,
+    )
+    db.add(clone)
+    db.flush()
+    return clone
+
+
+def _fallback_candidate(db: Session, current_loc: int, staging_ids: set, car_type: str, always_empty: bool):
+    """Search all waybills (including assigned) for a route to clone when the unassigned pool is exhausted."""
+    if current_loc in staging_ids:
+        candidates = db.query(Waybill).filter(
+            Waybill.origin_id == current_loc,
+            Waybill.is_empty == False,
+            Waybill.destination_id.isnot(None),
+        ).limit(20).all()
+    elif always_empty:
+        candidates = db.query(Waybill).filter(
+            Waybill.origin_id == current_loc,
+            Waybill.is_empty == True,
+            Waybill.destination_id.in_(list(staging_ids)),
+        ).limit(20).all()
+    else:
+        candidates = db.query(Waybill).filter(
+            Waybill.origin_id == current_loc,
+            Waybill.destination_id.isnot(None),
+        ).limit(20).all()
+    for w in candidates:
+        if _car_type_matches(w.required_car_type, car_type):
+            return w
+    return None
+
+
+def _fallback_starting_loc(db: Session, staging_ids: set, car_type: str):
+    """When the unassigned pool has no staging-origin waybills, query all waybills for one to seed routing."""
+    candidates = db.query(Waybill).filter(
+        Waybill.origin_id.in_(list(staging_ids)),
+        Waybill.is_empty == False,
+        Waybill.destination_id.isnot(None),
+    ).limit(20).all()
+    for w in candidates:
+        if _car_type_matches(w.required_car_type, car_type):
+            return w.origin_id
+    return None
+
+
+def auto_assign_one_car(car, unassigned: list, staging_ids: set, db: Session, starting_loc=None) -> int:
+    """Fill open waybill slots for a single car. Returns number of slots filled.
+    Mutates `unassigned` in place (removes assigned loaded waybills).
+    Falls back to cloning existing waybills when the pool is exhausted so all 4 slots are always filled."""
+    occupied = {w.slot_index for w in car.waybills if w.slot_index is not None}
+    open_slots = [s for s in range(4) if s not in occupied]
+    if not open_slots:
+        return 0
+
+    always_empty = any(t in car.car_type.lower() for t in _ALWAYS_EMPTY_RETURN_TYPES)
+
+    if not car.waybills:
+        if starting_loc is not None:
+            current_loc = starting_loc
+        else:
+            current_loc = _find_best_staging_for_car(unassigned, staging_ids, car.car_type, loaded_only=always_empty)
+            if current_loc is None:
+                current_loc = _fallback_starting_loc(db, staging_ids, car.car_type)
+        if current_loc is None:
+            return 0
+    else:
+        filled = sorted(w.slot_index for w in car.waybills if w.slot_index is not None)
+        last = filled[-1]
+        expected = list(range(last + 1, last + 1 + len(open_slots)))
+        if open_slots != expected:
+            return 0
+        last_wb = next((w for w in car.waybills if w.slot_index == last), None)
+        if last_wb is None or last_wb.destination_id is None:
+            return 0
+        current_loc = last_wb.destination_id
+
+    assigned = 0
+    for slot in open_slots:
+        if current_loc in staging_ids:
+            if always_empty:
+                candidate = _find_loaded_from(unassigned, current_loc, car.car_type)
+            else:
+                candidate = _find_any_from(unassigned, current_loc, car.car_type)
+        elif always_empty:
+            candidate = _find_empty_to_staging(unassigned, current_loc, staging_ids, car.car_type)
+        else:
+            candidate = (
+                _find_loaded_from(unassigned, current_loc, car.car_type)
+                or _find_empty_to_staging(unassigned, current_loc, staging_ids, car.car_type)
+            )
+
+        if candidate is None:
+            candidate = _fallback_candidate(db, current_loc, staging_ids, car.car_type, always_empty)
+            if candidate is None:
+                break
+            _clone_waybill(candidate, car, slot, db)
+            assigned += 1
+            current_loc = candidate.destination_id
+            if current_loc is None:
+                break
+            continue
+
+        if candidate.is_empty:
+            _clone_waybill(candidate, car, slot, db)
+        else:
+            candidate.car_id = car.id
+            candidate.slot_index = slot
+            unassigned.remove(candidate)
+
+        assigned += 1
+        current_loc = candidate.destination_id
+        if current_loc is None:
+            break
+
+    return assigned
+
+
+def clear_car_slots(car, db: Session):
+    """Unassign all waybill slots from a car, returning loaded waybills to the pool.
+    Cloned empty waybills are deleted (they have no independent pool entry).
+    Resets active_waybill_slot to 0 so the fresh assignment starts at the beginning."""
+    for wb in list(car.waybills):
+        if wb.is_empty:
+            db.delete(wb)
+        else:
+            wb.car_id = None
+            wb.slot_index = None
+    car.active_waybill_slot = 0
+    db.commit()
+
+
 @app.post("/api/auto-assign-waybills")
 def auto_assign_waybills(db: Session = Depends(get_db)):
     cars = db.query(Car).all()
@@ -898,75 +1039,31 @@ def auto_assign_waybills(db: Session = Depends(get_db)):
         return {"assigned": 0, "cars_updated": [car_to_dict(c) for c in cars]}
 
     assigned = 0
-
     for car in cars:
-        occupied = {w.slot_index for w in car.waybills if w.slot_index is not None}
-        open_slots = [s for s in range(4) if s not in occupied]
-        if not open_slots:
-            continue
-
-        always_empty = any(t in car.car_type.lower() for t in _ALWAYS_EMPTY_RETURN_TYPES)
-
-        if not car.waybills:
-            current_loc = _find_best_staging_for_car(unassigned, staging_ids, car.car_type, loaded_only=always_empty)
-            if current_loc is None:
-                continue
-        else:
-            filled = sorted(w.slot_index for w in car.waybills if w.slot_index is not None)
-            last = filled[-1]
-            expected = list(range(last + 1, last + 1 + len(open_slots)))
-            if open_slots != expected:
-                continue
-            last_wb = next((w for w in car.waybills if w.slot_index == last), None)
-            if last_wb is None or last_wb.destination_id is None:
-                continue
-            current_loc = last_wb.destination_id
-
-        for slot in open_slots:
-            if current_loc in staging_ids:
-                if always_empty:
-                    candidate = _find_loaded_from(unassigned, current_loc, car.car_type)
-                else:
-                    candidate = _find_any_from(unassigned, current_loc, car.car_type)
-            elif always_empty:
-                candidate = _find_empty_to_staging(unassigned, current_loc, staging_ids, car.car_type)
-            else:
-                candidate = (
-                    _find_loaded_from(unassigned, current_loc, car.car_type)
-                    or _find_empty_to_staging(unassigned, current_loc, staging_ids, car.car_type)
-                )
-
-            if candidate is None:
-                break
-
-            if candidate.is_empty:
-                clone = Waybill(
-                    name=candidate.name,
-                    origin_id=candidate.origin_id,
-                    destination_id=candidate.destination_id,
-                    industry_id=candidate.industry_id,
-                    commodity=candidate.commodity,
-                    required_car_type=candidate.required_car_type,
-                    is_empty=True,
-                    car_id=car.id,
-                    slot_index=slot,
-                )
-                db.add(clone)
-                db.flush()
-            else:
-                candidate.car_id = car.id
-                candidate.slot_index = slot
-                unassigned.remove(candidate)
-
-            assigned += 1
-            current_loc = candidate.destination_id
-            if current_loc is None:
-                break
+        assigned += auto_assign_one_car(car, unassigned, staging_ids, db)
 
     db.commit()
     for car in cars:
         db.refresh(car)
     return {"assigned": assigned, "cars_updated": [car_to_dict(c) for c in cars]}
+
+
+@app.post("/api/cars/{car_id}/auto-assign")
+def auto_assign_single_car(car_id: int, db: Session = Depends(get_db)):
+    car = db.get(Car, car_id)
+    if not car:
+        raise HTTPException(404, "Car not found")
+    clear_car_slots(car, db)
+    db.refresh(car)
+    staging_ids = {
+        loc.id for loc in
+        db.query(Location).filter(Location.location_type.in_(["staging", "yard"])).all()
+    }
+    unassigned = db.query(Waybill).filter(Waybill.car_id.is_(None)).all()
+    assigned = auto_assign_one_car(car, unassigned, staging_ids, db, starting_loc=car.current_location_id)
+    db.commit()
+    db.refresh(car)
+    return {"assigned": assigned, "car": car_to_dict(car)}
 
 
 # ── Upload library ───────────────────────────────────────────────────────────

@@ -86,7 +86,15 @@ function hide(el) { el.classList.add("hidden"); }
 function show(el) { el.classList.remove("hidden"); }
 
 function showToast(message, type = "info", duration = 3500) {
-  const container = $("#toast-container");
+  const openDialog = document.querySelector("dialog[open]");
+  const container = openDialog
+    ? (openDialog.querySelector(".dialog-toast-container") || (() => {
+        const c = document.createElement("div");
+        c.className = "dialog-toast-container";
+        openDialog.querySelector("article").appendChild(c);
+        return c;
+      })())
+    : $("#toast-container");
   const toast = document.createElement("div");
   toast.className = `toast ${type}`;
   toast.textContent = message;
@@ -622,6 +630,40 @@ $("#btn-confirm-move").addEventListener("click", async () => {
   } catch (err) {
     showToast("Error: " + err.message, "error");
   }
+});
+
+// ── Per-car auto-assign ───────────────────────────────────────────────────────
+
+$("#btn-auto-assign-car").addEventListener("click", async () => {
+  if (!selectedCarId) return;
+  const btn = $("#btn-auto-assign-car");
+  if (!btn.dataset.confirm) {
+    btn.dataset.confirm = "1";
+    btn.classList.add("btn-confirming");
+    const orig = btn.textContent;
+    btn.dataset.origText = orig;
+    btn.textContent = "Clear & reassign?";
+    setTimeout(() => {
+      delete btn.dataset.confirm;
+      delete btn.dataset.origText;
+      btn.classList.remove("btn-confirming");
+      btn.textContent = orig;
+    }, 3000);
+    return;
+  }
+  const orig = btn.dataset.origText || "🔄 Auto-Assign";
+  btn.classList.remove("btn-confirming");
+  delete btn.dataset.confirm;
+  delete btn.dataset.origText;
+  await withLoading(btn, "Assigning…", async () => {
+    const result = await api("POST", `/api/cars/${selectedCarId}/auto-assign`);
+    if (result.assigned === 0) {
+      showToast("No matching waybills available for this car.", "warning");
+    } else {
+      showToast(`${result.assigned} waybill(s) assigned.`, "success");
+    }
+    await openCarDetail(selectedCarId);
+  });
 });
 
 // ── Assign waybill slots dialog ───────────────────────────────────────────────
@@ -1408,9 +1450,29 @@ $("#industry-form").addEventListener("submit", async e => {
     const tokens = input.value.split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
     const unknown = tokens.filter(t => !commodityMap.find(m => m.commodity === t));
     if (unknown.length) {
-      warnEl.textContent = `⚠ Not in commodity map: ${unknown.join(", ")}`;
+      warnEl.innerHTML = `⚠ Not in commodity map: ` +
+        unknown.map(c =>
+          `<button type="button" class="outline small cmap-add-chip" data-commodity="${c}">+ ${c}</button>`
+        ).join(" ");
       warnEl.classList.remove("hidden");
     }
+  });
+
+  warnEl.addEventListener("click", async e => {
+    const chip = e.target.closest(".cmap-add-chip");
+    if (!chip) return;
+    const commodity = chip.dataset.commodity;
+    // Expand commodity map panel if collapsed
+    const body = $("#commodity-map-body");
+    const toggleBtn = $("#btn-toggle-commodity-map");
+    if (body.classList.contains("hidden")) {
+      body.classList.remove("hidden");
+      toggleBtn.textContent = "▼";
+    }
+    // Fill the commodity field and trigger AI suggest
+    $("#cmap-commodity").value = commodity;
+    body.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    $("#btn-suggest-cmap").click();
   });
 }
 

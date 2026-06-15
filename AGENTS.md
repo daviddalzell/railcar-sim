@@ -63,6 +63,15 @@ source .venv/bin/activate
 
 ---
 
+## Git Workflow
+
+- **Always create a new branch before starting any new feature or significant change.** Never implement directly on `main`.
+- Branch naming: use a short kebab-case description, e.g. `feature/per-car-auto-assign`, `fix/hopper-matching`.
+- After the user approves a plan, create the branch first, then implement.
+- When work is complete and the user confirms, merge the branch into `main`.
+
+---
+
 ## Development Notes
 
 - The app runs on SQLite — no external database setup needed
