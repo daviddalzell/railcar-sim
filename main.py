@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request
 
 from database import get_db, init_db
-from models import Car, CommodityCarTypeMap, Industry, LayoutSettings, Location, MovementLog, SessionClock, Waybill
+from models import Car, CarType, CommodityCarTypeMap, Industry, LayoutSettings, Location, MovementLog, SessionClock, Waybill
 from vision import analyze_car_photo, get_provider, OllamaVisionProvider, call_with_retry
 
 UPLOADS_DIR = Path("uploads")
@@ -126,6 +126,10 @@ class WaybillCreate(BaseModel):
     commodity: str = ""
     is_empty: bool = False
     required_car_type: Optional[str] = None
+
+
+class CarTypeCreate(BaseModel):
+    name: str
 
 
 class GenerateWaybillsRequest(BaseModel):
@@ -680,6 +684,38 @@ def suggest_commodity_endpoint(data: CommoditySuggestRequest, db: Session = Depe
     except Exception as e:
         raise HTTPException(500, str(e))
     return {"car_type": result.get("car_type", "boxcar")}
+
+
+# ── Car Types ────────────────────────────────────────────────────────────────
+
+@app.get("/api/car-types")
+def list_car_types(db: Session = Depends(get_db)):
+    return [{"id": ct.id, "name": ct.name} for ct in db.query(CarType).order_by(CarType.name).all()]
+
+
+@app.post("/api/car-types", status_code=201)
+def create_car_type(data: CarTypeCreate, db: Session = Depends(get_db)):
+    name = data.name.strip().lower()
+    if not name:
+        raise HTTPException(400, "Name is required")
+    if db.query(CarType).filter(CarType.name == name).first():
+        raise HTTPException(409, "Car type already exists")
+    ct = CarType(name=name)
+    db.add(ct)
+    db.commit()
+    db.refresh(ct)
+    return {"id": ct.id, "name": ct.name}
+
+
+@app.delete("/api/car-types/{ct_id}", status_code=204)
+def delete_car_type(ct_id: int, db: Session = Depends(get_db)):
+    ct = db.get(CarType, ct_id)
+    if not ct:
+        raise HTTPException(404)
+    if db.query(Car).filter(Car.car_type == ct.name).first():
+        raise HTTPException(409, f'Cars exist with type "{ct.name}" — reassign them first')
+    db.delete(ct)
+    db.commit()
 
 
 # ── Automation ───────────────────────────────────────────────────────────────

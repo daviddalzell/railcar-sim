@@ -6,6 +6,7 @@ let industries = [];
 let cars = [];
 let waybillPool = [];
 let commodityMap = [];
+let carTypes = [];
 let selectedCarId = null;
 let editingWaybillId = null;
 let photoPath = null;
@@ -1179,11 +1180,12 @@ $("#btn-confirm-end-session").addEventListener("click", async () => {
 
 // ── Layout setup ──────────────────────────────────────────────────────────────
 async function loadLayout() {
-  [[locations, industries, commodityMap], settings] = await Promise.all([
+  [[locations, industries, commodityMap, carTypes], settings] = await Promise.all([
     Promise.all([
       api("GET", "/api/locations"),
       api("GET", "/api/industries"),
       api("GET", "/api/commodity-car-type-map"),
+      api("GET", "/api/car-types"),
     ]),
     api("GET", "/api/settings"),
   ]);
@@ -1191,11 +1193,76 @@ async function loadLayout() {
   renderIndustryList();
   populateIndustryLocationSelect();
   renderCommodityMapList();
+  populateCarTypeSelects();
+  renderCarTypeList();
   if (settings) {
     $("#clock-start-time").value = settings.clock_start_time;
     $("#clock-speed").value = String(settings.clock_speed);
   }
 }
+
+function populateCarTypeSelect(sel, includeAny) {
+  const prev = sel.value;
+  const names = carTypes.map(ct => ct.name);
+  sel.innerHTML = (includeAny ? '<option value="">— any —</option>' : "") +
+    names.map(n => `<option value="${n}">${n}</option>`).join("");
+  if (names.includes(prev)) sel.value = prev;
+}
+
+function populateCarTypeSelects() {
+  populateCarTypeSelect($("#field-type"), false);
+  populateCarTypeSelect($("#edit-field-type"), false);
+  populateCarTypeSelect($("#we-car-type"), true);
+  populateCarTypeSelect($("#cmap-car-type"), false);
+}
+
+function renderCarTypeList() {
+  const list = $("#car-type-list");
+  if (!carTypes.length) {
+    list.innerHTML = '<p class="muted small">No car types defined.</p>';
+    return;
+  }
+  list.innerHTML = carTypes.map(ct => `
+    <div class="layout-item">
+      <span>${ct.name}</span>
+      <button class="outline small contrast del-car-type" data-id="${ct.id}" data-name="${ct.name}">🗑</button>
+    </div>
+  `).join("");
+  list.querySelectorAll(".del-car-type").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!btn.dataset.confirm) {
+        btn.dataset.confirm = "1";
+        btn.textContent = "Confirm?";
+        setTimeout(() => { btn.dataset.confirm = ""; btn.textContent = "🗑"; }, 3000);
+        return;
+      }
+      try {
+        await api("DELETE", `/api/car-types/${btn.dataset.id}`);
+        await loadLayout();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+  });
+}
+
+$("#btn-add-car-type").addEventListener("click", () => {
+  $("#car-type-name").value = "";
+  show($("#car-type-body"));
+  $("#btn-toggle-car-type").textContent = "▼";
+  show($("#car-type-form"));
+});
+$("#btn-cancel-car-type").addEventListener("click", () => hide($("#car-type-form")));
+$("#car-type-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    await api("POST", "/api/car-types", { name: $("#car-type-name").value.trim() });
+    hide($("#car-type-form"));
+    await loadLayout();
+  } catch (err) {
+    showToast("Error: " + err.message, "error");
+  }
+});
 
 $("#clock-settings-form").addEventListener("submit", async e => {
   e.preventDefault();
@@ -1275,20 +1342,38 @@ function renderIndustryList() {
     return;
   }
   const roleBadge = r => r === "producer" ? "producer" : r === "transload" ? "transload" : "";
-  list.innerHTML = industries.map(i => `
-    <div class="layout-item">
-      <span>
-        <strong>${i.name}</strong>
-        ${i.location_name ? `<em>@ ${i.location_name}</em>` : ""}
-        ${roleBadge(i.industry_role) ? `<span class='waybill-badge muted'>${roleBadge(i.industry_role)}</span>` : ""}
-        ${i.commodities ? `<span class='muted'>${i.commodities}</span>` : ""}
-      </span>
-      <span>
-        <button class="outline small edit-ind" data-id="${i.id}">✏️</button>
-        <button class="outline small contrast del-ind" data-id="${i.id}">🗑</button>
-      </span>
-    </div>
-  `).join("");
+
+  list.innerHTML = industries.map(i => {
+    const tokens = (i.commodities || "").split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+    const unmapped = tokens.filter(t => !commodityMap.find(m => m.commodity === t));
+    const unmappedHtml = unmapped.length
+      ? `<div class="ind-unmapped-row">
+           <span class="ind-unmapped-label">⚠ unmapped:</span>
+           ${unmapped.map(c =>
+             `<span class="chip-group">` +
+             `<button type="button" class="outline small cmap-add-chip" data-commodity="${c}" data-ind-id="${i.id}">+ ${c}</button>` +
+             `<button type="button" class="outline small contrast cmap-dismiss-chip" data-commodity="${c}" data-ind-id="${i.id}" title="Remove from industry">×</button>` +
+             `</span>`
+           ).join("")}
+         </div>`
+      : "";
+    return `
+      <div class="layout-item layout-item-stack">
+        <div class="layout-item-main">
+          <span>
+            <strong>${i.name}</strong>
+            ${i.location_name ? `<em>@ ${i.location_name}</em>` : ""}
+            ${roleBadge(i.industry_role) ? `<span class='waybill-badge muted'>${roleBadge(i.industry_role)}</span>` : ""}
+            ${i.commodities ? `<span class='muted'>${i.commodities}</span>` : ""}
+          </span>
+          <span>
+            <button class="outline small edit-ind" data-id="${i.id}">✏️</button>
+            <button class="outline small contrast del-ind" data-id="${i.id}">🗑</button>
+          </span>
+        </div>
+        ${unmappedHtml}
+      </div>`;
+  }).join("");
 
   $$(".edit-ind").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1300,6 +1385,7 @@ function renderIndustryList() {
       $("#ind-commodities").value = ind.commodities;
       $("#ind-edit-id").value = ind.id;
       roleToCheckboxes(ind.industry_role || "consumer");
+      hide($("#commodity-warn"));
       show($("#industry-form"));
     });
   });
@@ -1323,6 +1409,43 @@ function renderIndustryList() {
         showToast("Error: " + err.message, "error");
       }
     });
+  });
+
+  // Inline unmapped chip handlers
+  list.addEventListener("click", async e => {
+    const indId = parseInt(e.target.closest("[data-ind-id]")?.dataset.indId);
+    const ind = industries.find(i => i.id === indId);
+    if (!ind) return;
+
+    const dismiss = e.target.closest(".cmap-dismiss-chip");
+    if (dismiss) {
+      const commodity = dismiss.dataset.commodity;
+      const updated = (ind.commodities || "").split(",").map(t => t.trim()).filter(t => t.toLowerCase() !== commodity.toLowerCase()).join(", ");
+      await api("PUT", `/api/industries/${indId}`, {
+        name: ind.name,
+        location_id: ind.location_id || null,
+        accepted_car_types: ind.accepted_car_types,
+        commodities: updated,
+        industry_role: ind.industry_role || "consumer",
+      });
+      await loadLayout();
+      return;
+    }
+
+    const chip = e.target.closest(".cmap-add-chip");
+    if (chip) {
+      const commodity = chip.dataset.commodity;
+      const body = $("#commodity-map-body");
+      if (body.classList.contains("hidden")) {
+        body.classList.remove("hidden");
+        $("#btn-toggle-commodity-map").textContent = "▼";
+      }
+      show($("#commodity-map-form"));
+      $("#cmap-edit-id").value = "";
+      $("#cmap-commodity").value = commodity;
+      body.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      $("#btn-suggest-cmap").click();
+    }
   });
 }
 
@@ -1363,6 +1486,7 @@ $("#btn-add-industry").addEventListener("click", () => {
   $("#ind-commodities").value = "";
   $("#ind-edit-id").value = "";
   roleToCheckboxes("consumer");
+  hide($("#commodity-warn"));
   show($("#industry-form"));
 });
 $("#btn-cancel-industry").addEventListener("click", () => hide($("#industry-form")));
@@ -1408,6 +1532,26 @@ $("#industry-form").addEventListener("submit", async e => {
 });
 
 // ── Commodity autocomplete ────────────────────────────────────────────────────
+
+function refreshCommodityWarning() {
+  const warnEl = $("#commodity-warn");
+  const tokens = $("#ind-commodities").value
+    .split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+  const unknown = tokens.filter(t => !commodityMap.find(m => m.commodity === t));
+  if (!unknown.length) {
+    hide(warnEl);
+    return;
+  }
+  warnEl.innerHTML = "⚠ Not in commodity map: " +
+    unknown.map(c =>
+      `<span class="chip-group">` +
+      `<button type="button" class="outline small cmap-add-chip" data-commodity="${c}">+ ${c}</button>` +
+      `<button type="button" class="outline small contrast cmap-dismiss-chip" data-commodity="${c}" title="Remove from industry">×</button>` +
+      `</span>`
+    ).join(" ");
+  warnEl.classList.remove("hidden");
+}
+
 {
   const input    = $("#ind-commodities");
   const dropdown = $("#commodity-suggestions");
@@ -1447,18 +1591,32 @@ $("#industry-form").addEventListener("submit", async e => {
 
   input.addEventListener("blur", () => {
     dropdown.classList.add("hidden");
-    const tokens = input.value.split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
-    const unknown = tokens.filter(t => !commodityMap.find(m => m.commodity === t));
-    if (unknown.length) {
-      warnEl.innerHTML = `⚠ Not in commodity map: ` +
-        unknown.map(c =>
-          `<button type="button" class="outline small cmap-add-chip" data-commodity="${c}">+ ${c}</button>`
-        ).join(" ");
-      warnEl.classList.remove("hidden");
-    }
+    refreshCommodityWarning();
   });
 
   warnEl.addEventListener("click", async e => {
+    // × dismiss: remove commodity from industry and auto-save
+    const dismiss = e.target.closest(".cmap-dismiss-chip");
+    if (dismiss) {
+      const commodity = dismiss.dataset.commodity;
+      const current = input.value.split(",").map(t => t.trim()).filter(Boolean);
+      input.value = current.filter(t => t.toLowerCase() !== commodity.toLowerCase()).join(", ");
+      const editId = $("#ind-edit-id").value;
+      if (editId) {
+        await api("PUT", `/api/industries/${editId}`, {
+          name: $("#ind-name").value.trim(),
+          location_id: $("#ind-location").value ? parseInt($("#ind-location").value) : null,
+          accepted_car_types: $("#ind-car-types").value.trim(),
+          commodities: input.value,
+          industry_role: checkboxesToRole(),
+        });
+        await loadLayout();
+      }
+      refreshCommodityWarning();
+      return;
+    }
+
+    // + chip: open commodity map form and trigger AI suggest
     const chip = e.target.closest(".cmap-add-chip");
     if (!chip) return;
     const commodity = chip.dataset.commodity;
@@ -1469,7 +1627,9 @@ $("#industry-form").addEventListener("submit", async e => {
       body.classList.remove("hidden");
       toggleBtn.textContent = "▼";
     }
-    // Fill the commodity field and trigger AI suggest
+    // Open the form and populate it
+    show($("#commodity-map-form"));
+    $("#cmap-edit-id").value = "";
     $("#cmap-commodity").value = commodity;
     body.scrollIntoView({ behavior: "smooth", block: "nearest" });
     $("#btn-suggest-cmap").click();
@@ -1534,6 +1694,13 @@ $("#btn-toggle-commodity-map").addEventListener("click", () => {
   btn.textContent = collapsed ? "▶" : "▼";
 });
 
+$("#btn-toggle-car-type").addEventListener("click", () => {
+  const body = $("#car-type-body");
+  const btn  = $("#btn-toggle-car-type");
+  const collapsed = body.classList.toggle("hidden");
+  btn.textContent = collapsed ? "▶" : "▼";
+});
+
 $("#btn-add-commodity-map").addEventListener("click", () => {
   $("#cmap-commodity").value = "";
   $("#cmap-car-type").value = "boxcar";
@@ -1582,6 +1749,7 @@ $("#commodity-map-form").addEventListener("submit", async e => {
     hide($("#commodity-map-form"));
     $("#cmap-commodity").disabled = false;
     await loadLayout();
+    refreshCommodityWarning();
   } catch (err) {
     showToast("Error saving mapping: " + err.message, "error");
   }
@@ -1706,11 +1874,13 @@ $("#btn-help-expand-all").addEventListener("click", () => {
   await Promise.all([
     loadRoster(),
     (async () => {
-      [locations, industries, waybillPool] = await Promise.all([
+      [locations, industries, waybillPool, carTypes] = await Promise.all([
         api("GET", "/api/locations"),
         api("GET", "/api/industries"),
         api("GET", "/api/waybills"),
+        api("GET", "/api/car-types"),
       ]);
+      populateCarTypeSelects();
     })(),
   ]);
 })();

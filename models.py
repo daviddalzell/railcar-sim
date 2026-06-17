@@ -90,6 +90,13 @@ class CommodityCarTypeMap(Base):
     car_type: Mapped[str] = mapped_column(String, nullable=False)
 
 
+class CarType(Base):
+    __tablename__ = "car_types"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+
+
 class LayoutSettings(Base):
     __tablename__ = "layout_settings"
 

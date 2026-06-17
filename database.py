@@ -19,9 +19,23 @@ def get_db():
         db.close()
 
 
+DEFAULT_CAR_TYPES = [
+    "boxcar", "flatcar", "gondola", "tank car", "hopper",
+    "covered hopper", "refrigerator car", "caboose", "passenger car", "other",
+]
+
+
 def init_db():
-    from models import Car, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock  # noqa: F401
+    from models import Car, CarType, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock  # noqa: F401
     Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        if db.query(CarType).count() == 0:
+            for name in DEFAULT_CAR_TYPES:
+                db.add(CarType(name=name))
+            db.commit()
+    finally:
+        db.close()
     with engine.connect() as conn:
         try:
             conn.execute(text("ALTER TABLE waybills ADD COLUMN required_car_type TEXT"))

@@ -82,12 +82,7 @@
           </div>
           <div class="grid">
             <label>Car Type
-              <select id="field-type">
-                <option>boxcar</option><option>flatcar</option><option>gondola</option>
-                <option>tank car</option><option>hopper</option><option>covered hopper</option>
-                <option>refrigerator car</option><option>caboose</option>
-                <option>passenger car</option><option>other</option>
-              </select>
+              <select id="field-type"></select>
             </label>
             <label>Color <input id="field-color" type="text" placeholder="e.g. brown" /></label>
           </div>
@@ -147,12 +142,7 @@
           </div>
           <div class="grid">
             <label>Car Type
-              <select id="edit-field-type">
-                <option>boxcar</option><option>flatcar</option><option>gondola</option>
-                <option>tank car</option><option>hopper</option><option>covered hopper</option>
-                <option>refrigerator car</option><option>caboose</option>
-                <option>passenger car</option><option>other</option>
-              </select>
+              <select id="edit-field-type"></select>
             </label>
             <label>Color <input id="edit-field-color" type="text" placeholder="e.g. brown" /></label>
           </div>
@@ -231,13 +221,7 @@
           </div>
           <div class="grid">
             <label>Required Car Type
-              <select id="we-car-type">
-                <option value="">— any —</option>
-                <option>boxcar</option><option>flatcar</option><option>gondola</option>
-                <option>tank car</option><option>hopper</option><option>covered hopper</option>
-                <option>refrigerator car</option><option>caboose</option>
-                <option>passenger car</option><option>other</option>
-              </select>
+              <select id="we-car-type"></select>
             </label>
             <label class="checkbox-label we-empty-label">
               <input type="checkbox" id="we-empty" /> Empty / return move
@@ -372,13 +356,7 @@
               </div>
             </label>
             <label>Car Type
-              <select id="cmap-car-type">
-                <option value="boxcar">boxcar</option><option value="flatcar">flatcar</option>
-                <option value="gondola">gondola</option><option value="tank car">tank car</option>
-                <option value="hopper">hopper</option><option value="covered hopper">covered hopper</option>
-                <option value="refrigerator car">refrigerator car</option><option value="caboose">caboose</option>
-                <option value="passenger car">passenger car</option><option value="other">other</option>
-              </select>
+              <select id="cmap-car-type"></select>
             </label>
           </div>
           <div class="button-row">
@@ -388,6 +366,25 @@
           </div>
         </form>
         <div id="commodity-map-list"></div>
+      </div>
+
+      <hr />
+      <div>
+        <div class="section-header">
+          <h3>Car Types</h3>
+          <div class="button-row">
+            <button id="btn-toggle-car-type" class="outline small" title="Collapse / expand">▼</button>
+            <button id="btn-add-car-type" class="outline small">+ Add</button>
+          </div>
+        </div>
+        <div id="car-type-body">
+          <form id="car-type-form" class="hidden inline-form">
+            <input id="car-type-name" type="text" placeholder="e.g. autorack" required />
+            <button type="submit" class="small">Save</button>
+            <button type="button" id="btn-cancel-car-type" class="outline secondary small">✕</button>
+          </form>
+          <div id="car-type-list"></div>
+        </div>
       </div>
 
       <hr />
