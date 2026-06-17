@@ -1,8 +1,10 @@
+import csv
 import io
 import json
 import os
 import shutil
 import time
+import xml.etree.ElementTree as ET
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -135,6 +137,18 @@ class CarTypeCreate(BaseModel):
     name: str
 
 
+class CarImportRow(BaseModel):
+    reporting_marks: str
+    car_number: str
+    car_type: str = "other"
+    color: str = ""
+
+
+class CarImportCommit(BaseModel):
+    cars: list[CarImportRow]
+    mode: str = "add"
+
+
 class GenerateWaybillsRequest(BaseModel):
     origin_location_id: int
     replace: bool = False
@@ -241,6 +255,81 @@ def _import_table(db: Session, model, rows: list) -> None:
         }
         db.execute(model.__table__.insert().values(**filtered))
     db.flush()
+
+
+# ── Car import helpers ────────────────────────────────────────────────────────
+
+CAR_TYPE_MAP = {
+    "box car": "boxcar", "boxcar": "boxcar",
+    "flat": "flatcar", "flat car": "flatcar", "flatcar": "flatcar",
+    "tank": "tank car", "tank car": "tank car",
+    "covered hopper": "covered hopper", "cov hopper": "covered hopper",
+    "gondola": "gondola",
+    "hopper": "hopper", "coal car": "hopper",
+    "caboose": "caboose",
+    "passenger": "passenger car", "coach": "passenger car", "passenger car": "passenger car",
+    "refrigerator": "refrigerator car", "reefer": "refrigerator car",
+    "refrigerator car": "refrigerator car", "reefer car": "refrigerator car",
+    "auto rack": "other", "autorack": "other",
+}
+
+CSV_FIELD_ALIASES = {
+    "reporting_marks": {"reporting_marks", "road", "marks", "railroad"},
+    "car_number":      {"car_number", "number", "no", "num"},
+    "car_type":        {"car_type", "type", "kind"},
+    "color":           {"color", "colour"},
+}
+
+
+def normalise_car_type(raw: str) -> str:
+    return CAR_TYPE_MAP.get(raw.strip().lower(), "other")
+
+
+def parse_csv_cars(content: str) -> tuple[list[dict], list[str]]:
+    rows, errors = [], []
+    reader = csv.DictReader(io.StringIO(content))
+    if not reader.fieldnames:
+        return rows, ["CSV appears to be empty or has no header row"]
+    col_map = {}
+    for field, aliases in CSV_FIELD_ALIASES.items():
+        for header in (reader.fieldnames or []):
+            if header.strip().lower() in aliases:
+                col_map[field] = header
+                break
+    for i, row in enumerate(reader, start=2):
+        marks = row.get(col_map.get("reporting_marks", ""), "").strip()
+        number = row.get(col_map.get("car_number", ""), "").strip()
+        if not marks or not number:
+            errors.append(f"Row {i}: missing {'road' if not marks else 'number'} — skipped")
+            continue
+        rows.append({
+            "reporting_marks": marks,
+            "car_number": number,
+            "car_type": normalise_car_type(row.get(col_map.get("car_type", ""), "")),
+            "color": row.get(col_map.get("color", ""), "").strip(),
+        })
+    return rows, errors
+
+
+def parse_jmri_cars(content: str) -> tuple[list[dict], list[str]]:
+    rows, errors = [], []
+    try:
+        root = ET.fromstring(content)
+    except ET.ParseError as e:
+        return rows, [f"XML parse error: {e}"]
+    for i, car in enumerate(root.iter("car"), start=1):
+        marks  = (car.get("road") or car.get("roadName") or "").strip()
+        number = (car.get("number") or car.get("roadNumber") or "").strip()
+        if not marks or not number:
+            errors.append(f"Car {i}: missing road or number — skipped")
+            continue
+        rows.append({
+            "reporting_marks": marks,
+            "car_number": number,
+            "car_type": normalise_car_type(car.get("type", "")),
+            "color": (car.get("color") or "").strip(),
+        })
+    return rows, errors
 
 
 # ── Cars ──────────────────────────────────────────────────────────────────────
@@ -1442,3 +1531,86 @@ async def import_data(file: UploadFile = File(...), db: Session = Depends(get_db
     _import_table(db, MovementLog,         tables.get("movement_logs", []))
     db.commit()
     return {"ok": True}
+
+
+@app.post("/api/import/cars")
+async def import_cars(
+    file: UploadFile = File(...),
+    mode: str = "add",
+    dry_run: str = "false",
+    db: Session = Depends(get_db),
+):
+    content = (await file.read()).decode("utf-8", errors="replace")
+    filename = (file.filename or "").lower()
+
+    if filename.endswith(".xml"):
+        parsed, errors = parse_jmri_cars(content)
+    else:
+        parsed, errors = parse_csv_cars(content)
+
+    is_dry = dry_run.lower() == "true"
+    skipped_duplicates = 0
+    valid = []
+
+    existing_keys = {
+        (c.reporting_marks.lower(), c.car_number.lower())
+        for c in db.query(Car).all()
+    }
+
+    for row in parsed:
+        key = (row["reporting_marks"].lower(), row["car_number"].lower())
+        if mode == "add" and key in existing_keys:
+            skipped_duplicates += 1
+        else:
+            valid.append(row)
+
+    if not is_dry:
+        if mode == "replace":
+            db.query(MovementLog).delete()
+            db.query(Waybill).filter(Waybill.car_id.isnot(None)).delete()
+            db.query(Car).delete()
+            db.flush()
+        for row in valid:
+            db.add(Car(
+                reporting_marks=row["reporting_marks"],
+                car_number=row["car_number"],
+                car_type=row["car_type"],
+                color=row["color"],
+            ))
+        db.commit()
+
+    return {
+        "rows": valid,          # all valid rows for the frontend to store
+        "preview": valid[:8],   # first 8 for display
+        "total": len(valid),
+        "skipped_duplicates": skipped_duplicates,
+        "errors": errors,
+    }
+
+
+@app.post("/api/import/cars/commit")
+def commit_car_import(data: CarImportCommit, db: Session = Depends(get_db)):
+    if data.mode == "replace":
+        db.query(MovementLog).delete()
+        db.query(Waybill).filter(Waybill.car_id.isnot(None)).delete()
+        db.query(Car).delete()
+        db.flush()
+
+    existing_keys = {
+        (c.reporting_marks.lower(), c.car_number.lower())
+        for c in db.query(Car).all()
+    }
+    imported = 0
+    for row in data.cars:
+        key = (row.reporting_marks.lower(), row.car_number.lower())
+        if data.mode == "add" and key in existing_keys:
+            continue
+        db.add(Car(
+            reporting_marks=row.reporting_marks,
+            car_number=row.car_number,
+            car_type=row.car_type,
+            color=row.color,
+        ))
+        imported += 1
+    db.commit()
+    return {"imported": imported}

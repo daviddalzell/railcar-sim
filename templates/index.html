@@ -273,6 +273,8 @@
           <a href="/api/export" download class="outline small">⬇ Export Backup</a>
           <button id="btn-import-trigger" class="outline small">⬆ Import Backup</button>
           <input type="file" id="import-file-input" accept=".zip" class="hidden" />
+          <button id="btn-import-cars" class="outline small">⬆ Import Cars</button>
+          <input type="file" id="import-cars-file" accept=".csv,.xml" class="hidden" />
           <button id="btn-purge-uploads" class="outline small contrast">🗑 Purge Unused Photos</button>
         </div>
       </div>
@@ -563,6 +565,40 @@
           <button id="btn-edit-car" class="outline secondary">Edit Car…</button>
           <button id="btn-delete-car" class="outline contrast">Delete Car</button>
         </div>
+      </footer>
+    </article>
+  </dialog>
+
+  <!-- ── Import Cars Dialog ───────────────────────────────────────────────── -->
+  <dialog id="import-cars-dialog">
+    <article>
+      <header>
+        <button aria-label="Close" rel="prev" id="close-import-cars-dialog"></button>
+        <h3>Import Car Roster</h3>
+      </header>
+      <div id="import-cars-file-area">
+        <button type="button" id="btn-import-cars-pick" class="outline">Choose CSV or JMRI XML file…</button>
+        <p class="muted small" style="margin-top:0.5rem">
+          <strong>CSV:</strong> columns <code>Road, Number</code> required; <code>Type, Color</code> optional.<br>
+          <strong>JMRI:</strong> <code>OperationsCarRoster.xml</code> from your JMRI Operations folder.
+        </p>
+      </div>
+      <div id="import-cars-preview" class="hidden">
+        <p id="import-cars-summary"></p>
+        <div id="import-cars-errors" class="hidden error-msg small"></div>
+        <table id="import-cars-table" class="small">
+          <thead><tr><th>Road</th><th>Number</th><th>Type</th><th>Color</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <fieldset>
+          <legend>Import mode</legend>
+          <label><input type="radio" name="import-cars-mode" value="add" checked /> Add to existing cars</label>
+          <label><input type="radio" name="import-cars-mode" value="replace" /> Replace all cars</label>
+        </fieldset>
+      </div>
+      <footer>
+        <button id="btn-import-cars-confirm" class="hidden">Import</button>
+        <button type="button" id="btn-cancel-import-cars" class="outline secondary">Cancel</button>
       </footer>
     </article>
   </dialog>

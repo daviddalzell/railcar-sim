@@ -1857,6 +1857,110 @@ $("#import-file-input").addEventListener("change", async e => {
   }
 });
 
+// ── Import Cars dialog ───────────────────────────────────────────────────────
+
+let importCarsPreviewData = null;
+
+function openImportCarsDialog() {
+  importCarsPreviewData = null;
+  show($("#import-cars-file-area"));
+  hide($("#import-cars-preview"));
+  hide($("#btn-import-cars-confirm"));
+  hide($("#import-cars-errors"));
+  $("#import-cars-table tbody").innerHTML = "";
+  $("#import-cars-summary").textContent = "";
+  $("input[name='import-cars-mode'][value='add']").checked = true;
+  $("#import-cars-dialog").showModal();
+}
+
+$("#btn-import-cars").addEventListener("click", openImportCarsDialog);
+$("#close-import-cars-dialog").addEventListener("click", () => $("#import-cars-dialog").close());
+$("#btn-cancel-import-cars").addEventListener("click", () => $("#import-cars-dialog").close());
+
+$("#btn-import-cars-pick").addEventListener("click", () => $("#import-cars-file").click());
+
+$("#import-cars-file").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const btn = $("#btn-import-cars-pick");
+  btn.textContent = "⏳ Parsing…";
+  btn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("mode", "add");
+    fd.append("dry_run", "true");
+    const result = await fetch("/api/import/cars", { method: "POST", body: fd }).then(async r => {
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    });
+    importCarsPreviewData = result;
+
+    const errEl = $("#import-cars-errors");
+    if (result.errors?.length) {
+      errEl.textContent = result.errors.join("\n");
+      show(errEl);
+    } else {
+      hide(errEl);
+    }
+
+    let summary = `${result.total} car${result.total !== 1 ? "s" : ""} ready to import`;
+    if (result.skipped_duplicates) summary += ` (${result.skipped_duplicates} duplicate${result.skipped_duplicates !== 1 ? "s" : ""} will be skipped)`;
+    $("#import-cars-summary").textContent = summary;
+
+    const tbody = $("#import-cars-table tbody");
+    tbody.innerHTML = (result.preview || []).map(c =>
+      `<tr><td>${c.reporting_marks}</td><td>${c.car_number}</td><td>${c.car_type}</td><td>${c.color || "—"}</td></tr>`
+    ).join("");
+    if (result.total > 8) {
+      tbody.innerHTML += `<tr><td colspan="4" class="muted">… and ${result.total - 8} more</td></tr>`;
+    }
+
+    show($("#import-cars-preview"));
+    hide($("#import-cars-file-area"));
+    if (result.total > 0) show($("#btn-import-cars-confirm"));
+  } catch (err) {
+    showToast("Parse failed: " + err.message, "error");
+  } finally {
+    btn.textContent = "Choose CSV or JMRI XML file…";
+    btn.disabled = false;
+    e.target.value = "";
+  }
+});
+
+$("#btn-import-cars-confirm").addEventListener("click", async () => {
+  if (!importCarsPreviewData) return;
+  const file = $("#import-cars-file");
+  const mode = $("input[name='import-cars-mode']:checked").value;
+  const btn = $("#btn-import-cars-confirm");
+
+  if (mode === "replace" && !btn.dataset.confirm) {
+    btn.dataset.confirm = "1";
+    const orig = btn.textContent;
+    btn.textContent = "Replace all? Confirm";
+    btn.classList.add("btn-confirming");
+    setTimeout(() => { delete btn.dataset.confirm; btn.textContent = orig; btn.classList.remove("btn-confirming"); }, 3000);
+    return;
+  }
+  delete btn.dataset.confirm;
+  btn.classList.remove("btn-confirming");
+
+  // Re-send the file with dry_run=false
+  try {
+    const resp = await fetch("/api/import/cars/commit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cars: importCarsPreviewData.rows, mode }),
+    });
+    const result = await resp.json();
+    $("#import-cars-dialog").close();
+    await loadRoster();
+    showToast(`Imported ${result.imported} car${result.imported !== 1 ? "s" : ""}`, "success");
+  } catch (err) {
+    showToast("Import failed: " + err.message, "error");
+  }
+});
+
 // ── Ops/session thumbnail click → car detail ─────────────────────────────────
 $("#ops-list").addEventListener("click", e => {
   const thumb = e.target.closest(".clickable-thumb");
