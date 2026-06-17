@@ -339,14 +339,16 @@
       <!-- Commodity → Car Type mapping -->
       <hr />
       <div class="section-header" style="margin-top:1rem">
-        <h3>Commodity → Car Type</h3>
+        <div class="section-header-title">
+          <button id="btn-toggle-commodity-map" class="outline small" title="Collapse / expand">▶</button>
+          <h3>Commodity → Car Type</h3>
+        </div>
         <div class="button-row">
-          <button id="btn-toggle-commodity-map" class="outline small" title="Collapse / expand">▼</button>
           <button id="btn-seed-commodity-map" class="outline small">⚙ Seed Defaults</button>
           <button id="btn-add-commodity-map" class="outline small">+</button>
         </div>
       </div>
-      <div id="commodity-map-body">
+      <div id="commodity-map-body" class="hidden">
         <form id="commodity-map-form" class="hidden inline-form">
           <div class="grid">
             <label>Commodity
@@ -371,13 +373,13 @@
       <hr />
       <div>
         <div class="section-header">
-          <h3>Car Types</h3>
-          <div class="button-row">
-            <button id="btn-toggle-car-type" class="outline small" title="Collapse / expand">▼</button>
-            <button id="btn-add-car-type" class="outline small">+ Add</button>
+          <div class="section-header-title">
+            <button id="btn-toggle-car-type" class="outline small" title="Collapse / expand">▶</button>
+            <h3>Car Types</h3>
           </div>
+          <button id="btn-add-car-type" class="outline small">+ Add</button>
         </div>
-        <div id="car-type-body">
+        <div id="car-type-body" class="hidden">
           <form id="car-type-form" class="hidden inline-form">
             <input id="car-type-name" type="text" placeholder="e.g. autorack" required />
             <button type="submit" class="small">Save</button>

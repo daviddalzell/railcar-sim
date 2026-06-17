@@ -216,6 +216,12 @@ header nav a.active {
   margin: 0;
 }
 
+.section-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 /* ── Car grid ────────────────────────────────────────────────────────────── */
 .car-grid {
   display: grid;
