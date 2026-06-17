@@ -1801,6 +1801,13 @@ $("#btn-seed-commodity-map").addEventListener("click", async () => {
 });
 
 // ── Export / Import ───────────────────────────────────────────────────────────
+$("#btn-export-backup").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = "/api/export";
+  a.download = "";
+  a.click();
+});
+
 $("#btn-import-trigger").addEventListener("click", () => {
   const btn = $("#btn-import-trigger");
   if (!btn.dataset.confirm) {
