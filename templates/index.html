@@ -275,7 +275,6 @@
           <input type="file" id="import-file-input" accept=".zip" class="hidden" />
           <button id="btn-import-cars" class="outline small">⬆ Import Cars</button>
           <input type="file" id="import-cars-file" accept=".csv,.xml" class="hidden" />
-          <button id="btn-purge-uploads" class="outline small contrast">🗑 Purge Unused Photos</button>
         </div>
       </div>
       <hr />
@@ -607,13 +606,11 @@
   <dialog id="photo-library-dialog">
     <article>
       <header>
-        <button aria-label="Close" rel="prev" id="close-photo-library-dialog"></button>
+        <button aria-label="Close" rel="prev" id="btn-close-library"></button>
         <h3>Photo Library</h3>
+        <button id="btn-purge-uploads" class="outline small contrast" style="margin-top:0.75rem">🗑 Purge Unused Images</button>
       </header>
       <div id="photo-library-grid" class="photo-library-grid"></div>
-      <footer>
-        <button id="btn-close-library" class="outline secondary">Cancel</button>
-      </footer>
     </article>
   </dialog>
 

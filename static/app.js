@@ -152,7 +152,6 @@ async function openPhotoLibrary(onSelect) {
   }
 }
 
-$("#close-photo-library-dialog").addEventListener("click", () => $("#photo-library-dialog").close());
 $("#btn-close-library").addEventListener("click", () => $("#photo-library-dialog").close());
 
 // ── Tab navigation ────────────────────────────────────────────────────────────
