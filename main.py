@@ -116,6 +116,9 @@ class IndustryCreate(BaseModel):
     accepted_car_types: str = ""
     commodities: str = ""
     industry_role: str = "consumer"
+    inbound_car_types: str = ""
+    outbound_commodities: str = ""
+    outbound_car_types: str = ""
 
 
 class WaybillCreate(BaseModel):
@@ -176,6 +179,21 @@ def car_to_dict(car: Car) -> dict:
 
 def commodity_map_to_dict(m: CommodityCarTypeMap) -> dict:
     return {"id": m.id, "commodity": m.commodity, "car_type": m.car_type}
+
+
+def industry_to_dict(i: Industry) -> dict:
+    return {
+        "id": i.id,
+        "name": i.name,
+        "location_id": i.location_id,
+        "location_name": i.location.name if i.location else None,
+        "accepted_car_types": i.accepted_car_types,
+        "commodities": i.commodities,
+        "industry_role": i.industry_role,
+        "inbound_car_types": i.inbound_car_types,
+        "outbound_commodities": i.outbound_commodities,
+        "outbound_car_types": i.outbound_car_types,
+    }
 
 
 def waybill_to_dict(w: Waybill) -> dict:
@@ -535,18 +553,7 @@ def delete_location(loc_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/industries")
 def list_industries(db: Session = Depends(get_db)):
-    return [
-        {
-            "id": i.id,
-            "name": i.name,
-            "location_id": i.location_id,
-            "location_name": i.location.name if i.location else None,
-            "accepted_car_types": i.accepted_car_types,
-            "commodities": i.commodities,
-            "industry_role": i.industry_role,
-        }
-        for i in db.query(Industry).all()
-    ]
+    return [industry_to_dict(i) for i in db.query(Industry).all()]
 
 
 @app.post("/api/industries", status_code=201)
@@ -555,9 +562,7 @@ def create_industry(data: IndustryCreate, db: Session = Depends(get_db)):
     db.add(ind)
     db.commit()
     db.refresh(ind)
-    return {"id": ind.id, "name": ind.name, "location_id": ind.location_id,
-            "accepted_car_types": ind.accepted_car_types, "commodities": ind.commodities,
-            "industry_role": ind.industry_role}
+    return industry_to_dict(ind)
 
 
 @app.put("/api/industries/{ind_id}")
@@ -568,9 +573,7 @@ def update_industry(ind_id: int, data: IndustryCreate, db: Session = Depends(get
     for field, value in data.model_dump().items():
         setattr(ind, field, value)
     db.commit()
-    return {"id": ind.id, "name": ind.name, "location_id": ind.location_id,
-            "accepted_car_types": ind.accepted_car_types, "commodities": ind.commodities,
-            "industry_role": ind.industry_role}
+    return industry_to_dict(ind)
 
 
 @app.delete("/api/industries/{ind_id}", status_code=204)
@@ -591,15 +594,18 @@ def suggest_industry_endpoint(data: IndustrySuggestRequest, db: Session = Depend
     if not get_provider().is_available():
         raise HTTPException(503, "No AI provider available — check your API key settings")
     existing = [r.name for r in db.query(Industry).all()]
+    known_commodities = [r.commodity for r in db.query(CommodityCarTypeMap).all()]
     try:
         from vision import suggest_industry
-        result = suggest_industry(data.description, existing)
+        result = suggest_industry(data.description, existing, known_commodities)
     except Exception as e:
         raise HTTPException(500, str(e))
     return {
-        "commodities": result.get("commodities", ""),
-        "accepted_car_types": result.get("accepted_car_types", ""),
         "industry_role": result.get("industry_role", "consumer"),
+        "inbound_commodities": result.get("inbound_commodities", result.get("commodities", "")),
+        "inbound_car_types": result.get("inbound_car_types", result.get("accepted_car_types", "")),
+        "outbound_commodities": result.get("outbound_commodities", ""),
+        "outbound_car_types": result.get("outbound_car_types", ""),
     }
 
 
@@ -793,13 +799,31 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
     for ind in industries:
         if not ind.location_id:
             continue
-        commodities = [c.strip() for c in ind.commodities.split(",") if c.strip()]
-        if not commodities:
-            continue
-
-        raw_types = [t.strip() for t in ind.accepted_car_types.split(",") if t.strip()]
-        industry_fallback = None if not raw_types or raw_types[0].lower() in _WILDCARD_TYPES else raw_types[0]
         role = getattr(ind, "industry_role", "consumer")
+
+        def parse_csv(s):
+            return [t.strip() for t in (s or "").split(",") if t.strip()]
+
+        def fallback_type(types):
+            t = [x for x in types if x.lower() not in _WILDCARD_TYPES]
+            return t[0] if t else None
+
+        # Inbound fields: commodities + car types for receiving direction
+        inbound_commodities = parse_csv(ind.commodities)
+        inbound_raw_types   = parse_csv(ind.inbound_car_types or ind.accepted_car_types)
+        inbound_fallback    = fallback_type(inbound_raw_types)
+
+        # Outbound fields: commodities + car types for shipping direction
+        # Fall back to inbound fields so existing single-direction data keeps working
+        outbound_commodities = parse_csv(ind.outbound_commodities or ind.commodities)
+        outbound_raw_types   = parse_csv(ind.outbound_car_types or ind.accepted_car_types)
+        outbound_fallback    = fallback_type(outbound_raw_types)
+
+        has_inbound  = role in ("consumer", "transload")
+        has_outbound = role in ("producer", "transload")
+
+        if not inbound_commodities and not outbound_commodities:
+            continue
 
         def _wb_exists(name, _ind_id=ind.id):
             return db.query(Waybill).filter(
@@ -813,56 +837,10 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
             new_waybills.append(wb)
             created += 1
 
-        if role == "producer":
-            for commodity in commodities:
-                req_type = commodity_map.get(commodity.lower(), industry_fallback)
-                out_name = f"{commodity} ← {ind.name}"
-                if not _wb_exists(out_name):
-                    _add(Waybill(
-                        name=out_name,
-                        origin_id=ind.location_id,
-                        destination_id=data.origin_location_id,
-                        industry_id=ind.id,
-                        commodity=commodity,
-                        required_car_type=req_type,
-                        is_empty=False,
-                    ))
-                else:
-                    skipped += 1
-
-        elif role == "transload":
-            for commodity in commodities:
-                req_type = commodity_map.get(commodity.lower(), industry_fallback)
-                in_name = f"{commodity} → {ind.name}"
-                out_name = f"{commodity} ← {ind.name}"
-                if not _wb_exists(in_name):
-                    _add(Waybill(
-                        name=in_name,
-                        origin_id=data.origin_location_id,
-                        destination_id=ind.location_id,
-                        industry_id=ind.id,
-                        commodity=commodity,
-                        required_car_type=req_type,
-                        is_empty=False,
-                    ))
-                else:
-                    skipped += 1
-                if not _wb_exists(out_name):
-                    _add(Waybill(
-                        name=out_name,
-                        origin_id=ind.location_id,
-                        destination_id=data.origin_location_id,
-                        industry_id=ind.id,
-                        commodity=commodity,
-                        required_car_type=req_type,
-                        is_empty=False,
-                    ))
-                else:
-                    skipped += 1
-
-        else:  # consumer (default)
-            for commodity in commodities:
-                req_type = commodity_map.get(commodity.lower(), industry_fallback)
+        # Inbound loaded waybills (staging → industry)
+        if has_inbound:
+            for commodity in inbound_commodities:
+                req_type = commodity_map.get(commodity.lower(), inbound_fallback)
                 in_name = f"{commodity} → {ind.name}"
                 if not _wb_exists(in_name):
                     _add(Waybill(
@@ -877,12 +855,28 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
                 else:
                     skipped += 1
 
-        # Empty waybills — one per accepted car type (or one generic if wildcard)
-        empty_types = [ct for ct in raw_types if ct.lower() not in _WILDCARD_TYPES] if raw_types else []
+        # Outbound loaded waybills (industry → staging)
+        if has_outbound:
+            for commodity in outbound_commodities:
+                req_type = commodity_map.get(commodity.lower(), outbound_fallback)
+                out_name = f"{commodity} ← {ind.name}"
+                if not _wb_exists(out_name):
+                    _add(Waybill(
+                        name=out_name,
+                        origin_id=ind.location_id,
+                        destination_id=data.origin_location_id,
+                        industry_id=ind.id,
+                        commodity=commodity,
+                        required_car_type=req_type,
+                        is_empty=False,
+                    ))
+                else:
+                    skipped += 1
 
-        # Empty return (industry → staging) for all roles
-        if empty_types:
-            for ct in empty_types:
+        # Empty return waybills (industry → staging), one per inbound car type
+        inbound_empty_types = [ct for ct in inbound_raw_types if ct.lower() not in _WILDCARD_TYPES]
+        if inbound_empty_types:
+            for ct in inbound_empty_types:
                 n = f"← {ind.name} (empty {ct})"
                 if not _wb_exists(n):
                     _add(Waybill(name=n, origin_id=ind.location_id,
@@ -890,17 +884,18 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
                         commodity="", required_car_type=ct, is_empty=True))
                 else:
                     skipped += 1
-        else:
+        elif has_inbound:
             n = f"← {ind.name} (empty)"
             if not _wb_exists(n):
                 _add(Waybill(name=n, origin_id=ind.location_id,
                     destination_id=data.origin_location_id, industry_id=ind.id,
                     commodity="", required_car_type=None, is_empty=True))
 
-        # Empty delivery (staging → industry) for shipping roles (producer + transload)
-        if role in ("producer", "transload"):
-            if empty_types:
-                for ct in empty_types:
+        # Empty delivery waybills (staging → industry), one per outbound car type
+        if has_outbound:
+            outbound_empty_types = [ct for ct in outbound_raw_types if ct.lower() not in _WILDCARD_TYPES]
+            if outbound_empty_types:
+                for ct in outbound_empty_types:
                     n = f"→ {ind.name} (empty {ct})"
                     if not _wb_exists(n):
                         _add(Waybill(name=n, origin_id=data.origin_location_id,
@@ -913,7 +908,7 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
                 if not _wb_exists(n):
                     _add(Waybill(name=n, origin_id=data.origin_location_id,
                         destination_id=ind.location_id, industry_id=ind.id,
-                        commodity="", required_car_type=industry_fallback, is_empty=True))
+                        commodity="", required_car_type=outbound_fallback, is_empty=True))
 
     db.commit()
     for w in new_waybills:

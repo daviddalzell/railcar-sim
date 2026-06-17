@@ -27,6 +27,9 @@ class Industry(Base):
     accepted_car_types: Mapped[str] = mapped_column(String, default="")
     commodities: Mapped[str] = mapped_column(String, default="")
     industry_role: Mapped[str] = mapped_column(String, default="consumer")
+    inbound_car_types: Mapped[str] = mapped_column(String, default="")
+    outbound_commodities: Mapped[str] = mapped_column(String, default="")
+    outbound_car_types: Mapped[str] = mapped_column(String, default="")
 
     location: Mapped[Optional["Location"]] = relationship("Location", back_populates="industries")
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="industry")

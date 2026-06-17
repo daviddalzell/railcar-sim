@@ -315,18 +315,28 @@
             <select id="ind-location">
               <option value="">— no location —</option>
             </select>
-            <input id="ind-car-types" type="text" placeholder="Accepted car types (comma-sep)" />
-            <div class="commodity-wrap">
-              <input id="ind-commodities" type="text" placeholder="Commodities (comma-sep)" autocomplete="off" />
-              <ul id="commodity-suggestions" class="suggestion-dropdown hidden"></ul>
+            <label class="checkbox-label">
+              <input type="checkbox" id="ind-receiver" checked /> Receives loaded cars
+            </label>
+            <div id="ind-inbound-section">
+              <input id="ind-inbound-car-types" type="text" placeholder="Inbound car types (comma-sep)" />
+              <div class="commodity-wrap">
+                <input id="ind-inbound-commodities" type="text" placeholder="Inbound commodities (comma-sep)" autocomplete="off" />
+                <ul id="inbound-commodity-suggestions" class="suggestion-dropdown hidden"></ul>
+              </div>
+              <small id="inbound-commodity-warn" class="hidden error-msg"></small>
             </div>
-            <small id="commodity-warn" class="hidden error-msg"></small>
             <label class="checkbox-label">
-              <input type="checkbox" id="ind-receiver" checked /> Receiver (receives loaded cars)
+              <input type="checkbox" id="ind-shipper" /> Ships loaded cars
             </label>
-            <label class="checkbox-label">
-              <input type="checkbox" id="ind-shipper" /> Shipper (ships loaded cars)
-            </label>
+            <div id="ind-outbound-section" class="hidden">
+              <input id="ind-outbound-car-types" type="text" placeholder="Outbound car types (comma-sep)" />
+              <div class="commodity-wrap">
+                <input id="ind-outbound-commodities" type="text" placeholder="Outbound commodities (comma-sep)" autocomplete="off" />
+                <ul id="outbound-commodity-suggestions" class="suggestion-dropdown hidden"></ul>
+              </div>
+              <small id="outbound-commodity-warn" class="hidden error-msg"></small>
+            </div>
             <button type="submit" class="small">Save</button>
             <button type="button" id="btn-cancel-industry" class="outline secondary small">✕</button>
             <input type="hidden" id="ind-edit-id" value="" />

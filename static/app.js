@@ -1330,10 +1330,21 @@ function checkboxesToRole() {
   return "consumer";
 }
 
+function syncDirectionSections() {
+  if ($("#ind-receiver").checked) show($("#ind-inbound-section"));
+  else hide($("#ind-inbound-section"));
+  if ($("#ind-shipper").checked) show($("#ind-outbound-section"));
+  else hide($("#ind-outbound-section"));
+}
+
 function roleToCheckboxes(role) {
   $("#ind-receiver").checked = (role !== "producer");
   $("#ind-shipper").checked  = (role === "producer" || role === "transload");
+  syncDirectionSections();
 }
+
+$("#ind-receiver").addEventListener("change", syncDirectionSections);
+$("#ind-shipper").addEventListener("change", syncDirectionSections);
 
 function renderIndustryList() {
   const list = $("#industry-list");
@@ -1343,20 +1354,23 @@ function renderIndustryList() {
   }
   const roleBadge = r => r === "producer" ? "producer" : r === "transload" ? "transload" : "";
 
-  list.innerHTML = industries.map(i => {
-    const tokens = (i.commodities || "").split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+  function unmappedChipsHtml(commodityCsv, direction, indId) {
+    const tokens = (commodityCsv || "").split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
     const unmapped = tokens.filter(t => !commodityMap.find(m => m.commodity === t));
-    const unmappedHtml = unmapped.length
-      ? `<div class="ind-unmapped-row">
-           <span class="ind-unmapped-label">⚠ unmapped:</span>
-           ${unmapped.map(c =>
-             `<span class="chip-group">` +
-             `<button type="button" class="outline small cmap-add-chip" data-commodity="${c}" data-ind-id="${i.id}">+ ${c}</button>` +
-             `<button type="button" class="outline small contrast cmap-dismiss-chip" data-commodity="${c}" data-ind-id="${i.id}" title="Remove from industry">×</button>` +
-             `</span>`
-           ).join("")}
-         </div>`
-      : "";
+    if (!unmapped.length) return "";
+    return `<div class="ind-unmapped-row">
+      <span class="ind-unmapped-label">⚠ unmapped (${direction}):</span>
+      ${unmapped.map(c =>
+        `<span class="chip-group">` +
+        `<button type="button" class="outline small cmap-add-chip" data-commodity="${c}" data-ind-id="${indId}" data-field="${direction}">+ ${c}</button>` +
+        `<button type="button" class="outline small contrast cmap-dismiss-chip" data-commodity="${c}" data-ind-id="${indId}" data-field="${direction}" title="Remove from industry">×</button>` +
+        `</span>`
+      ).join("")}
+    </div>`;
+  }
+
+  list.innerHTML = industries.map(i => {
+    const allCommodities = [i.commodities, i.outbound_commodities].filter(Boolean).join(", ");
     return `
       <div class="layout-item layout-item-stack">
         <div class="layout-item-main">
@@ -1364,14 +1378,15 @@ function renderIndustryList() {
             <strong>${i.name}</strong>
             ${i.location_name ? `<em>@ ${i.location_name}</em>` : ""}
             ${roleBadge(i.industry_role) ? `<span class='waybill-badge muted'>${roleBadge(i.industry_role)}</span>` : ""}
-            ${i.commodities ? `<span class='muted'>${i.commodities}</span>` : ""}
+            ${allCommodities ? `<span class='muted'>${allCommodities}</span>` : ""}
           </span>
           <span>
             <button class="outline small edit-ind" data-id="${i.id}">✏️</button>
             <button class="outline small contrast del-ind" data-id="${i.id}">🗑</button>
           </span>
         </div>
-        ${unmappedHtml}
+        ${unmappedChipsHtml(i.commodities, "inbound", i.id)}
+        ${unmappedChipsHtml(i.outbound_commodities, "outbound", i.id)}
       </div>`;
   }).join("");
 
@@ -1381,11 +1396,14 @@ function renderIndustryList() {
       if (!ind) return;
       $("#ind-name").value = ind.name;
       $("#ind-location").value = ind.location_id || "";
-      $("#ind-car-types").value = ind.accepted_car_types;
-      $("#ind-commodities").value = ind.commodities;
+      $("#ind-inbound-car-types").value = ind.inbound_car_types || ind.accepted_car_types || "";
+      $("#ind-inbound-commodities").value = ind.commodities || "";
+      $("#ind-outbound-car-types").value = ind.outbound_car_types || "";
+      $("#ind-outbound-commodities").value = ind.outbound_commodities || "";
       $("#ind-edit-id").value = ind.id;
       roleToCheckboxes(ind.industry_role || "consumer");
-      hide($("#commodity-warn"));
+      hide($("#inbound-commodity-warn"));
+      hide($("#outbound-commodity-warn"));
       show($("#industry-form"));
     });
   });
@@ -1420,14 +1438,20 @@ function renderIndustryList() {
     const dismiss = e.target.closest(".cmap-dismiss-chip");
     if (dismiss) {
       const commodity = dismiss.dataset.commodity;
-      const updated = (ind.commodities || "").split(",").map(t => t.trim()).filter(t => t.toLowerCase() !== commodity.toLowerCase()).join(", ");
-      await api("PUT", `/api/industries/${indId}`, {
+      const field = dismiss.dataset.field;
+      const srcVal = field === "outbound" ? (ind.outbound_commodities || "") : (ind.commodities || "");
+      const updated = srcVal.split(",").map(t => t.trim()).filter(t => t.toLowerCase() !== commodity.toLowerCase()).join(", ");
+      const patch = {
         name: ind.name,
         location_id: ind.location_id || null,
-        accepted_car_types: ind.accepted_car_types,
-        commodities: updated,
+        accepted_car_types: ind.accepted_car_types || "",
+        commodities: field === "outbound" ? (ind.commodities || "") : updated,
         industry_role: ind.industry_role || "consumer",
-      });
+        inbound_car_types: ind.inbound_car_types || "",
+        outbound_commodities: field === "outbound" ? updated : (ind.outbound_commodities || ""),
+        outbound_car_types: ind.outbound_car_types || "",
+      };
+      await api("PUT", `/api/industries/${indId}`, patch);
       await loadLayout();
       return;
     }
@@ -1482,11 +1506,14 @@ $("#location-form").addEventListener("submit", async e => {
 $("#btn-add-industry").addEventListener("click", () => {
   $("#ind-name").value = "";
   $("#ind-location").value = "";
-  $("#ind-car-types").value = "";
-  $("#ind-commodities").value = "";
+  $("#ind-inbound-car-types").value = "";
+  $("#ind-inbound-commodities").value = "";
+  $("#ind-outbound-car-types").value = "";
+  $("#ind-outbound-commodities").value = "";
   $("#ind-edit-id").value = "";
   roleToCheckboxes("consumer");
-  hide($("#commodity-warn"));
+  hide($("#inbound-commodity-warn"));
+  hide($("#outbound-commodity-warn"));
   show($("#industry-form"));
 });
 $("#btn-cancel-industry").addEventListener("click", () => hide($("#industry-form")));
@@ -1500,9 +1527,11 @@ $("#btn-suggest-industry").addEventListener("click", async () => {
   btn.disabled = true;
   try {
     const result = await api("POST", "/api/industries/suggest", { description });
-    if (result.commodities)      $("#ind-commodities").value  = result.commodities;
-    if (result.accepted_car_types) $("#ind-car-types").value  = result.accepted_car_types;
     if (result.industry_role) roleToCheckboxes(result.industry_role);
+    if (result.inbound_commodities)  $("#ind-inbound-commodities").value  = result.inbound_commodities;
+    if (result.inbound_car_types)    $("#ind-inbound-car-types").value    = result.inbound_car_types;
+    if (result.outbound_commodities) $("#ind-outbound-commodities").value = result.outbound_commodities;
+    if (result.outbound_car_types)   $("#ind-outbound-car-types").value   = result.outbound_car_types;
   } catch (err) {
     showToast("AI suggestion failed — check ANTHROPIC_API_KEY", "error");
   } finally {
@@ -1518,9 +1547,12 @@ $("#industry-form").addEventListener("submit", async e => {
   const body = {
     name: $("#ind-name").value.trim(),
     location_id: locVal ? parseInt(locVal) : null,
-    accepted_car_types: $("#ind-car-types").value.trim(),
-    commodities: $("#ind-commodities").value.trim(),
+    accepted_car_types: "",
+    commodities: $("#ind-inbound-commodities").value.trim(),
     industry_role: checkboxesToRole(),
+    inbound_car_types: $("#ind-inbound-car-types").value.trim(),
+    outbound_commodities: $("#ind-outbound-commodities").value.trim(),
+    outbound_car_types: $("#ind-outbound-car-types").value.trim(),
   };
   if (editId) {
     await api("PUT", `/api/industries/${editId}`, body);
@@ -1533,15 +1565,10 @@ $("#industry-form").addEventListener("submit", async e => {
 
 // ── Commodity autocomplete ────────────────────────────────────────────────────
 
-function refreshCommodityWarning() {
-  const warnEl = $("#commodity-warn");
-  const tokens = $("#ind-commodities").value
-    .split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+function refreshCommodityWarning(inputEl, warnEl) {
+  const tokens = inputEl.value.split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
   const unknown = tokens.filter(t => !commodityMap.find(m => m.commodity === t));
-  if (!unknown.length) {
-    hide(warnEl);
-    return;
-  }
+  if (!unknown.length) { hide(warnEl); return; }
   warnEl.innerHTML = "⚠ Not in commodity map: " +
     unknown.map(c =>
       `<span class="chip-group">` +
@@ -1549,13 +1576,18 @@ function refreshCommodityWarning() {
       `<button type="button" class="outline small contrast cmap-dismiss-chip" data-commodity="${c}" title="Remove from industry">×</button>` +
       `</span>`
     ).join(" ");
-  warnEl.classList.remove("hidden");
+  show(warnEl);
 }
 
-{
-  const input    = $("#ind-commodities");
-  const dropdown = $("#commodity-suggestions");
-  const warnEl   = $("#commodity-warn");
+function refreshAllCommodityWarnings() {
+  refreshCommodityWarning($("#ind-inbound-commodities"), $("#inbound-commodity-warn"));
+  refreshCommodityWarning($("#ind-outbound-commodities"), $("#outbound-commodity-warn"));
+}
+
+function setupCommodityAutocomplete(inputId, dropdownId, warnId) {
+  const input    = $(inputId);
+  const dropdown = $(dropdownId);
+  const warnEl   = $(warnId);
 
   function currentToken() {
     const val = input.value;
@@ -1573,10 +1605,10 @@ function refreshCommodityWarning() {
 
   input.addEventListener("input", () => {
     const token = currentToken();
-    warnEl.classList.add("hidden");
-    if (!token || !commodityMap.length) { dropdown.classList.add("hidden"); return; }
+    hide(warnEl);
+    if (!token || !commodityMap.length) { hide(dropdown); return; }
     const matches = commodityMap.filter(m => m.commodity.includes(token));
-    if (!matches.length) { dropdown.classList.add("hidden"); return; }
+    if (!matches.length) { hide(dropdown); return; }
     dropdown.innerHTML = matches.map(m =>
       `<li class="suggestion-item" data-commodity="${m.commodity}">
         <span>${m.commodity}</span>
@@ -1586,16 +1618,15 @@ function refreshCommodityWarning() {
     dropdown.querySelectorAll(".suggestion-item").forEach(li =>
       li.addEventListener("mousedown", e => { e.preventDefault(); completeToken(li.dataset.commodity); })
     );
-    dropdown.classList.remove("hidden");
+    show(dropdown);
   });
 
   input.addEventListener("blur", () => {
-    dropdown.classList.add("hidden");
-    refreshCommodityWarning();
+    hide(dropdown);
+    refreshCommodityWarning(input, warnEl);
   });
 
   warnEl.addEventListener("click", async e => {
-    // × dismiss: remove commodity from industry and auto-save
     const dismiss = e.target.closest(".cmap-dismiss-chip");
     if (dismiss) {
       const commodity = dismiss.dataset.commodity;
@@ -1606,28 +1637,27 @@ function refreshCommodityWarning() {
         await api("PUT", `/api/industries/${editId}`, {
           name: $("#ind-name").value.trim(),
           location_id: $("#ind-location").value ? parseInt($("#ind-location").value) : null,
-          accepted_car_types: $("#ind-car-types").value.trim(),
-          commodities: input.value,
+          accepted_car_types: "",
+          commodities: $("#ind-inbound-commodities").value.trim(),
           industry_role: checkboxesToRole(),
+          inbound_car_types: $("#ind-inbound-car-types").value.trim(),
+          outbound_commodities: $("#ind-outbound-commodities").value.trim(),
+          outbound_car_types: $("#ind-outbound-car-types").value.trim(),
         });
         await loadLayout();
       }
-      refreshCommodityWarning();
+      refreshCommodityWarning(input, warnEl);
       return;
     }
 
-    // + chip: open commodity map form and trigger AI suggest
     const chip = e.target.closest(".cmap-add-chip");
     if (!chip) return;
     const commodity = chip.dataset.commodity;
-    // Expand commodity map panel if collapsed
     const body = $("#commodity-map-body");
-    const toggleBtn = $("#btn-toggle-commodity-map");
     if (body.classList.contains("hidden")) {
       body.classList.remove("hidden");
-      toggleBtn.textContent = "▼";
+      $("#btn-toggle-commodity-map").textContent = "▼";
     }
-    // Open the form and populate it
     show($("#commodity-map-form"));
     $("#cmap-edit-id").value = "";
     $("#cmap-commodity").value = commodity;
@@ -1635,6 +1665,9 @@ function refreshCommodityWarning() {
     $("#btn-suggest-cmap").click();
   });
 }
+
+setupCommodityAutocomplete("#ind-inbound-commodities",  "#inbound-commodity-suggestions",  "#inbound-commodity-warn");
+setupCommodityAutocomplete("#ind-outbound-commodities", "#outbound-commodity-suggestions", "#outbound-commodity-warn");
 
 // ── Commodity → Car Type map ──────────────────────────────────────────────────
 function renderCommodityMapList() {
@@ -1749,7 +1782,7 @@ $("#commodity-map-form").addEventListener("submit", async e => {
     hide($("#commodity-map-form"));
     $("#cmap-commodity").disabled = false;
     await loadLayout();
-    refreshCommodityWarning();
+    refreshAllCommodityWarnings();
   } catch (err) {
     showToast("Error saving mapping: " + err.message, "error");
   }

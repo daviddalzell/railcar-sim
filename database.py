@@ -47,3 +47,29 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE industries ADD COLUMN inbound_car_types TEXT DEFAULT ''"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE industries ADD COLUMN outbound_commodities TEXT DEFAULT ''"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE industries ADD COLUMN outbound_car_types TEXT DEFAULT ''"))
+            conn.commit()
+        except Exception:
+            pass
+        # One-time migration: move producer industries' data to outbound fields
+        conn.execute(text("""
+            UPDATE industries
+            SET outbound_commodities = commodities,
+                outbound_car_types   = accepted_car_types,
+                commodities          = '',
+                accepted_car_types   = ''
+            WHERE industry_role = 'producer'
+              AND (outbound_commodities IS NULL OR outbound_commodities = '')
+        """))
+        conn.commit()

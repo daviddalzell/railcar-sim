@@ -413,16 +413,20 @@ Return ONLY a JSON object with no markdown, no explanation:
     return _parse_json_response(_text_complete(prompt))
 
 
-def suggest_industry(description: str, existing_industries: list[str]) -> dict:
+def suggest_industry(description: str, existing_industries: list[str], known_commodities: list[str] | None = None) -> dict:
     """Return AI-suggested commodities, accepted_car_types, and industry_role for a new industry."""
     car_types_str = ", ".join(CAR_TYPES)
     existing_str = (", ".join(existing_industries)) if existing_industries else "none yet"
+    known_str = (", ".join(known_commodities)) if known_commodities else "none yet"
 
     prompt = f"""You are a model railroad operations expert. A user is adding a new industry to their layout.
 
 Industry name / description: "{description}"
 
 Existing industries on this layout: {existing_str}
+
+Known commodities already in this layout's commodity map: {known_str}
+Prefer using these exact commodity names when they are a close match for what this industry handles. Only introduce a new commodity name if none of the known ones fit.
 
 Suggest realistic railroad commodities, car types, and role for this industry.
 
@@ -431,13 +435,15 @@ Valid industry_role values: consumer, producer, transload
 
 Return ONLY a JSON object with these fields (no markdown, no explanation):
 {{
-  "commodities": "<comma-separated list of commodities this industry handles>",
-  "accepted_car_types": "<comma-separated car types from the valid list above>",
-  "industry_role": "<consumer, producer, or transload>"
+  "industry_role": "<consumer, producer, or transload>",
+  "inbound_commodities": "<comma-separated commodities this industry RECEIVES, or empty string if producer>",
+  "inbound_car_types": "<comma-separated car types for inbound traffic, or empty string if producer>",
+  "outbound_commodities": "<comma-separated commodities this industry SHIPS, or empty string if consumer>",
+  "outbound_car_types": "<comma-separated car types for outbound traffic, or empty string if consumer>"
 }}
 
-consumer = receives loaded cars (e.g. factory consuming raw materials)
-producer = ships loaded cars (e.g. mine, grain elevator)
-transload = both receives and ships (e.g. distribution center)"""
+consumer = receives loaded cars only (e.g. factory consuming raw materials)
+producer = ships loaded cars only (e.g. mine, grain elevator)
+transload = both receives AND ships, potentially different commodities each direction (e.g. grain elevator receives grain, ships flour)"""
 
     return _parse_json_response(_text_complete(prompt))
