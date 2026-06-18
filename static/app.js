@@ -142,6 +142,7 @@ async function openPhotoLibrary(onSelect) {
       `).join("");
       $$(".lib-thumb").forEach(el => {
         el.addEventListener("click", () => {
+          if (!photoLibraryCallback) return;
           photoLibraryCallback({ path: el.dataset.path, url: el.dataset.url });
           $("#photo-library-dialog").close();
         });
@@ -1801,6 +1802,8 @@ $("#btn-seed-commodity-map").addEventListener("click", async () => {
 });
 
 // ── Export / Import ───────────────────────────────────────────────────────────
+$("#btn-open-photo-library").addEventListener("click", () => openPhotoLibrary(null));
+
 $("#btn-export-backup").addEventListener("click", () => {
   const a = document.createElement("a");
   a.href = "/api/export";
