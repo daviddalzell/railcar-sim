@@ -449,9 +449,10 @@
             <li>Click <strong>+ Add Car via Photo</strong> to photograph or upload an image. AI fills in all fields automatically.</li>
             <li>Click <strong>🗄️ Select From Library</strong> to pick from previously uploaded photos.</li>
             <li>Use <strong>✨ Generate Stylized Illustration</strong> to create an artistic rendering of your car.</li>
+            <li>Click <strong>+ Add Car Manually</strong> to enter car details without a photo. Select a car type and, if a default image has been assigned to that type, a banner will offer to use it automatically.</li>
+            <li>Cars without a personal photo display their car type's default image on the roster grid, detail view, and operations list — if one has been assigned in Layout Setup → Car Types.</li>
             <li>Click any car card to open its full details: waybills, movement history, location.</li>
             <li>Edit or delete a car from its detail view. Deleting a car removes all associated waybills and movement history.</li>
-            <li>Cars can be added manually if you prefer not to use a photo.</li>
           </ul>
         </div>
       </div>
@@ -474,11 +475,24 @@
       <div class="help-section">
         <button class="help-section-header">▶ Layout Setup</button>
         <div class="help-section-body hidden">
-          <p>Define the geography of your model railroad: locations, industries, and commodity rules.</p>
+          <p>Define the geography of your model railroad: locations, industries, car types, and commodity rules.</p>
           <ul>
             <li><strong>Locations</strong> have four types: <em>Yard</em> (staging hub), <em>Industry</em> (car destination), <em>Staging</em> (off-layout staging), <em>Storage</em> (parked cars awaiting assignment).</li>
-            <li><strong>Industries</strong> are attached to locations and have a role: <em>Consumer</em> (receives loaded cars), <em>Producer</em> (ships loaded cars), or <em>Transload</em> (both).</li>
-            <li>Use <strong>✨ AI Suggest</strong> next to any industry name to let AI fill in commodities, accepted car types, and role automatically.</li>
+            <li><strong>Industries</strong> are attached to locations and have a role:
+              <ul>
+                <li><em>Consumer</em> — receives loaded cars inbound; define inbound car types and inbound commodities.</li>
+                <li><em>Producer</em> — ships loaded cars outbound; define outbound car types and outbound commodities.</li>
+                <li><em>Transload</em> — both receives and ships; configure both inbound and outbound fields.</li>
+              </ul>
+            </li>
+            <li>Use <strong>✨ AI Suggest</strong> next to any industry name to let AI fill in role, commodities, and accepted car types automatically. AI reuses existing commodity names where possible.</li>
+            <li><strong>Car Types</strong> — add or remove car types available in the roster. Each car type can have a default image assigned from the Photo Library; this image is shown for any car of that type that has no personal photo.
+              <ul>
+                <li>Bundled default images in <code>static/images/car-types/</code> are assigned automatically at startup (named by car type, e.g. <code>boxcar.png</code>).</li>
+                <li>Use <strong>Set image</strong> on any car type row to pick a different image from the Photo Library.</li>
+                <li>Use <strong>Clear</strong> to remove the assignment; the bundled default will be restored on next server restart.</li>
+              </ul>
+            </li>
             <li><strong>Commodity → Car Type</strong> mappings tell the auto-assign system which car type to use for each commodity.</li>
             <li>Use <strong>✨</strong> next to any commodity to get an AI suggestion for the correct car type.</li>
             <li>Use <strong>⚙ Seed Defaults</strong> to populate a starter set of commodity→car-type mappings.</li>
@@ -535,14 +549,53 @@
       </div>
 
       <div class="help-section">
+        <button class="help-section-header">▶ Importing Cars (CSV / JMRI)</button>
+        <div class="help-section-body hidden">
+          <p>Use <strong>Import Cars</strong> in Layout Setup → Data to bulk-load your roster from a CSV file or a JMRI roster XML export.</p>
+          <ul>
+            <li>Column order does not matter — the importer matches columns by header name.</li>
+            <li><strong>Required columns</strong> (rows missing either are skipped):
+              <ul>
+                <li><em>Reporting marks</em> — header: <code>reporting_marks</code>, <code>road</code>, <code>marks</code>, or <code>railroad</code></li>
+                <li><em>Car number</em> — header: <code>car_number</code>, <code>number</code>, <code>no</code>, or <code>num</code></li>
+              </ul>
+            </li>
+            <li><strong>Optional columns</strong>:
+              <ul>
+                <li><em>Car type</em> — header: <code>car_type</code>, <code>type</code>, or <code>kind</code></li>
+                <li><em>Color</em> — header: <code>color</code> or <code>colour</code></li>
+              </ul>
+            </li>
+            <li>Example minimal CSV:<br><code>road,number<br>UP,12345<br>BNSF,98765</code></li>
+            <li>Import shows a preview before committing. Choose <em>Skip duplicates</em> or <em>Replace</em> for cars already in the roster.</li>
+            <li>For JMRI XML, export your roster from JMRI (File → Export Roster) and import the resulting <code>.xml</code> file directly.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <button class="help-section-header">▶ Photo Library</button>
+        <div class="help-section-body hidden">
+          <p>The Photo Library stores all uploaded images and bundled car type defaults. Access it from Layout Setup → Data → <strong>Photo Library</strong>.</p>
+          <ul>
+            <li>Click <strong>⬆ Load File(s)</strong> to upload one or more images at once — select multiple files in the file picker.</li>
+            <li>Images marked <strong>in use</strong> (blue badge) are attached to a car. Images marked <strong>default</strong> (green badge) are the bundled car type defaults.</li>
+            <li>To delete uploaded images, click thumbnails to select them (a checkmark appears), then click <strong>🗑 Delete Selected</strong> and confirm. Default images cannot be selected for deletion.</li>
+            <li><strong>🗑 Purge Unused</strong> removes all uploaded images not currently assigned to any car or car type default in one step.</li>
+            <li>Images assigned to a car or set as a car type default are always protected from purge.</li>
+            <li>When opened via <strong>Set image</strong> in Car Types, clicking a thumbnail assigns it as the default for that car type and closes the library.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="help-section">
         <button class="help-section-header">▶ Data &amp; Backup</button>
         <div class="help-section-body hidden">
           <p>Export and restore your entire layout — locations, industries, cars, waybills, photos, and movement logs — in a single ZIP file.</p>
           <ul>
-            <li>Use <strong>Export Backup</strong> (bottom of any screen, or via the Layout Setup tab) to download a complete snapshot.</li>
+            <li>Use <strong>Export Backup</strong> in the Layout Setup Data section to download a complete snapshot.</li>
             <li>Use <strong>Import Backup</strong> to restore from a ZIP. This replaces all current data.</li>
             <li>Backups are useful for sharing layouts with other operators or recovering from errors.</li>
-            <li>Use <strong>Purge Orphaned Photos</strong> to remove uploaded images no longer attached to any car.</li>
             <li>Each car's detail view shows its last 5 movements with timestamps and notes.</li>
           </ul>
         </div>
