@@ -1,3 +1,4 @@
+from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -28,14 +29,8 @@ DEFAULT_CAR_TYPES = [
 def init_db():
     from models import Car, CarType, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock  # noqa: F401
     Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    try:
-        if db.query(CarType).count() == 0:
-            for name in DEFAULT_CAR_TYPES:
-                db.add(CarType(name=name))
-            db.commit()
-    finally:
-        db.close()
+    # Run all column migrations before any ORM queries so SQLAlchemy doesn't
+    # try to SELECT columns that don't exist yet on older databases.
     with engine.connect() as conn:
         try:
             conn.execute(text("ALTER TABLE waybills ADD COLUMN required_car_type TEXT"))
@@ -62,6 +57,11 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE car_types ADD COLUMN default_photo_path TEXT"))
+            conn.commit()
+        except Exception:
+            pass
         # One-time migration: move producer industries' data to outbound fields
         conn.execute(text("""
             UPDATE industries
@@ -73,3 +73,24 @@ def init_db():
               AND (outbound_commodities IS NULL OR outbound_commodities = '')
         """))
         conn.commit()
+    db = SessionLocal()
+    try:
+        if db.query(CarType).count() == 0:
+            for name in DEFAULT_CAR_TYPES:
+                db.add(CarType(name=name))
+            db.commit()
+        # Auto-assign bundled default images for car types that have none set
+        static_dir = Path("static/images/car-types")
+        if static_dir.exists():
+            for ct in db.query(CarType).all():
+                if ct.default_photo_path:
+                    continue
+                slug = ct.name.replace(" ", "-")
+                for ext in (".svg", ".png", ".jpg", ".jpeg", ".webp"):
+                    candidate = static_dir / f"{slug}{ext}"
+                    if candidate.exists():
+                        ct.default_photo_path = str(candidate)
+                        break
+            db.commit()
+    finally:
+        db.close()

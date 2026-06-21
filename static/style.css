@@ -274,6 +274,25 @@ header nav a.active {
   padding: 0.25rem;
 }
 
+.default-car-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #FAF0E6;
+}
+
+.car-type-thumb {
+  width: 48px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #eee;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .car-info {
   padding: 0.6rem 0.75rem;
   display: flex;
@@ -787,6 +806,28 @@ button.small {
 
 .lib-thumb.lib-assigned { opacity: 0.6; }
 
+.lib-thumb.lib-selected {
+  border-color: var(--rail-accent);
+  outline: 2px solid var(--rail-accent);
+}
+
+.lib-thumb.lib-selected::after {
+  content: "✓";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: var(--rail-accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: bold;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .lib-badge {
   position: absolute;
   bottom: 3px;
@@ -796,6 +837,10 @@ button.small {
   font-size: 0.65rem;
   padding: 1px 5px;
   border-radius: 3px;
+}
+
+.lib-badge-default {
+  background: var(--rail-accent, #5c7a3e);
 }
 
 .upload-zone-actions {

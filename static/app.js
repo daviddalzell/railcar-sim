@@ -123,37 +123,137 @@ function withLoading(btn, label, fn) {
 
 // ── Photo library ─────────────────────────────────────────────────────────────
 let photoLibraryCallback = null;
+let selectedLibraryPaths = new Set();
 
-async function openPhotoLibrary(onSelect) {
-  photoLibraryCallback = onSelect;
+function updateDeleteSelectedBtn() {
+  const btn = $("#btn-delete-selected");
+  const n = selectedLibraryPaths.size;
+  if (n > 0) {
+    show(btn);
+    $("#selected-count").textContent = n;
+  } else {
+    hide(btn);
+    delete btn.dataset.confirm;
+    btn.classList.remove("btn-confirming");
+  }
+}
+
+async function refreshLibraryGrid() {
   const grid = $("#photo-library-grid");
   grid.innerHTML = `<p class="muted" style="text-align:center;padding:1rem"><span class="spinner"></span>Loading…</p>`;
-  $("#photo-library-dialog").showModal();
   try {
     const files = await api("GET", "/api/uploads");
     if (!files.length) {
       grid.innerHTML = emptyState("🖼", "No photos uploaded yet.");
     } else {
-      grid.innerHTML = files.map(f => `
-        <div class="lib-thumb${f.assigned ? " lib-assigned" : ""}" data-path="${f.path}" data-url="${f.url}">
+      grid.innerHTML = files.map(f => {
+        const sel = selectedLibraryPaths.has(f.path) ? " lib-selected" : "";
+        const badge = f.is_default
+          ? '<span class="lib-badge lib-badge-default">default</span>'
+          : f.assigned
+            ? '<span class="lib-badge">in use</span>'
+            : "";
+        return `
+        <div class="lib-thumb${f.assigned ? " lib-assigned" : ""}${sel}"
+             data-path="${f.path}" data-url="${f.url}" data-is-default="${f.is_default}">
           <img src="${f.url}" alt="" loading="lazy" />
-          ${f.assigned ? '<span class="lib-badge">in use</span>' : ""}
-        </div>
-      `).join("");
+          ${badge}
+        </div>`;
+      }).join("");
       $$(".lib-thumb").forEach(el => {
         el.addEventListener("click", () => {
-          if (!photoLibraryCallback) return;
-          photoLibraryCallback({ path: el.dataset.path, url: el.dataset.url });
-          $("#photo-library-dialog").close();
+          if (photoLibraryCallback) {
+            photoLibraryCallback({ path: el.dataset.path, url: el.dataset.url });
+            $("#photo-library-dialog").close();
+            return;
+          }
+          // selection mode — default images cannot be selected for deletion
+          if (el.dataset.isDefault === "true") return;
+          if (selectedLibraryPaths.has(el.dataset.path)) {
+            selectedLibraryPaths.delete(el.dataset.path);
+            el.classList.remove("lib-selected");
+          } else {
+            selectedLibraryPaths.add(el.dataset.path);
+            el.classList.add("lib-selected");
+          }
+          updateDeleteSelectedBtn();
         });
       });
     }
   } catch (err) {
     grid.innerHTML = `<p class="muted" style="text-align:center">Failed to load library: ${err.message}</p>`;
   }
+  updateDeleteSelectedBtn();
 }
 
-$("#btn-close-library").addEventListener("click", () => $("#photo-library-dialog").close());
+async function openPhotoLibrary(onSelect) {
+  photoLibraryCallback = onSelect;
+  selectedLibraryPaths.clear();
+  $("#photo-library-dialog").showModal();
+  await refreshLibraryGrid();
+}
+
+$("#btn-close-library").addEventListener("click", () => {
+  selectedLibraryPaths.clear();
+  updateDeleteSelectedBtn();
+  $("#photo-library-dialog").close();
+});
+
+$("#btn-delete-selected").addEventListener("click", async () => {
+  const btn = $("#btn-delete-selected");
+  if (!btn.dataset.confirm) {
+    btn.dataset.confirm = "1";
+    btn.classList.add("btn-confirming");
+    const orig = btn.innerHTML;
+    btn.textContent = `⚠ Delete ${selectedLibraryPaths.size}? Click again.`;
+    setTimeout(() => {
+      if (btn.dataset.confirm) {
+        delete btn.dataset.confirm;
+        btn.classList.remove("btn-confirming");
+        btn.innerHTML = orig;
+      }
+    }, 4000);
+    return;
+  }
+  delete btn.dataset.confirm;
+  btn.classList.remove("btn-confirming");
+  try {
+    const result = await api("POST", "/api/uploads/delete-many", { paths: [...selectedLibraryPaths] });
+    selectedLibraryPaths.clear();
+    const msg = result.protected
+      ? `Deleted ${result.deleted}, skipped ${result.protected} in-use image(s).`
+      : `Deleted ${result.deleted} image(s).`;
+    showToast(msg, result.protected ? "warning" : "success");
+    await refreshLibraryGrid();
+  } catch (err) {
+    showToast("Delete failed: " + err.message, "error");
+  }
+});
+
+$("#btn-library-upload").addEventListener("click", () => $("#library-upload-input").click());
+$("#library-upload-input").addEventListener("change", async e => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  const btn = $("#btn-library-upload");
+  btn.disabled = true;
+  let failed = 0;
+  for (let i = 0; i < files.length; i++) {
+    btn.textContent = `Uploading ${i + 1}/${files.length}…`;
+    try {
+      const fd = new FormData();
+      fd.append("file", files[i]);
+      const resp = await fetch("/api/cars/upload?skip_analysis=true", { method: "POST", body: fd });
+      if (!resp.ok) throw new Error(await resp.text());
+    } catch {
+      failed++;
+    }
+  }
+  btn.textContent = "⬆ Load File(s)";
+  btn.disabled = false;
+  e.target.value = "";
+  if (failed) showToast(`${failed} file(s) failed to upload.`, "error");
+  await refreshLibraryGrid();
+});
 
 // ── Tab navigation ────────────────────────────────────────────────────────────
 $$(".tab-link").forEach(link => {
@@ -176,6 +276,11 @@ async function loadRoster() {
   renderCarGrid();
 }
 
+function defaultCarImage(carTypeName) {
+  const ct = carTypes.find(t => t.name === carTypeName);
+  return ct?.default_photo_path ? `/${ct.default_photo_path}` : null;
+}
+
 function renderCarGrid() {
   const grid = $("#car-grid");
   if (!cars.length) {
@@ -186,12 +291,15 @@ function renderCarGrid() {
     const needsMove = car.active_waybill
       && car.active_waybill.destination_id != null
       && car.current_location_id !== car.active_waybill.destination_id;
+    const defImg = defaultCarImage(car.car_type);
     return `
     <div class="car-card${needsMove ? ' car-needs-move' : ''}" data-id="${car.id}">
       <div class="car-thumb">
         ${car.photo_path
           ? `<img src="/${car.photo_path}" alt="${car.reporting_marks} ${car.car_number}" />`
-          : `<div class="no-photo">${car.car_type}</div>`}
+          : defImg
+            ? `<img src="${defImg}" alt="${car.car_type}" class="default-car-img" />`
+            : `<div class="no-photo">${car.car_type}</div>`}
       </div>
       <div class="car-info">
         <strong>${car.reporting_marks || "—"} ${car.car_number || ""}</strong>
@@ -262,6 +370,7 @@ $("#btn-add-manual").addEventListener("click", () => {
   hide($("#upload-preview"));
   hide($("#analyzing-msg"));
   hide($("#vision-error"));
+  hide($("#default-image-offer"));
   show($("#car-fields"));
   photoPath = null;
   $("#photo-input").value = "";
@@ -270,12 +379,14 @@ $("#btn-add-manual").addEventListener("click", () => {
   $("#field-number").value = "";
   $("#field-type").value = "other";
   $("#field-color").value = "";
+  updateDefaultImageOffer();
 });
 
 $("#btn-cancel-car").addEventListener("click", async () => {
   await discardStylized();
   hide($("#add-car-form"));
   hide($("#stylize-section"));
+  hide($("#default-image-offer"));
 });
 
 function applyAnalysis(result) {
@@ -337,6 +448,7 @@ $("#btn-library-add").addEventListener("click", () => {
       photoPath = path;
       $("#preview-img").src = url;
       show($("#upload-preview"));
+      hide($("#default-image-offer"));
     });
   } else {
     // Photo mode: run vision analysis on selection
@@ -375,6 +487,7 @@ async function processPhotoFile(file) {
     try {
       const result = await api("POST", "/api/cars/upload", form);
       if (result.photo_path) photoPath = result.photo_path;
+      hide($("#default-image-offer"));
     } catch (err) {
       $("#vision-error-msg").textContent = "Upload failed: " + err.message;
       show($("#vision-error"));
@@ -458,9 +571,14 @@ async function openCarDetail(carId) {
       `).join("")
     : "<p class='muted'>No waybill cards yet. Click Edit Waybills to assign from the pool.</p>";
 
+  const detailDefImg = defaultCarImage(car.car_type);
   $("#detail-body").innerHTML = `
     <div class="detail-grid">
-      ${car.photo_path ? `<img src="/${car.photo_path}" class="detail-photo" />` : ""}
+      ${car.photo_path
+        ? `<img src="/${car.photo_path}" class="detail-photo" />`
+        : detailDefImg
+          ? `<img src="${detailDefImg}" class="detail-photo default-car-img" />`
+          : ""}
       <div>
         <p><strong>Type:</strong> ${car.car_type}</p>
         <p><strong>Color:</strong> ${car.color || "—"}</p>
@@ -965,9 +1083,12 @@ async function loadOperations() {
       && wb.destination_id != null
       && car.current_location_id !== wb.destination_id;
     const dest = wb?.destination_name;
+    const opsDefImg = defaultCarImage(car.car_type);
     const thumb = car.photo_path
       ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="/${car.photo_path}" alt="" /></div>`
-      : `<div class="session-car-thumb no-photo-thumb clickable-thumb" data-id="${car.id}">${car.car_type}</div>`;
+      : opsDefImg
+        ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="${opsDefImg}" alt="${car.car_type}" style="width:100%;height:100%;object-fit:contain;" /></div>`
+        : `<div class="session-car-thumb no-photo-thumb clickable-thumb" data-id="${car.id}">${car.car_type}</div>`;
     return `
       <div class="ops-row${needsMove ? ' car-needs-move' : ''}">
         ${thumb}
@@ -1061,9 +1182,12 @@ function renderActiveSession() {
 
   function carRow(car) {
     const statusClass = car.status === "done" ? " done" : car.status === "cp" ? " cp" : "";
+    const sessionDefImg = defaultCarImage(car.carType);
     const thumb = car.photoPath
       ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="/${car.photoPath}" alt="" /></div>`
-      : `<div class="session-car-thumb no-photo-thumb clickable-thumb" data-id="${car.id}">${car.carType}</div>`;
+      : sessionDefImg
+        ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="${sessionDefImg}" alt="${car.carType}" style="width:100%;height:100%;object-fit:contain;" /></div>`
+        : `<div class="session-car-thumb no-photo-thumb clickable-thumb" data-id="${car.id}">${car.carType}</div>`;
     return `
       <div class="session-car-row${statusClass}" id="session-row-${car.id}">
         ${thumb}
@@ -1216,18 +1340,73 @@ function populateCarTypeSelects() {
   populateCarTypeSelect($("#cmap-car-type"), false);
 }
 
+function updateDefaultImageOffer() {
+  if (addMode !== "manual" || photoPath) {
+    hide($("#default-image-offer"));
+    return;
+  }
+  const typeName = $("#field-type").value;
+  const ct = carTypes.find(t => t.name === typeName);
+  if (ct?.default_photo_path) {
+    $("#default-offer-thumb").src = `/${ct.default_photo_path}`;
+    $("#default-offer-label").textContent = `A default image is available for "${typeName}".`;
+    show($("#default-image-offer"));
+  } else {
+    hide($("#default-image-offer"));
+  }
+}
+
+$("#field-type").addEventListener("change", updateDefaultImageOffer);
+
+$("#btn-use-default-image").addEventListener("click", () => {
+  const typeName = $("#field-type").value;
+  const ct = carTypes.find(t => t.name === typeName);
+  if (!ct?.default_photo_path) return;
+  photoPath = ct.default_photo_path;
+  $("#preview-img").src = `/${photoPath}`;
+  show($("#upload-preview"));
+  hide($("#upload-zone"));
+  hide($("#default-image-offer"));
+});
+
+$("#btn-dismiss-default-offer").addEventListener("click", () => {
+  hide($("#default-image-offer"));
+});
+
 function renderCarTypeList() {
   const list = $("#car-type-list");
   if (!carTypes.length) {
     list.innerHTML = '<p class="muted small">No car types defined.</p>';
     return;
   }
-  list.innerHTML = carTypes.map(ct => `
+  list.innerHTML = carTypes.map(ct => {
+    const thumb = ct.default_photo_path
+      ? `<img src="/${ct.default_photo_path}" class="car-type-thumb" />`
+      : `<div class="car-type-thumb no-photo" style="font-size:0.55rem;">none</div>`;
+    return `
     <div class="layout-item">
-      <span>${ct.name}</span>
+      ${thumb}
+      <span style="flex:1">${ct.name}</span>
+      <button class="outline small set-car-type-img" data-id="${ct.id}">Set image</button>
+      ${ct.default_photo_path ? `<button class="outline small secondary clear-car-type-img" data-id="${ct.id}">Clear</button>` : ""}
       <button class="outline small contrast del-car-type" data-id="${ct.id}" data-name="${ct.name}">🗑</button>
-    </div>
-  `).join("");
+    </div>`;
+  }).join("");
+  list.querySelectorAll(".set-car-type-img").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = parseInt(btn.dataset.id);
+      openPhotoLibrary(async ({ path }) => {
+        await api("PUT", `/api/car-types/${id}/default-image`, { photo_path: path });
+        await loadLayout();
+      });
+    });
+  });
+  list.querySelectorAll(".clear-car-type-img").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await api("PUT", `/api/car-types/${btn.dataset.id}/default-image`, { photo_path: null });
+      await loadLayout();
+    });
+  });
   list.querySelectorAll(".del-car-type").forEach(btn => {
     btn.addEventListener("click", async () => {
       if (!btn.dataset.confirm) {
@@ -1843,6 +2022,7 @@ $("#btn-purge-uploads").addEventListener("click", async () => {
     await withLoading(btn, "Purging…", async () => {
       const result = await api("POST", "/api/uploads/purge");
       showToast(`Deleted ${result.deleted} unassigned photo${result.deleted !== 1 ? "s" : ""}.`, "success");
+      await refreshLibraryGrid();
     });
   } catch (err) {
     showToast("Purge failed: " + err.message, "error");

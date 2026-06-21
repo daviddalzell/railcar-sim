@@ -785,7 +785,7 @@ def suggest_commodity_endpoint(data: CommoditySuggestRequest, db: Session = Depe
 
 @app.get("/api/car-types")
 def list_car_types(db: Session = Depends(get_db)):
-    return [{"id": ct.id, "name": ct.name} for ct in db.query(CarType).order_by(CarType.name).all()]
+    return [{"id": ct.id, "name": ct.name, "default_photo_path": ct.default_photo_path} for ct in db.query(CarType).order_by(CarType.name).all()]
 
 
 @app.post("/api/car-types", status_code=201)
@@ -800,6 +800,16 @@ def create_car_type(data: CarTypeCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(ct)
     return {"id": ct.id, "name": ct.name}
+
+
+@app.put("/api/car-types/{ct_id}/default-image")
+def set_car_type_default_image(ct_id: int, body: dict, db: Session = Depends(get_db)):
+    ct = db.get(CarType, ct_id)
+    if not ct:
+        raise HTTPException(404)
+    ct.default_photo_path = body.get("photo_path") or None
+    db.commit()
+    return {"ok": True}
 
 
 @app.delete("/api/car-types/{ct_id}", status_code=204)
@@ -1191,6 +1201,9 @@ def auto_assign_single_car(car_id: int, db: Session = Depends(get_db)):
 @app.get("/api/uploads")
 def list_uploads(db: Session = Depends(get_db)):
     assigned = {car.photo_path for car in db.query(Car).all() if car.photo_path}
+    for ct in db.query(CarType).all():
+        if ct.default_photo_path:
+            assigned.add(ct.default_photo_path)
     files = []
     for f in sorted(UPLOADS_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
         if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
@@ -1198,13 +1211,27 @@ def list_uploads(db: Session = Depends(get_db)):
                 "path": str(f),
                 "url": "/" + str(f),
                 "assigned": str(f) in assigned,
+                "is_default": False,
             })
+    static_car_dir = Path("static/images/car-types")
+    if static_car_dir.exists():
+        for f in sorted(static_car_dir.iterdir(), key=lambda x: x.name):
+            if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"):
+                files.append({
+                    "path": str(f),
+                    "url": "/" + str(f),
+                    "assigned": str(f) in assigned,
+                    "is_default": True,
+                })
     return files
 
 
 @app.post("/api/uploads/purge")
 def purge_uploads(db: Session = Depends(get_db)):
     assigned = {car.photo_path for car in db.query(Car).all() if car.photo_path}
+    for ct in db.query(CarType).all():
+        if ct.default_photo_path:
+            assigned.add(ct.default_photo_path)
     deleted = 0
     for f in UPLOADS_DIR.iterdir():
         if f.is_file() and str(f) not in assigned:
@@ -1225,6 +1252,30 @@ def delete_upload(data: DeleteUploadRequest):
     if not target.name.endswith("_stylized.png"):
         raise HTTPException(400, "Only stylized images may be deleted this way")
     target.unlink(missing_ok=True)
+
+
+class DeleteUploadsRequest(BaseModel):
+    paths: list[str]
+
+@app.post("/api/uploads/delete-many", status_code=200)
+def delete_uploads(data: DeleteUploadsRequest, db: Session = Depends(get_db)):
+    assigned = {car.photo_path for car in db.query(Car).all() if car.photo_path}
+    for ct in db.query(CarType).all():
+        if ct.default_photo_path:
+            assigned.add(ct.default_photo_path)
+    uploads_resolved = UPLOADS_DIR.resolve()
+    deleted = 0
+    protected = 0
+    for path_str in data.paths:
+        target = Path(path_str).resolve()
+        if not str(target).startswith(str(uploads_resolved)):
+            continue
+        if path_str in assigned:
+            protected += 1
+            continue
+        target.unlink(missing_ok=True)
+        deleted += 1
+    return {"deleted": deleted, "protected": protected}
 
 
 # ── Operating Session ────────────────────────────────────────────────────────

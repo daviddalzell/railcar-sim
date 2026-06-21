@@ -98,6 +98,7 @@ class CarType(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    default_photo_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
 class LayoutSettings(Base):
