@@ -629,13 +629,44 @@ def update_location(loc_id: int, data: LocationCreate, db: Session = Depends(get
     return {"id": loc.id, "name": loc.name, "location_type": loc.location_type}
 
 
-@app.delete("/api/locations/{loc_id}", status_code=204)
-def delete_location(loc_id: int, db: Session = Depends(get_db)):
+@app.delete("/api/locations/{loc_id}")
+def delete_location(loc_id: int, merge_into_id: Optional[int] = None, db: Session = Depends(get_db)):
     loc = db.get(Location, loc_id)
     if not loc:
         raise HTTPException(404, "Location not found")
-    db.delete(loc)
-    db.commit()
+
+    if loc.location_type == "staging":
+        if merge_into_id is None:
+            raise HTTPException(400, "Staging locations require a merge target")
+        target = db.get(Location, merge_into_id)
+        if not target or target.location_type != "staging":
+            raise HTTPException(400, "Merge target must be a staging location")
+        db.query(Car).filter(Car.current_location_id == loc_id).update({"current_location_id": merge_into_id})
+        db.query(Waybill).filter(Waybill.origin_id == loc_id).update({"origin_id": merge_into_id})
+        db.query(Waybill).filter(Waybill.destination_id == loc_id).update({"destination_id": merge_into_id})
+        db.query(MovementLog).filter(MovementLog.from_location_id == loc_id).update({"from_location_id": merge_into_id})
+        db.query(MovementLog).filter(MovementLog.to_location_id == loc_id).update({"to_location_id": merge_into_id})
+        db.flush()
+        db.delete(loc)
+        db.commit()
+        return {"action": "merged", "into": target.name}
+
+    else:
+        blocking = db.query(Car).filter(Car.current_location_id == loc_id).all()
+        if blocking:
+            raise HTTPException(409, detail={
+                "message": f"Cars must be moved before deleting \"{loc.name}\"",
+                "cars": [{"id": c.id, "reporting_marks": c.reporting_marks,
+                           "car_number": c.car_number, "car_type": c.car_type} for c in blocking]
+            })
+        db.query(MovementLog).filter(MovementLog.from_location_id == loc_id).update({"from_location_id": None})
+        db.query(MovementLog).filter(MovementLog.to_location_id == loc_id).update({"to_location_id": None})
+        db.query(Waybill).filter(
+            (Waybill.origin_id == loc_id) | (Waybill.destination_id == loc_id)
+        ).delete(synchronize_session=False)
+        db.delete(loc)
+        db.commit()
+        return {"action": "deleted"}
 
 
 # ── Industries ────────────────────────────────────────────────────────────────
@@ -670,6 +701,7 @@ def delete_industry(ind_id: int, db: Session = Depends(get_db)):
     ind = db.get(Industry, ind_id)
     if not ind:
         raise HTTPException(404, "Industry not found")
+    db.query(Waybill).filter(Waybill.industry_id == ind_id, Waybill.car_id == None).delete(synchronize_session=False)
     db.delete(ind)
     db.commit()
 

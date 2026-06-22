@@ -680,6 +680,37 @@
     </article>
   </dialog>
 
+  <dialog id="staging-merge-dialog">
+    <article>
+      <header>
+        <button aria-label="Close" rel="prev" id="btn-close-staging-merge"></button>
+        <h3>Consolidate Staging Location</h3>
+      </header>
+      <p id="staging-merge-desc"></p>
+      <label>Merge all cars and waybills into:
+        <select id="staging-merge-target"></select>
+      </label>
+      <footer>
+        <button id="btn-staging-merge-confirm">Merge &amp; Delete</button>
+        <button class="outline secondary" id="btn-staging-merge-cancel">Cancel</button>
+      </footer>
+    </article>
+  </dialog>
+
+  <dialog id="location-block-dialog">
+    <article>
+      <header>
+        <button aria-label="Close" rel="prev" id="btn-close-location-block"></button>
+        <h3>Cannot Delete Location</h3>
+      </header>
+      <p id="location-block-desc"></p>
+      <div id="location-block-car-list"></div>
+      <footer>
+        <button class="outline secondary" id="btn-location-block-close">OK — I'll move them</button>
+      </footer>
+    </article>
+  </dialog>
+
   <div id="toast-container"></div>
   <script src="/static/app.js"></script>
 </body>

@@ -10,6 +10,7 @@ let carTypes = [];
 let selectedCarId = null;
 let editingWaybillId = null;
 let photoPath = null;
+let stagingMergeDeleteId = null;
 
 // ── Fast clock ────────────────────────────────────────────────────────────────
 let clockInterval = null;
@@ -1480,26 +1481,89 @@ function renderLocationList() {
   });
 
   $$(".del-loc").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      if (!btn.dataset.confirm) {
-        btn.dataset.confirm = "1";
-        btn.classList.add("btn-confirming");
-        const orig = btn.innerHTML;
-        btn.textContent = "Sure?";
-        setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.innerHTML = orig; }, 3000);
-        return;
-      }
-      btn.classList.remove("btn-confirming");
-      delete btn.dataset.confirm;
-      try {
-        await api("DELETE", `/api/locations/${btn.dataset.id}`);
-        await loadLayout();
-      } catch (err) {
-        showToast("Error: " + err.message, "error");
+    btn.addEventListener("click", () => {
+      const locId = parseInt(btn.dataset.id);
+      const loc = locations.find(l => l.id === locId);
+      if (!loc) return;
+      if (loc.location_type === "staging") {
+        openStagingMergeDialog(loc);
+      } else {
+        const blocking = cars.filter(c => c.current_location_id === locId);
+        if (blocking.length) {
+          openLocationBlockDialog(loc, blocking);
+        } else {
+          confirmThenDeleteLocation(btn, locId);
+        }
       }
     });
   });
 }
+
+function confirmThenDeleteLocation(btn, locId) {
+  if (!btn.dataset.confirm) {
+    btn.dataset.confirm = "1";
+    btn.classList.add("btn-confirming");
+    const orig = btn.innerHTML;
+    btn.textContent = "Sure?";
+    setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.innerHTML = orig; }, 3000);
+    return;
+  }
+  btn.classList.remove("btn-confirming");
+  delete btn.dataset.confirm;
+  api("DELETE", `/api/locations/${locId}`)
+    .then(() => loadLayout())
+    .catch(err => showToast("Error: " + err.message, "error"));
+}
+
+function openStagingMergeDialog(loc) {
+  const otherStaging = locations.filter(l => l.location_type === "staging" && l.id !== loc.id);
+  if (!otherStaging.length) {
+    showToast("No other staging locations to merge into — add one first.", "warning");
+    return;
+  }
+  stagingMergeDeleteId = loc.id;
+  $("#staging-merge-desc").textContent =
+    `"${loc.name}" is a staging location. All cars and waybills will be redirected to the selected location before deletion.`;
+  const sel = $("#staging-merge-target");
+  sel.innerHTML = otherStaging.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+  $("#staging-merge-dialog").showModal();
+}
+
+function openLocationBlockDialog(loc, blockingCars) {
+  $("#location-block-desc").textContent =
+    `Move the following cars away from "${loc.name}" before deleting it:`;
+  $("#location-block-car-list").innerHTML = blockingCars.map(c =>
+    `<div class="layout-item">
+       <span><strong>${c.reporting_marks || "—"} ${c.car_number || ""}</strong> — ${c.car_type}</span>
+     </div>`
+  ).join("");
+  $("#location-block-dialog").showModal();
+}
+
+$("#btn-staging-merge-confirm").addEventListener("click", async () => {
+  const mergeInto = parseInt($("#staging-merge-target").value);
+  if (!stagingMergeDeleteId || isNaN(mergeInto)) return;
+  try {
+    await api("DELETE", `/api/locations/${stagingMergeDeleteId}?merge_into_id=${mergeInto}`);
+    $("#staging-merge-dialog").close();
+    showToast("Staging location merged and deleted.", "success");
+    await loadLayout();
+    cars = await api("GET", "/api/cars");
+    renderCarGrid();
+  } catch (err) {
+    showToast("Error: " + err.message, "error");
+  }
+});
+["#btn-staging-merge-cancel", "#btn-close-staging-merge"].forEach(sel =>
+  $(sel).addEventListener("click", () => {
+    stagingMergeDeleteId = null;
+    $("#staging-merge-dialog").close();
+  })
+);
+
+["#btn-location-block-close", "#btn-close-location-block"].forEach(sel =>
+  $(sel).addEventListener("click", () => $("#location-block-dialog").close())
+);
 
 function checkboxesToRole() {
   const recv = $("#ind-receiver").checked;
