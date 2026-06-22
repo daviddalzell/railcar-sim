@@ -1787,9 +1787,14 @@ $("#industry-form").addEventListener("submit", async e => {
   e.preventDefault();
   const editId = $("#ind-edit-id").value;
   const locVal = $("#ind-location").value;
+  if (!locVal) {
+    showToast("A location is required before saving an industry.", "error");
+    $("#ind-location").focus();
+    return;
+  }
   const body = {
     name: $("#ind-name").value.trim(),
-    location_id: locVal ? parseInt(locVal) : null,
+    location_id: parseInt(locVal),
     accepted_car_types: "",
     commodities: $("#ind-inbound-commodities").value.trim(),
     industry_role: checkboxesToRole(),

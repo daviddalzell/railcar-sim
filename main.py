@@ -114,7 +114,7 @@ class LocationCreate(BaseModel):
 
 class IndustryCreate(BaseModel):
     name: str
-    location_id: Optional[int] = None
+    location_id: int
     accepted_car_types: str = ""
     commodities: str = ""
     industry_role: str = "consumer"
