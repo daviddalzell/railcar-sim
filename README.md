@@ -33,7 +33,15 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment variables
+### 4. Activate the pre-commit hook
+
+```bash
+git config core.hooksPath scripts/hooks
+```
+
+This runs the test suite before every commit and blocks the commit if any test fails.
+
+### 5. Configure environment variables
 
 Copy the example config file and edit it:
 
@@ -104,15 +112,20 @@ If no provider is configured (or the API key is missing), the app still works. A
 
 ```
 railcar-sim/
-├── main.py          # FastAPI app and API endpoints
-├── models.py        # SQLAlchemy database models
-├── database.py      # Database connection and setup
-├── vision.py        # AI vision provider implementations
+├── main.py              # FastAPI app and API endpoints
+├── models.py            # SQLAlchemy database models
+├── database.py          # Database connection and setup
+├── vision.py            # AI vision provider implementations
 ├── requirements.txt
-├── .env.example     # Configuration template
-├── static/          # CSS and JavaScript
-├── templates/       # HTML template
-└── uploads/         # Uploaded car photos (auto-created)
+├── pytest.ini
+├── .env.example         # Configuration template
+├── scripts/
+│   └── hooks/
+│       └── pre-commit   # Git pre-commit hook (activate with step 4 above)
+├── static/              # CSS and JavaScript
+├── templates/           # HTML template
+├── tests/               # Pytest test suite
+└── uploads/             # Uploaded car photos (auto-created)
 ```
 
 ---
