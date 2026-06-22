@@ -244,6 +244,45 @@
 
     <!-- ── OPERATIONS ─────────────────────────────────────────────────── -->
     <section id="tab-operations" class="tab-panel hidden">
+      <!-- Layout Status strip — always visible -->
+      <article id="layout-status" style="margin-bottom:1rem">
+        <div class="section-header">
+          <div class="section-header-title">
+            <button id="btn-toggle-layout-status" class="outline small">▶</button>
+            <h3 style="margin:0">Layout Status</h3>
+          </div>
+        </div>
+        <div id="layout-status-body" class="hidden" style="margin-top:0.5rem">
+          <div id="layout-status-areas"></div>
+          <div id="layout-status-yards"></div>
+        </div>
+      </article>
+
+      <!-- Dispatcher panel — shown only when no session is active -->
+      <article id="dispatcher-panel" class="hidden" style="margin-bottom:1rem">
+        <h4>Virtual Dispatcher</h4>
+        <div class="grid">
+          <label>Origin (staging / yard)
+            <select id="disp-origin"><option value="">— select origin —</option></select>
+          </label>
+          <label>Switching Area
+            <select id="disp-area"><option value="">— select area —</option></select>
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="btn-build-consist">Build Consist</button>
+          <button id="btn-clear-dispatch-plan" class="outline secondary">✕ Clear</button>
+        </div>
+        <div id="dispatch-plan-result" class="hidden" style="margin-top:0.75rem">
+          <p id="dispatch-plan-summary" class="muted" style="margin-bottom:0.5rem"></p>
+          <div id="dispatch-consist-list"></div>
+          <div class="button-row" style="margin-top:0.75rem">
+            <button id="btn-start-dispatch-session">Start Session with this Consist</button>
+          </div>
+        </div>
+        <div id="dispatch-warnings" class="hidden session-warnings" style="margin-top:0.5rem"></div>
+      </article>
+
       <div class="section-header" id="ops-header">
         <h2 id="ops-title">Operations</h2>
         <div class="button-row" id="ops-header-buttons">
@@ -303,6 +342,9 @@
               <option value="staging">Staging</option>
               <option value="storage">Storage</option>
             </select>
+            <select id="loc-switching-area">
+              <option value="">— no switching area —</option>
+            </select>
             <button type="submit" class="small">Save</button>
             <button type="button" id="btn-cancel-location" class="outline secondary small">✕</button>
             <input type="hidden" id="loc-edit-id" value="" />
@@ -353,6 +395,36 @@
           <div id="industry-list"></div>
         </div>
 
+      </div>
+
+      <!-- Switching Areas -->
+      <hr />
+      <div>
+        <div class="section-header">
+          <div class="section-header-title">
+            <button id="btn-toggle-switching-areas" class="outline small" title="Collapse / expand">▶</button>
+            <h3>Switching Areas</h3>
+          </div>
+          <button id="btn-add-switching-area" class="outline small">+</button>
+        </div>
+        <div id="switching-area-body" class="hidden">
+          <form id="switching-area-form" class="hidden inline-form">
+            <div class="grid">
+              <label>Area Name
+                <input id="sa-name" type="text" required />
+              </label>
+              <label>Car Capacity
+                <input id="sa-capacity" type="number" min="1" value="10" required />
+              </label>
+            </div>
+            <div class="button-row">
+              <button type="submit" class="small">Save</button>
+              <button type="button" id="btn-cancel-switching-area" class="outline secondary small">✕</button>
+              <input type="hidden" id="sa-edit-id" value="" />
+            </div>
+          </form>
+          <div id="switching-area-list"></div>
+        </div>
       </div>
 
       <!-- Commodity → Car Type mapping -->
@@ -584,6 +656,22 @@
             <li><strong>🗑 Purge Unused</strong> removes all uploaded images not currently assigned to any car or car type default in one step.</li>
             <li>Images assigned to a car or set as a car type default are always protected from purge.</li>
             <li>When opened via <strong>Set image</strong> in Car Types, clicking a thumbnail assigns it as the default for that car type and closes the library.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <button class="help-section-header">▶ Virtual Dispatcher</button>
+        <div class="help-section-body hidden">
+          <p>The Virtual Dispatcher builds a capacity-aware consist for a single run from a staging yard to a switching area.</p>
+          <ul>
+            <li><strong>Switching Areas</strong> are named groups of locations (industries, storage, yards) with a defined car capacity. Create and manage them in Layout Setup → Switching Areas. Assign locations to a switching area using the location edit form.</li>
+            <li><strong>Capacity math</strong> — the dispatcher calculates how many cars can be set out into the switching area: <em>available spots = capacity − cars currently in area + cars being picked up from area this run</em>. Cars being picked out free up slots for inbound cars.</li>
+            <li><strong>Building a consist</strong> — select an origin (staging yard) and a switching area, then click <strong>Build Consist</strong>. The dispatcher finds cars at the origin whose active waybill points into the switching area (setouts), and cars already in the switching area whose waybill points back to a yard (pickups). The inbound count is capped by available spots.</li>
+            <li><strong>Single origin rule</strong> — all inbound cars must come from the same origin. Cars at other yards are not included in the consist.</li>
+            <li><strong>Unused eligible cars</strong> — if more cars are eligible than spots allow, the excess stays at the origin and will appear in the next consist automatically.</li>
+            <li><strong>Starting a session</strong> — click <strong>Start Session with this Consist</strong> to hand the consist off to the session workflow. Setouts appear as arrivals; pickups appear as departures. Mark each car done as normal, then end the session.</li>
+            <li><strong>Layout Status</strong> — the strip at the top of the Operations tab shows current car counts for every switching area (with capacity bars) and every yard/staging area. Click any row to expand it and see the individual cars with their waybill destinations.</li>
           </ul>
         </div>
       </div>

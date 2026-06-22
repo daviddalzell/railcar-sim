@@ -27,7 +27,7 @@ DEFAULT_CAR_TYPES = [
 
 
 def init_db():
-    from models import Car, CarType, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock  # noqa: F401
+    from models import Car, CarType, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock, SwitchingArea, DispatchPlan  # noqa: F401
     Base.metadata.create_all(bind=engine)
     # Run all column migrations before any ORM queries so SQLAlchemy doesn't
     # try to SELECT columns that don't exist yet on older databases.
@@ -59,6 +59,16 @@ def init_db():
             pass
         try:
             conn.execute(text("ALTER TABLE car_types ADD COLUMN default_photo_path TEXT"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE locations ADD COLUMN switching_area_id INTEGER REFERENCES switching_areas(id)"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE dispatch_plan ADD COLUMN spots_ids_json TEXT DEFAULT '[]'"))
             conn.commit()
         except Exception:
             pass

@@ -5,13 +5,25 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
 
+class SwitchingArea(Base):
+    __tablename__ = "switching_areas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    car_capacity: Mapped[int] = mapped_column(Integer, default=10)
+
+    locations: Mapped[List["Location"]] = relationship("Location", back_populates="switching_area")
+
+
 class Location(Base):
     __tablename__ = "locations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     location_type: Mapped[str] = mapped_column(String, default="yard")  # yard / industry / staging
+    switching_area_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("switching_areas.id"), nullable=True)
 
+    switching_area: Mapped[Optional["SwitchingArea"]] = relationship("SwitchingArea", back_populates="locations")
     cars: Mapped[List["Car"]] = relationship("Car", back_populates="current_location")
     industries: Mapped[List["Industry"]] = relationship("Industry", back_populates="location")
     origin_waybills: Mapped[List["Waybill"]] = relationship("Waybill", foreign_keys="Waybill.origin_id", back_populates="origin")
@@ -118,3 +130,18 @@ class SessionClock(Base):
     paused_accum_s: Mapped[float] = mapped_column(default=0.0)
     start_time: Mapped[str] = mapped_column(String, default="08:00")
     speed: Mapped[int] = mapped_column(Integer, default=4)
+
+
+class DispatchPlan(Base):
+    __tablename__ = "dispatch_plan"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    plan_type: Mapped[str] = mapped_column(String, default="switching")  # "switching" | "transfer" (future)
+    origin_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
+    switching_area_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("switching_areas.id"), nullable=True)
+    destination_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
+    setout_ids_json: Mapped[str] = mapped_column(String, default="[]")
+    pickup_ids_json: Mapped[str] = mapped_column(String, default="[]")
+    spots_ids_json:  Mapped[str] = mapped_column(String, default="[]")
+    available_spots: Mapped[int] = mapped_column(Integer, default=0)
+    built_at: Mapped[Optional[float]] = mapped_column(nullable=True)
