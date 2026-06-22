@@ -133,3 +133,51 @@ railcar-sim/
 ## Database
 
 The app uses SQLite and creates `railcar.db` automatically in the project root on first run. No database setup is required.
+
+---
+
+## UI design (Figma)
+
+The visual design is driven by CSS custom properties defined in `static/style.css`. All colours, border radii, and key surface values are named variables, making them directly mappable to Figma Variables for iterative design work.
+
+### Design token reference
+
+| Figma variable | CSS property | Current value |
+|---|---|---|
+| `brand/accent` | `--rail-accent` | `#c0392b` |
+| `brand/accent-bg` | `--rail-accent-bg` | `#fdf3f2` |
+| `brand/dark` | `--rail-dark` | `#2c3e50` |
+| `brand/light` | `--rail-light` | `#ecf0f1` |
+| `brand/red` | `--rail-red` | `#e74c3c` |
+| `brand/green` | `--rail-green` | `#5c7a3e` |
+| `surface/bg-muted` | `--bg-muted` | `#f4f4f4` |
+| `surface/border-light` | `--border-light` | `#ddd` |
+| `surface/border-muted` | `--border-muted` | `#aaa` |
+| `surface/border-subtle` | `--border-subtle` | `#eee` |
+| `text/muted` | `--text-muted` | `#888` |
+| `text/secondary` | `--text-secondary` | `#555` |
+| `text/light` | `--text-light` | `#777` |
+| `text/strong` | `--text-strong` | `#333` |
+| `badge/blue` | `--badge-blue` | `#2980b9` |
+| `badge/green` | `--badge-green` | `#27ae60` |
+| `badge/purple` | `--badge-purple` | `#8e44ad` |
+| `badge/orange` | `--badge-orange` | `#d68910` |
+| `badge/muted-bg` | `--badge-muted-bg` | `#bdc3c7` |
+| `radius/card` | `--card-radius` | `8px` |
+
+**Fonts:** body uses *Red Rose* (weights 300–700), headers use *Montserrat Alternates* (weights 400–900), both loaded from Google Fonts.
+
+### Setting up the Figma file
+
+1. Create a **Variables** collection named `Rail Theme` and add each row from the table above, grouped by prefix (`brand/`, `surface/`, `text/`, `badge/`, `radius/`)
+2. Create **Text Styles**: `Body/Default` (Red Rose 400, 1rem) and `Brand/Header` (Montserrat Alternates 700)
+3. Build components for: car card, navigation tabs, waybill badge, dialog template, toast notification — using Auto Layout and the Variables you just defined
+
+### Iteration workflow
+
+1. Adjust Variable values in Figma
+2. Open Dev Mode → Variables panel to read the updated hex values
+3. Update the matching `--variable-name` in `static/style.css :root`
+4. Commit
+
+For an automated token export, install the [Tokens Studio for Figma](https://tokens.studio) plugin — it can export a `tokens.json` that a small script can apply directly to `style.css`.
