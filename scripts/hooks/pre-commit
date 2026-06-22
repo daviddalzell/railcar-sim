@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Run the test suite before every commit. Abort if any test fails.
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Use the virtualenv interpreter if present, otherwise fall back to system python
+if [ -x ".venv/bin/python" ]; then
+    PYTHON=".venv/bin/python"
+else
+    PYTHON="python"
+fi
+
+echo "Running tests..."
+"$PYTHON" -m pytest tests/ -q --tb=short
