@@ -109,6 +109,8 @@ body {
   --badge-green:    #27ae60;
   --badge-purple:   #8e44ad;
   --badge-orange:   #d68910;
+
+  --rail-green: #5c7a3e;
 }
 
 main.container {
@@ -840,7 +842,7 @@ button.small {
 }
 
 .lib-badge-default {
-  background: var(--rail-accent, #5c7a3e);
+  background: var(--rail-green);
 }
 
 .upload-zone-actions {
