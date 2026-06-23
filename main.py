@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy import DateTime as SADateTime
-from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import inspect as sa_inspect, nullslast
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
@@ -128,6 +128,19 @@ class DispatchBuildRequest(BaseModel):
 class DispatchPowerUpdate(BaseModel):
     power_ids: list[int] = []
     caboose_id: Optional[int] = None
+
+
+class DispatchPlanIdentityUpdate(BaseModel):
+    train_number: Optional[str] = None
+    train_name: Optional[str] = None
+    departure_time: Optional[str] = None
+    engineer: Optional[str] = None
+    conductor: Optional[str] = None
+    special_instructions: Optional[str] = None
+
+
+class DispatchPlanStatusUpdate(BaseModel):
+    status: str  # "draft" | "active" | "complete"
 
 
 class IndustryCreate(BaseModel):
@@ -296,7 +309,9 @@ def dispatch_plan_to_dict(plan: DispatchPlan, db: Session) -> dict:
     area = db.get(SwitchingArea, plan.switching_area_id) if plan.switching_area_id else None
 
     return {
+        "id": plan.id,
         "plan_type": plan.plan_type,
+        "status": plan.status or "draft",
         "origin_location_id": plan.origin_location_id,
         "origin_name": origin.name if origin else None,
         "switching_area_id": plan.switching_area_id,
@@ -308,15 +323,19 @@ def dispatch_plan_to_dict(plan: DispatchPlan, db: Session) -> dict:
         "caboose": caboose_car,
         "available_spots": plan.available_spots,
         "built_at": plan.built_at,
+        "train_number": plan.train_number,
+        "train_name": plan.train_name,
+        "departure_time": plan.departure_time,
+        "engineer": plan.engineer,
+        "conductor": plan.conductor,
+        "special_instructions": plan.special_instructions,
         "warnings": [],
     }
 
 
 def _clear_dispatch_plan(db: Session):
-    plan = db.get(DispatchPlan, 1)
-    if plan:
-        db.delete(plan)
-        db.commit()
+    db.query(DispatchPlan).delete(synchronize_session=False)
+    db.commit()
 
 
 # ── Export / Import helpers ───────────────────────────────────────────────────
@@ -805,19 +824,22 @@ def delete_switching_area(area_id: int, db: Session = Depends(get_db)):
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
-@app.post("/api/dispatcher/build-plan")
-def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db)):
-    area = db.get(SwitchingArea, data.switching_area_id)
-    if not area:
-        raise HTTPException(404, "Switching area not found")
-    origin = db.get(Location, data.origin_location_id)
-    if not origin:
-        raise HTTPException(404, "Origin location not found")
+def _run_build_algorithm(data_origin_id: int, data_area_id: int, db: Session) -> tuple:
+    """Core build logic. Returns (consist_inbound, outbound, local_spots, available_spots, warnings)."""
+    area = db.get(SwitchingArea, data_area_id)
+    origin = db.get(Location, data_origin_id)
 
     area_location_ids = {l.id for l in area.locations}
     dispatch_ids = {l.id for l in db.query(Location).filter(
         Location.location_type.in_(["staging", "yard"])
     ).all()}
+
+    # Collect car IDs already claimed by other non-complete plans
+    claimed_ids: set = set()
+    for other in db.query(DispatchPlan).filter(DispatchPlan.status != "complete").all():
+        claimed_ids |= set(json.loads(other.setout_ids_json or "[]"))
+        claimed_ids |= set(json.loads(other.pickup_ids_json or "[]"))
+        claimed_ids |= set(json.loads(other.spots_ids_json or "[]"))
 
     current_count = db.query(Car).filter(
         Car.current_location_id.in_(list(area_location_ids))
@@ -829,14 +851,14 @@ def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db
 
     outbound = [
         car for car in area_cars
-        if (wb := _get_active_waybill(car)) and wb.destination_id in dispatch_ids
+        if car.id not in claimed_ids
+        and (wb := _get_active_waybill(car)) and wb.destination_id in dispatch_ids
     ]
 
-    # Cars already inside the area that still need to be spotted to another location
-    # within the area (local switching moves — don't free capacity).
     local_spots = [
         car for car in area_cars
-        if (wb := _get_active_waybill(car))
+        if car.id not in claimed_ids
+        and (wb := _get_active_waybill(car))
         and wb.destination_id in area_location_ids
         and car.current_location_id != wb.destination_id
     ]
@@ -844,11 +866,12 @@ def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db
     available_spots = max(0, area.car_capacity - current_count + len(outbound))
 
     origin_cars = db.query(Car).filter(
-        Car.current_location_id == data.origin_location_id
+        Car.current_location_id == data_origin_id
     ).all()
     inbound = [
         car for car in origin_cars
-        if (wb := _get_active_waybill(car)) and wb.destination_id in area_location_ids
+        if car.id not in claimed_ids
+        and (wb := _get_active_waybill(car)) and wb.destination_id in area_location_ids
     ]
     consist_inbound = inbound[:available_spots]
 
@@ -856,18 +879,144 @@ def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db
     if not consist_inbound and not outbound and not local_spots:
         warnings.append("No eligible cars found for this origin and switching area.")
 
-    plan = db.get(DispatchPlan, 1)
-    if not plan:
-        plan = DispatchPlan(id=1)
-        db.add(plan)
+    return consist_inbound, outbound, local_spots, available_spots, warnings
 
-    plan.plan_type = "switching"
-    plan.origin_location_id = data.origin_location_id
-    plan.switching_area_id = data.switching_area_id
-    plan.destination_location_id = None
+
+@app.post("/api/dispatcher/build-plan")
+def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db)):
+    area = db.get(SwitchingArea, data.switching_area_id)
+    if not area:
+        raise HTTPException(404, "Switching area not found")
+    origin = db.get(Location, data.origin_location_id)
+    if not origin:
+        raise HTTPException(404, "Origin location not found")
+
+    consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
+        data.origin_location_id, data.switching_area_id, db
+    )
+
+    plan = DispatchPlan(
+        plan_type="switching",
+        origin_location_id=data.origin_location_id,
+        switching_area_id=data.switching_area_id,
+        setout_ids_json=json.dumps([c.id for c in consist_inbound]),
+        pickup_ids_json=json.dumps([c.id for c in outbound]),
+        spots_ids_json=json.dumps([c.id for c in local_spots]),
+        available_spots=available_spots,
+        built_at=time.time(),
+        status="draft",
+    )
+    db.add(plan)
+    db.commit()
+    db.refresh(plan)
+
+    result = dispatch_plan_to_dict(plan, db)
+    result["warnings"] = warnings
+    return result
+
+
+@app.get("/api/dispatcher/plans")
+def list_dispatch_plans(db: Session = Depends(get_db)):
+    plans = db.query(DispatchPlan).order_by(nullslast(DispatchPlan.departure_time), DispatchPlan.id).all()
+    return [dispatch_plan_to_dict(p, db) for p in plans]
+
+
+@app.get("/api/dispatcher/plan/{plan_id}")
+def get_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    return dispatch_plan_to_dict(plan, db)
+
+
+@app.delete("/api/dispatcher/plan/{plan_id}", status_code=204)
+def delete_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    db.delete(plan)
+    db.commit()
+
+
+@app.delete("/api/dispatcher/plans", status_code=204)
+def clear_all_dispatch_plans(db: Session = Depends(get_db)):
+    _clear_dispatch_plan(db)
+
+
+@app.patch("/api/dispatcher/plan/{plan_id}/power")
+def update_dispatch_power(plan_id: int, data: DispatchPowerUpdate, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    # Exclusivity check
+    other_plans = db.query(DispatchPlan).filter(DispatchPlan.id != plan_id).all()
+    for other in other_plans:
+        other_power = set(json.loads(other.power_ids_json or "[]"))
+        conflicts = set(data.power_ids) & other_power
+        if conflicts:
+            raise HTTPException(409, "Locomotive(s) already assigned to another consist")
+        if data.caboose_id and data.caboose_id == other.caboose_id:
+            raise HTTPException(409, "Caboose already assigned to another consist")
+    plan.power_ids_json = json.dumps(data.power_ids)
+    plan.caboose_id = data.caboose_id
+    db.commit()
+    return dispatch_plan_to_dict(plan, db)
+
+
+@app.patch("/api/dispatcher/plan/{plan_id}/identity")
+def update_dispatch_identity(plan_id: int, data: DispatchPlanIdentityUpdate, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    for field, value in data.model_dump(exclude_none=False).items():
+        setattr(plan, field, value)
+    db.commit()
+    return dispatch_plan_to_dict(plan, db)
+
+
+@app.patch("/api/dispatcher/plan/{plan_id}/status")
+def update_dispatch_status(plan_id: int, data: DispatchPlanStatusUpdate, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    if data.status not in ("draft", "active", "complete"):
+        raise HTTPException(400, "status must be draft, active, or complete")
+    plan.status = data.status
+    db.commit()
+    return dispatch_plan_to_dict(plan, db)
+
+
+@app.post("/api/dispatcher/plan/{plan_id}/rebuild")
+def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    if not plan.origin_location_id or not plan.switching_area_id:
+        raise HTTPException(400, "Plan has no origin or switching area to rebuild from")
+
+    area = db.get(SwitchingArea, plan.switching_area_id)
+    if not area:
+        raise HTTPException(404, "Switching area not found")
+    origin = db.get(Location, plan.origin_location_id)
+    if not origin:
+        raise HTTPException(404, "Origin location not found")
+
+    # Temporarily exclude this plan from claimed IDs so it can rebuild freely
+    old_setout = set(json.loads(plan.setout_ids_json or "[]"))
+    old_pickup = set(json.loads(plan.pickup_ids_json or "[]"))
+    old_spots = set(json.loads(plan.spots_ids_json or "[]"))
+    plan.setout_ids_json = "[]"
+    plan.pickup_ids_json = "[]"
+    plan.spots_ids_json = "[]"
+    db.flush()
+
+    consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
+        plan.origin_location_id, plan.switching_area_id, db
+    )
+
     plan.setout_ids_json = json.dumps([c.id for c in consist_inbound])
     plan.pickup_ids_json = json.dumps([c.id for c in outbound])
-    plan.spots_ids_json  = json.dumps([c.id for c in local_spots])
+    plan.spots_ids_json = json.dumps([c.id for c in local_spots])
     plan.available_spots = available_spots
     plan.built_at = time.time()
     db.commit()
@@ -875,30 +1024,6 @@ def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db
     result = dispatch_plan_to_dict(plan, db)
     result["warnings"] = warnings
     return result
-
-
-@app.get("/api/dispatcher/plan")
-def get_dispatch_plan(db: Session = Depends(get_db)):
-    plan = db.get(DispatchPlan, 1)
-    if not plan or plan.built_at is None:
-        return None
-    return dispatch_plan_to_dict(plan, db)
-
-
-@app.delete("/api/dispatcher/plan", status_code=204)
-def clear_dispatch_plan_endpoint(db: Session = Depends(get_db)):
-    _clear_dispatch_plan(db)
-
-
-@app.patch("/api/dispatcher/plan/power")
-def update_dispatch_power(data: DispatchPowerUpdate, db: Session = Depends(get_db)):
-    plan = db.get(DispatchPlan, 1)
-    if not plan:
-        raise HTTPException(404, "No dispatch plan exists — build one first")
-    plan.power_ids_json = json.dumps(data.power_ids)
-    plan.caboose_id = data.caboose_id
-    db.commit()
-    return dispatch_plan_to_dict(plan, db)
 
 
 # ── Layout Status ─────────────────────────────────────────────────────────────
@@ -1665,7 +1790,11 @@ def _get_or_create_settings(db: Session) -> LayoutSettings:
 
 
 def _settings_to_dict(s: LayoutSettings) -> dict:
-    return {"clock_start_time": s.clock_start_time, "clock_speed": s.clock_speed}
+    return {
+        "clock_start_time": s.clock_start_time,
+        "clock_speed": s.clock_speed,
+        "ops_mode": s.ops_mode or "free",
+    }
 
 
 @app.get("/api/settings")
@@ -1676,6 +1805,7 @@ def get_settings(db: Session = Depends(get_db)):
 class LayoutSettingsUpdate(BaseModel):
     clock_start_time: str = "08:00"
     clock_speed: int = 4
+    ops_mode: str = "free"
 
 
 @app.put("/api/settings")
@@ -1683,6 +1813,7 @@ def update_settings(data: LayoutSettingsUpdate, db: Session = Depends(get_db)):
     s = _get_or_create_settings(db)
     s.clock_start_time = data.clock_start_time
     s.clock_speed = data.clock_speed
+    s.ops_mode = data.ops_mode
     db.commit()
     return _settings_to_dict(s)
 
@@ -1699,9 +1830,11 @@ def _clock_to_dict(c: SessionClock) -> dict:
     }
 
 
-def _start_session_clock(db: Session):
-    s = _get_or_create_settings(db)
+def _start_session_clock(db: Session, force: bool = False):
     c = db.get(SessionClock, 1)
+    if not force and c and c.started_at is not None:
+        return  # clock already running — leave it alone
+    s = _get_or_create_settings(db)
     if not c:
         c = SessionClock(id=1)
         db.add(c)
@@ -1751,9 +1884,17 @@ def resume_session_clock(db: Session = Depends(get_db)):
 
 @app.post("/api/session/clock/start")
 def start_session_clock(db: Session = Depends(get_db)):
-    _start_session_clock(db)
+    _start_session_clock(db, force=True)
     c = db.get(SessionClock, 1)
     return _clock_to_dict(c)
+
+
+@app.post("/api/session/clock/ensure")
+def ensure_session_clock(db: Session = Depends(get_db)):
+    """Start the clock only if it isn't already running. Used when launching sessions so all operators share the same clock."""
+    _start_session_clock(db, force=False)
+    c = db.get(SessionClock, 1)
+    return _clock_to_dict(c) if c else None
 
 
 # ── Session ───────────────────────────────────────────────────────────────────
@@ -1761,7 +1902,7 @@ def start_session_clock(db: Session = Depends(get_db)):
 @app.post("/api/session/plan")
 def session_plan(db: Session = Depends(get_db)):
     plan = _build_session_plan(db)
-    _start_session_clock(db)
+    _start_session_clock(db, force=False)
     return plan
 
 

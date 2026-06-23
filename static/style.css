@@ -89,6 +89,7 @@ body {
   --rail-accent:    #c0392b;
   --rail-accent-bg: #fdf3f2;
   --rail-dark:      #2c3e50;
+  --rail-darker:    #212f3c;
   --rail-light:     #ecf0f1;
   --rail-red:       #e74c3c;
   --card-radius:    8px;
@@ -103,6 +104,7 @@ body {
   --text-placeholder: #666;
   --text-strong:      #333;
 
+  --rail-blue:      #2980b9;
   --badge-blue:     #2980b9;
   --badge-muted-bg: #bdc3c7;
   --badge-muted-fg: #555;
@@ -1250,4 +1252,31 @@ button.small {
 .power-strip-sep {
   color: var(--pico-muted-color);
   font-size: 0.8rem;
+}
+
+/* Consist card status badges */
+.status-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+.status-draft    { background: #d4d4d4; color: #555; }
+.status-active   { background: #2a9d8f; color: #fff; }
+.status-complete { background: #457b9d; color: #fff; }
+
+/* Consist cards */
+.consist-card {
+  background: var(--rail-darker);
+  border: 1px solid var(--rail-dark);
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+}
+
+.consist-body {
+  padding-top: 0.5rem;
 }

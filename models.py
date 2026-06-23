@@ -119,6 +119,7 @@ class LayoutSettings(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     clock_start_time: Mapped[str] = mapped_column(String, default="08:00")
     clock_speed: Mapped[int] = mapped_column(Integer, default=4)
+    ops_mode: Mapped[str] = mapped_column(String, default="free")  # "free" | "timetable_train_order" | "track_warrant"
 
 
 class SessionClock(Base):
@@ -135,7 +136,7 @@ class SessionClock(Base):
 class DispatchPlan(Base):
     __tablename__ = "dispatch_plan"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     plan_type: Mapped[str] = mapped_column(String, default="switching")  # "switching" | "transfer" (future)
     origin_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
     switching_area_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("switching_areas.id"), nullable=True)
@@ -147,3 +148,10 @@ class DispatchPlan(Base):
     caboose_id:      Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("cars.id"), nullable=True)
     available_spots: Mapped[int]           = mapped_column(Integer, default=0)
     built_at: Mapped[Optional[float]] = mapped_column(nullable=True)
+    status: Mapped[str] = mapped_column(String, default="draft")  # "draft" | "active" | "complete"
+    train_number: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    train_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    departure_time: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    engineer: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    conductor: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    special_instructions: Mapped[Optional[str]] = mapped_column(String, nullable=True)
