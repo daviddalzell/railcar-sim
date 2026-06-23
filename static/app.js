@@ -11,6 +11,8 @@ let selectedCarId = null;
 let editingWaybillId = null;
 let photoPath = null;
 let stagingMergeDeleteId = null;
+let switchingAreas = [];
+let dispatchPlan = null;
 
 // ── Fast clock ────────────────────────────────────────────────────────────────
 let clockInterval = null;
@@ -282,18 +284,12 @@ function defaultCarImage(carTypeName) {
   return ct?.default_photo_path ? `/${ct.default_photo_path}` : null;
 }
 
-function renderCarGrid() {
-  const grid = $("#car-grid");
-  if (!cars.length) {
-    grid.innerHTML = emptyState("🚃", "No cars yet — add one with the buttons above.");
-    return;
-  }
-  grid.innerHTML = cars.map(car => {
-    const needsMove = car.active_waybill
-      && car.active_waybill.destination_id != null
-      && car.current_location_id !== car.active_waybill.destination_id;
-    const defImg = defaultCarImage(car.car_type);
-    return `
+function carCardHTML(car) {
+  const needsMove = car.active_waybill
+    && car.active_waybill.destination_id != null
+    && car.current_location_id !== car.active_waybill.destination_id;
+  const defImg = defaultCarImage(car.car_type);
+  return `
     <div class="car-card${needsMove ? ' car-needs-move' : ''}" data-id="${car.id}">
       <div class="car-thumb">
         ${car.photo_path
@@ -312,12 +308,137 @@ function renderCarGrid() {
           : `<span class="waybill-badge muted">No waybill</span>`}
       </div>
     </div>
-  `; }).join("");
+  `;
+}
+
+function renderPowerStrip(power, caboose) {
+  const locos = power || [];
+  if (!locos.length && !caboose) return "";
+  function powerThumb(c) {
+    const img = c.photo_path ? `/${c.photo_path}` : defaultCarImage(c.car_type);
+    return img
+      ? `<img src="${img}" alt="${c.car_type}" />`
+      : `<span style="font-size:0.65rem">${c.car_type}</span>`;
+  }
+  function powerChip(c, label) {
+    return `<div class="power-chip" title="${label}">
+      ${powerThumb(c)}
+      <span class="power-chip-marks">${c.reporting_marks || "—"} ${c.car_number || ""}</span>
+    </div>`;
+  }
+  const locoChips   = locos.map(c => powerChip(c, "locomotive")).join("");
+  const cabooseChip = caboose ? powerChip(caboose, "caboose") : "";
+  return `<div class="session-power-strip">
+    <span class="muted small" style="margin-right:0.5rem">Power:</span>
+    ${locoChips}
+    ${locoChips && cabooseChip ? '<span class="power-strip-sep">·</span>' : ""}
+    ${cabooseChip}
+  </div>`;
+}
+
+function renderCarGrid() {
+  const locos   = cars.filter(c => c.car_type === "locomotive");
+  const freight = cars.filter(c => c.car_type !== "locomotive");
+
+  const poolSection  = $("#power-pool-section");
+  const poolBody     = $("#power-pool-body");
+  const poolList     = $("#power-pool-list");
+  const poolDivider  = $("#power-pool-divider");
+  const grid         = $("#car-grid");
+
+  if (locos.length) {
+    poolList.innerHTML = locos.map(carCardHTML).join("");
+    show(poolSection);
+    show(poolDivider);
+  } else {
+    hide(poolSection);
+    hide(poolDivider);
+  }
+
+  if (!freight.length && !locos.length) {
+    grid.innerHTML = emptyState("🚃", "No cars yet — add one with the buttons above.");
+  } else if (!freight.length) {
+    grid.innerHTML = "";
+  } else {
+    grid.innerHTML = freight.map(carCardHTML).join("");
+  }
 
   $$(".car-card").forEach(card => {
     card.addEventListener("click", () => openCarDetail(parseInt(card.dataset.id)));
   });
 }
+
+$("#btn-toggle-power-pool").addEventListener("click", () => {
+  const body = $("#power-pool-body");
+  const btn  = $("#btn-toggle-power-pool");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-dispatcher").addEventListener("click", () => {
+  const body = $("#dispatcher-body");
+  const btn  = $("#btn-toggle-dispatcher");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-ops").addEventListener("click", () => {
+  const body = $("#ops-body");
+  const btn  = $("#btn-toggle-ops");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-freight-cars").addEventListener("click", () => {
+  const body = $("#freight-cars-body");
+  const btn  = $("#btn-toggle-freight-cars");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-locations").addEventListener("click", () => {
+  const body = $("#location-body");
+  const btn  = $("#btn-toggle-locations");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-industries").addEventListener("click", () => {
+  const body = $("#industries-body");
+  const btn  = $("#btn-toggle-industries");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
 
 // ── Add car via photo ─────────────────────────────────────────────────────────
 let addMode = "photo"; // "photo" | "manual"
@@ -473,13 +594,22 @@ $("#btn-library-add").addEventListener("click", () => {
   }
 });
 
+function isBrowserUnsupportedImage(file) {
+  const ext = file.name.split(".").pop().toLowerCase();
+  return ["heic", "heif"].includes(ext) || file.type === "image/heic" || file.type === "image/heif";
+}
+
 async function processPhotoFile(file) {
   if (!file) return;
 
   $("#upload-label").textContent = file.name;
-  $("#preview-img").src = URL.createObjectURL(file);
-  show($("#upload-preview"));
   hide($("#vision-error"));
+
+  const unsupported = isBrowserUnsupportedImage(file);
+  if (!unsupported) {
+    $("#preview-img").src = URL.createObjectURL(file);
+    show($("#upload-preview"));
+  }
 
   const form = new FormData();
   form.append("file", file);
@@ -487,7 +617,11 @@ async function processPhotoFile(file) {
   if (addMode === "manual") {
     try {
       const result = await api("POST", "/api/cars/upload", form);
-      if (result.photo_path) photoPath = result.photo_path;
+      if (result.photo_path) {
+        photoPath = result.photo_path;
+        $("#preview-img").src = "/" + result.photo_path;
+        show($("#upload-preview"));
+      }
       hide($("#default-image-offer"));
     } catch (err) {
       $("#vision-error-msg").textContent = "Upload failed: " + err.message;
@@ -500,6 +634,10 @@ async function processPhotoFile(file) {
   show($("#analyzing-msg"));
   try {
     const result = await api("POST", "/api/cars/upload", form);
+    if (result.photo_path) {
+      $("#preview-img").src = "/" + result.photo_path;
+      show($("#upload-preview"));
+    }
     applyAnalysis(result);
   } catch (err) {
     hide($("#analyzing-msg"));
@@ -1008,17 +1146,31 @@ $("#btn-save-waybill-edit").addEventListener("click", async () => {
 async function loadOperations() {
   loadSessionFromStorage();
 
+  // Layout Status strip — always visible
+  await renderLayoutStatus();
+
   if (session) {
-    // Active session: swap header buttons and render switch list
+    // Active session: hide dispatcher
+    hide($("#dispatcher-panel"));
     $("#ops-header-buttons").innerHTML = ""; // cleared by renderActiveSession
     renderActiveSession();
     return;
   }
 
-  $("#ops-title").textContent = "Operations";
-  // Idle state: show Plan Session button + read-only amber list
+  // Idle: populate and show dispatcher
+  if (!locations.length || !switchingAreas.length) {
+    [locations, switchingAreas] = await Promise.all([
+      api("GET", "/api/locations"),
+      api("GET", "/api/switching-areas"),
+    ]);
+  }
+  await loadDispatcherPanel();
+  show($("#dispatcher-panel"));
+
+  $("#ops-title").textContent = "Quick Op Session";
+  // Idle state: "Plan Session" as fallback below the dispatcher
   $("#ops-header-buttons").innerHTML =
-    `<button id="btn-plan-session">🚆 Plan Session</button>`;
+    `<button id="btn-plan-session">Start Quick Op Session</button>`;
   document.getElementById("btn-plan-session").addEventListener("click", async () => {
     const btn = document.getElementById("btn-plan-session");
     await withLoading(btn, "Planning…", async () => {
@@ -1136,7 +1288,7 @@ function markCar(carId, status) {
 }
 
 function renderActiveSession() {
-  $("#ops-title").textContent = "Active Session";
+  $("#ops-title").textContent = "Quick Op — Active Session";
   const warnEl = $("#session-warnings");
   if (session.warnings?.length) {
     warnEl.innerHTML = session.warnings.map(w => `<p style="margin:0.2rem 0">⚠ ${w}</p>`).join("");
@@ -1204,10 +1356,13 @@ function renderActiveSession() {
       </div>`;
   }
 
+  // Power strip (non-interactive)
+  const powerHtml = renderPowerStrip(session.power, session.caboose);
+
   const noWork = !arrivals.length && !departures.length && !spots.length;
-  let html = "";
+  let html = powerHtml;
   if (noWork) {
-    html = `<p class="muted" style="text-align:center;padding:1.5rem">No cars to work this session.</p>`;
+    html += `<p class="muted" style="text-align:center;padding:1.5rem">No cars to work this session.</p>`;
   } else {
     if (arrivals.length) {
       html += `<p class="session-section-title">Set out from staging (${arrivals.length})</p>`;
@@ -1305,12 +1460,13 @@ $("#btn-confirm-end-session").addEventListener("click", async () => {
 
 // ── Layout setup ──────────────────────────────────────────────────────────────
 async function loadLayout() {
-  [[locations, industries, commodityMap, carTypes], settings] = await Promise.all([
+  [[locations, industries, commodityMap, carTypes, switchingAreas], settings] = await Promise.all([
     Promise.all([
       api("GET", "/api/locations"),
       api("GET", "/api/industries"),
       api("GET", "/api/commodity-car-type-map"),
       api("GET", "/api/car-types"),
+      api("GET", "/api/switching-areas"),
     ]),
     api("GET", "/api/settings"),
   ]);
@@ -1320,6 +1476,8 @@ async function loadLayout() {
   renderCommodityMapList();
   populateCarTypeSelects();
   renderCarTypeList();
+  renderSwitchingAreaList();
+  populateSwitchingAreaSelect();
   if (settings) {
     $("#clock-start-time").value = settings.clock_start_time;
     $("#clock-speed").value = String(settings.clock_speed);
@@ -1475,6 +1633,7 @@ function renderLocationList() {
       if (!loc) return;
       $("#loc-name").value = loc.name;
       $("#loc-type").value = loc.location_type;
+      $("#loc-switching-area").value = loc.switching_area_id || "";
       $("#loc-edit-id").value = loc.id;
       show($("#location-form"));
     });
@@ -1725,6 +1884,7 @@ function populateIndustryLocationSelect() {
 $("#btn-add-location").addEventListener("click", () => {
   $("#loc-name").value = "";
   $("#loc-type").value = "yard";
+  $("#loc-switching-area").value = "";
   $("#loc-edit-id").value = "";
   show($("#location-form"));
 });
@@ -1733,9 +1893,11 @@ $("#btn-cancel-location").addEventListener("click", () => hide($("#location-form
 $("#location-form").addEventListener("submit", async e => {
   e.preventDefault();
   const editId = $("#loc-edit-id").value;
+  const saVal = $("#loc-switching-area").value;
   const body = {
     name: $("#loc-name").value.trim(),
     location_type: $("#loc-type").value,
+    switching_area_id: saVal ? parseInt(saVal) : null,
   };
   if (editId) {
     await api("PUT", `/api/locations/${editId}`, body);
@@ -2264,16 +2426,402 @@ $("#btn-help-expand-all").addEventListener("click", () => {
   $("#btn-help-expand-all").textContent = helpAllExpanded ? "Collapse All" : "Expand All";
 });
 
+// ── Switching Areas ───────────────────────────────────────────────────────────
+
+function populateSwitchingAreaSelect() {
+  const sel = $("#loc-switching-area");
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— no switching area —</option>' +
+    switchingAreas.map(a => `<option value="${a.id}">${a.name}</option>`).join("");
+  if (prev) sel.value = prev;
+}
+
+function renderSwitchingAreaList() {
+  const list = $("#switching-area-list");
+  if (!list) return;
+  if (!switchingAreas.length) {
+    list.innerHTML = '<p class="muted small">No switching areas defined.</p>';
+    return;
+  }
+  list.innerHTML = switchingAreas.map(a => {
+    const locBadges = (a.locations || []).map(l =>
+      `<span class="waybill-badge muted">${l.name}</span>`
+    ).join(" ");
+    const count = a.current_car_count ?? 0;
+    const cap = a.car_capacity ?? 10;
+    return `
+    <div class="layout-item layout-item-stack">
+      <div class="layout-item-main">
+        <span style="flex:1">
+          <strong>${a.name}</strong>
+          <span class="muted">${count}/${cap} cars</span>
+          ${locBadges}
+        </span>
+        <span>
+          <button class="outline small edit-sa" data-id="${a.id}">✏️</button>
+          <button class="outline small contrast del-sa" data-id="${a.id}" data-name="${a.name}">🗑</button>
+        </span>
+      </div>
+    </div>`;
+  }).join("");
+
+  list.querySelectorAll(".edit-sa").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const area = switchingAreas.find(a => a.id === parseInt(btn.dataset.id));
+      if (!area) return;
+      $("#sa-name").value = area.name;
+      $("#sa-capacity").value = area.car_capacity;
+      $("#sa-edit-id").value = area.id;
+      show($("#switching-area-form"));
+    });
+  });
+
+  list.querySelectorAll(".del-sa").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!btn.dataset.confirm) {
+        btn.dataset.confirm = "1";
+        btn.classList.add("btn-confirming");
+        const orig = btn.innerHTML;
+        btn.textContent = "Sure?";
+        setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.innerHTML = orig; }, 3000);
+        return;
+      }
+      btn.classList.remove("btn-confirming");
+      delete btn.dataset.confirm;
+      try {
+        await api("DELETE", `/api/switching-areas/${btn.dataset.id}`);
+        await loadLayout();
+      } catch (err) {
+        showToast("Error: " + err.message, "error");
+      }
+    });
+  });
+}
+
+$("#btn-toggle-switching-areas").addEventListener("click", () => {
+  const body = $("#switching-area-body");
+  const btn = $("#btn-toggle-switching-areas");
+  const collapsed = body.classList.toggle("hidden");
+  btn.textContent = collapsed ? "▶" : "▼";
+});
+
+$("#btn-add-switching-area").addEventListener("click", () => {
+  $("#sa-name").value = "";
+  $("#sa-capacity").value = "10";
+  $("#sa-edit-id").value = "";
+  show($("#switching-area-body"));
+  $("#btn-toggle-switching-areas").textContent = "▼";
+  show($("#switching-area-form"));
+});
+$("#btn-cancel-switching-area").addEventListener("click", () => hide($("#switching-area-form")));
+
+$("#switching-area-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const editId = $("#sa-edit-id").value;
+  const body = {
+    name: $("#sa-name").value.trim(),
+    car_capacity: parseInt($("#sa-capacity").value),
+  };
+  try {
+    if (editId) {
+      await api("PUT", `/api/switching-areas/${editId}`, body);
+    } else {
+      await api("POST", "/api/switching-areas", body);
+    }
+    hide($("#switching-area-form"));
+    await loadLayout();
+  } catch (err) {
+    showToast("Error: " + err.message, "error");
+  }
+});
+
+// ── Layout Status strip ───────────────────────────────────────────────────────
+
+async function renderLayoutStatus() {
+  const areasEl = $("#layout-status-areas");
+  const yardsEl = $("#layout-status-yards");
+  if (!areasEl || !yardsEl) return;
+  let status;
+  try {
+    status = await api("GET", "/api/layout-status");
+  } catch {
+    return;
+  }
+
+  function carListHtml(cars) {
+    if (!cars.length) return '<p class="muted small" style="margin:0.25rem 0.5rem">No cars here.</p>';
+    return cars.map(c =>
+      `<div class="layout-item" style="padding:0.2rem 0.5rem;font-size:0.8rem">
+         <span><strong>${c.reporting_marks || "—"} ${c.car_number || ""}</strong> <em>${c.car_type}</em></span>
+         <span class="muted">${c.destination_name ? "→ " + c.destination_name : "—"}</span>
+       </div>`
+    ).join("");
+  }
+
+  areasEl.innerHTML = status.switching_areas.map(a => {
+    const pct = a.car_capacity > 0 ? Math.round((a.current_car_count / a.car_capacity) * 100) : 0;
+    return `
+    <div class="layout-status-row">
+      <div class="layout-status-summary" data-toggle="sa-${a.id}" style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0">
+        <span style="flex:1"><strong>${a.name}</strong></span>
+        <span class="muted" style="font-size:0.8rem">${a.current_car_count}/${a.car_capacity}</span>
+        <progress value="${pct}" max="100" style="width:5rem;height:0.6rem"></progress>
+        <span class="muted" style="font-size:0.75rem">▶</span>
+      </div>
+      <div id="sa-detail-${a.id}" class="hidden">${carListHtml(a.cars || [])}</div>
+    </div>`;
+  }).join("") || '<p class="muted small">No switching areas defined.</p>';
+
+  yardsEl.innerHTML = status.yards.map(y => `
+    <div class="layout-status-row">
+      <div class="layout-status-summary" data-toggle="yard-${y.id}" style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0">
+        <span style="flex:1"><strong>${y.name}</strong> <em class="muted">${y.location_type}</em></span>
+        <span class="muted" style="font-size:0.8rem">${y.car_count} cars</span>
+        <span class="muted" style="font-size:0.75rem">▶</span>
+      </div>
+      <div id="yard-detail-${y.id}" class="hidden">${carListHtml(y.cars || [])}</div>
+    </div>`
+  ).join("") || '<p class="muted small">No yards or staging areas.</p>';
+
+  document.querySelectorAll(".layout-status-summary").forEach(row => {
+    row.addEventListener("click", () => {
+      const key = row.dataset.toggle;
+      const detail = document.getElementById(`${key.startsWith("sa-") ? "sa-detail-" + key.slice(3) : "yard-detail-" + key.slice(5)}`);
+      const arrow = row.querySelector("span:last-child");
+      if (detail) {
+        const hidden = detail.classList.toggle("hidden");
+        if (arrow) arrow.textContent = hidden ? "▶" : "▼";
+      }
+    });
+  });
+}
+
+$("#btn-toggle-layout-status").addEventListener("click", () => {
+  const body = $("#layout-status-body");
+  const btn = $("#btn-toggle-layout-status");
+  const collapsed = body.classList.toggle("hidden");
+  btn.textContent = collapsed ? "▶" : "▼";
+});
+
+// ── Dispatcher ────────────────────────────────────────────────────────────────
+
+async function loadDispatcherPanel() {
+  // Populate origin select (staging + yard locations)
+  const originSel = $("#disp-origin");
+  const areaSel = $("#disp-area");
+  const yardLocs = locations.filter(l => l.location_type === "staging" || l.location_type === "yard");
+  originSel.innerHTML = '<option value="">— select origin —</option>' +
+    yardLocs.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+  areaSel.innerHTML = '<option value="">— select area —</option>' +
+    switchingAreas.map(a => `<option value="${a.id}">${a.name} (${a.current_car_count ?? 0}/${a.car_capacity})</option>`).join("");
+
+  // Restore persisted plan
+  try {
+    dispatchPlan = await api("GET", "/api/dispatcher/plan");
+  } catch {
+    dispatchPlan = null;
+  }
+  if (dispatchPlan) {
+    if (dispatchPlan.origin_location_id) originSel.value = dispatchPlan.origin_location_id;
+    if (dispatchPlan.switching_area_id)  areaSel.value  = dispatchPlan.switching_area_id;
+    renderDispatchPlan(dispatchPlan);
+  } else {
+    hide($("#dispatch-plan-result"));
+    hide($("#dispatch-warnings"));
+  }
+}
+
+function renderDispatchPlan(plan) {
+  if (!plan) { hide($("#dispatch-plan-result")); return; }
+
+  const setouts = plan.setouts || [];
+  const pickups = plan.pickups || [];
+  const spots   = plan.spots   || [];
+
+  const total = setouts.length + pickups.length + spots.length;
+  const spotWord = plan.available_spots !== 1 ? "spots" : "spot";
+  $("#dispatch-plan-summary").textContent =
+    `${setouts.length} set out · ${pickups.length} pick up · ${spots.length} local · ${plan.available_spots} ${spotWord} available`;
+
+  function carRow(c) {
+    const imgSrc = c.photo_path
+      ? `/${c.photo_path}`
+      : (defaultCarImage(c.car_type) || null);
+    const thumb = imgSrc
+      ? `<div class="session-car-thumb"><img src="${imgSrc}" alt="${c.car_type}" /></div>`
+      : `<div class="session-car-thumb no-photo-thumb">${c.car_type}</div>`;
+    const dest = c.active_waybill?.destination_name || "?";
+    const from = c.current_location_name || "?";
+    return `
+    <div class="session-car-row">
+      ${thumb}
+      <div class="session-car-info">
+        <span class="session-car-marks">${c.reporting_marks || "—"} ${c.car_number || ""} <span class="muted">${c.car_type}</span></span>
+        <span class="session-car-move">${c.role === "setout" ? "➡" : "⬅"} ${from} → ${dest}</span>
+      </div>
+      ${c.active_waybill?.industry_name ? `<span class="industry-tag">${c.active_waybill.industry_name}</span>` : ""}
+    </div>`;
+  }
+
+  $("#dispatch-power-strip-preview").innerHTML = renderPowerStrip(plan.power, plan.caboose);
+
+  let html = "";
+  if (setouts.length) {
+    html += `<p class="muted small" style="margin:0.25rem 0"><strong>Set out</strong></p>`;
+    html += setouts.map(carRow).join("");
+  }
+  if (spots.length) {
+    html += `<p class="muted small" style="margin:0.5rem 0 0.25rem"><strong>Spot locally</strong></p>`;
+    html += spots.map(carRow).join("");
+  }
+  if (pickups.length) {
+    html += `<p class="muted small" style="margin:0.5rem 0 0.25rem"><strong>Pick up</strong></p>`;
+    html += pickups.map(carRow).join("");
+  }
+  if (!total) {
+    html += '<p class="muted small">No cars in this consist.</p>';
+  }
+
+  $("#dispatch-consist-list").innerHTML = html;
+  show($("#dispatch-plan-result"));
+
+  const startBtn = $("#btn-start-dispatch-session");
+  total > 0 ? show(startBtn) : hide(startBtn);
+
+  const warnings = plan.warnings || [];
+  if (warnings.length) {
+    $("#dispatch-warnings").innerHTML = warnings.map(w => `<p>${w}</p>`).join("");
+    show($("#dispatch-warnings"));
+  } else {
+    hide($("#dispatch-warnings"));
+  }
+
+  // Populate power/caboose selects
+  const locos    = cars.filter(c => c.car_type === "locomotive");
+  const cabooses = cars.filter(c => c.car_type === "caboose");
+  const powerSel  = $("#disp-power");
+  const cabooseSel = $("#disp-caboose");
+  const assignedPowerIds = (plan.power || []).map(c => c.id);
+  const assignedCabooseId = plan.caboose?.id ?? null;
+
+  powerSel.innerHTML = locos.length
+    ? locos.map(c => `<option value="${c.id}"${assignedPowerIds.includes(c.id) ? " selected" : ""}>${c.reporting_marks || "—"} ${c.car_number || ""}</option>`).join("")
+    : `<option value="" disabled>— no locomotives in roster —</option>`;
+  cabooseSel.innerHTML = `<option value="">— none —</option>` +
+    cabooses.map(c => `<option value="${c.id}"${assignedCabooseId === c.id ? " selected" : ""}>${c.reporting_marks || "—"} ${c.car_number || ""}</option>`).join("");
+
+  show($("#dispatch-power-section"));
+}
+
+$("#btn-build-consist").addEventListener("click", async () => {
+  const originId = parseInt($("#disp-origin").value);
+  const areaId   = parseInt($("#disp-area").value);
+  if (!originId || !areaId) { showToast("Select an origin and switching area first.", "warning"); return; }
+  const btn = $("#btn-build-consist");
+  await withLoading(btn, "Building…", async () => {
+    try {
+      dispatchPlan = await api("POST", "/api/dispatcher/build-plan", {
+        origin_location_id: originId,
+        switching_area_id: areaId,
+      });
+      renderDispatchPlan(dispatchPlan);
+      await renderLayoutStatus();
+    } catch (err) {
+      showToast("Error building consist: " + err.message, "error");
+    }
+  });
+});
+
+$("#btn-clear-dispatch-plan").addEventListener("click", async () => {
+  try {
+    await api("DELETE", "/api/dispatcher/plan");
+    dispatchPlan = null;
+    hide($("#dispatch-plan-result"));
+    hide($("#dispatch-warnings"));
+    hide($("#btn-start-dispatch-session"));
+  } catch (err) {
+    showToast("Error clearing plan: " + err.message, "error");
+  }
+});
+
+function liveUpdatePowerStrip() {
+  if (!dispatchPlan) return;
+  const powerIds = [...$("#disp-power").selectedOptions]
+    .map(o => parseInt(o.value)).filter(v => !isNaN(v));
+  const cabooseId = $("#disp-caboose").value ? parseInt($("#disp-caboose").value) : null;
+  const powerCars  = powerIds.map(id => cars.find(c => c.id === id)).filter(Boolean);
+  const cabooseCar = cabooseId ? cars.find(c => c.id === cabooseId) || null : null;
+  $("#dispatch-power-strip-preview").innerHTML = renderPowerStrip(powerCars, cabooseCar);
+}
+
+$("#disp-caboose").addEventListener("change", liveUpdatePowerStrip);
+$("#disp-power").addEventListener("change", liveUpdatePowerStrip);
+
+$("#btn-assign-power").addEventListener("click", async () => {
+  const powerIds = [...$("#disp-power").selectedOptions]
+    .map(o => parseInt(o.value)).filter(v => !isNaN(v));
+  const cabooseVal = $("#disp-caboose").value;
+  const cabooseId = cabooseVal ? parseInt(cabooseVal) : null;
+  try {
+    dispatchPlan = await api("PATCH", "/api/dispatcher/plan/power", {
+      power_ids: powerIds,
+      caboose_id: cabooseId,
+    });
+    renderDispatchPlan(dispatchPlan);
+    showToast("Power assignment saved.", "success");
+  } catch (err) {
+    showToast("Error saving power: " + err.message, "error");
+  }
+});
+
+$("#btn-start-dispatch-session").addEventListener("click", async () => {
+  if (!dispatchPlan) return;
+  try {
+    await api("POST", "/api/session/clock/start");
+    clockState = await api("GET", "/api/session/clock");
+    if (clockState?.started_at) startClockTick();
+
+    const toSessionCar = (c, group) => ({
+      id: c.id,
+      marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
+      carType: c.car_type,
+      fromLocation: c.current_location_name,
+      toLocation: c.active_waybill?.destination_name || "?",
+      photoPath: c.photo_path || null,
+      industryName: c.active_waybill?.industry_name || null,
+      group,
+      status: "pending",
+    });
+
+    session = {
+      warnings: dispatchPlan.warnings || [],
+      power:    dispatchPlan.power    || [],
+      caboose:  dispatchPlan.caboose  || null,
+      cars: [
+        ...(dispatchPlan.setouts || []).map(c => toSessionCar(c, "arrivals")),
+        ...(dispatchPlan.spots   || []).map(c => toSessionCar(c, "spots")),
+        ...(dispatchPlan.pickups || []).map(c => toSessionCar(c, "departures")),
+      ],
+    };
+    saveSession();
+    hide($("#dispatcher-panel"));
+    renderActiveSession();
+  } catch (err) {
+    showToast("Error starting session: " + err.message, "error");
+  }
+});
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 (async function init() {
   await Promise.all([
     loadRoster(),
     (async () => {
-      [locations, industries, waybillPool, carTypes] = await Promise.all([
+      [locations, industries, waybillPool, carTypes, switchingAreas] = await Promise.all([
         api("GET", "/api/locations"),
         api("GET", "/api/industries"),
         api("GET", "/api/waybills"),
         api("GET", "/api/car-types"),
+        api("GET", "/api/switching-areas"),
       ]);
       populateCarTypeSelects();
     })(),

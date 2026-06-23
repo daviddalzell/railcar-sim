@@ -1203,3 +1203,51 @@ button.small {
     padding: 1rem;
   }
 }
+
+/* ── Power strip (session header / dispatcher consist) ───────────────────── */
+.session-power-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--pico-card-background-color, #f5f0e8);
+  border: 1px solid var(--pico-muted-border-color, #d9cfc4);
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.power-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.4rem;
+  background: var(--pico-secondary-background, #e8e0d5);
+  border-radius: 4px;
+}
+
+.power-chip img,
+.power-chip > span:first-child {
+  width: 60px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #FAF0E6;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.power-chip-marks {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.power-strip-sep {
+  color: var(--pico-muted-color);
+  font-size: 0.8rem;
+}

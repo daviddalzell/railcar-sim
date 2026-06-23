@@ -12,6 +12,8 @@ from typing import Optional
 import uuid
 
 from PIL import Image
+import pillow_heif
+pillow_heif.register_heif_opener()
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -26,7 +28,7 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request
 
 from database import get_db, init_db
-from models import Car, CarType, CommodityCarTypeMap, Industry, LayoutSettings, Location, MovementLog, SessionClock, Waybill
+from models import Car, CarType, CommodityCarTypeMap, DispatchPlan, Industry, LayoutSettings, Location, MovementLog, SessionClock, SwitchingArea, Waybill
 from vision import analyze_car_photo, get_provider, OllamaVisionProvider, call_with_retry
 
 UPLOADS_DIR = Path("uploads")
@@ -110,6 +112,22 @@ class CarUpdate(BaseModel):
 class LocationCreate(BaseModel):
     name: str
     location_type: str = "yard"
+    switching_area_id: Optional[int] = None
+
+
+class SwitchingAreaCreate(BaseModel):
+    name: str
+    car_capacity: int = 10
+
+
+class DispatchBuildRequest(BaseModel):
+    origin_location_id: int
+    switching_area_id: int
+
+
+class DispatchPowerUpdate(BaseModel):
+    power_ids: list[int] = []
+    caboose_id: Optional[int] = None
 
 
 class IndustryCreate(BaseModel):
@@ -230,6 +248,75 @@ def waybill_to_dict(w: Waybill) -> dict:
         "is_empty": w.is_empty,
         "required_car_type": w.required_car_type,
     }
+
+
+def switching_area_to_dict(area: SwitchingArea, db: Session) -> dict:
+    loc_ids = [l.id for l in area.locations]
+    current_count = db.query(Car).filter(Car.current_location_id.in_(loc_ids)).count() if loc_ids else 0
+    dispatch_ids = {l.id for l in db.query(Location).filter(
+        Location.location_type.in_(["staging", "yard"])
+    ).all()}
+    area_cars = db.query(Car).filter(Car.current_location_id.in_(loc_ids)).all() if loc_ids else []
+    outbound_count = sum(
+        1 for car in area_cars
+        if (wb := _get_active_waybill(car)) and wb.destination_id in dispatch_ids
+    )
+    available_spots = max(0, area.car_capacity - current_count + outbound_count)
+    return {
+        "id": area.id,
+        "name": area.name,
+        "car_capacity": area.car_capacity,
+        "current_car_count": current_count,
+        "available_spots": available_spots,
+        "locations": [{"id": l.id, "name": l.name, "location_type": l.location_type} for l in area.locations],
+    }
+
+
+def dispatch_plan_to_dict(plan: DispatchPlan, db: Session) -> dict:
+    setout_ids = json.loads(plan.setout_ids_json or "[]")
+    pickup_ids = json.loads(plan.pickup_ids_json or "[]")
+    spots_ids  = json.loads(plan.spots_ids_json or "[]")
+    power_ids  = json.loads(plan.power_ids_json or "[]")
+
+    def _enrich(car_id, role):
+        car = db.get(Car, car_id)
+        if not car:
+            return None
+        d = car_to_dict(car)
+        d["role"] = role
+        return d
+
+    setouts     = [d for cid in setout_ids if (d := _enrich(cid, "setout"))]
+    pickups     = [d for cid in pickup_ids if (d := _enrich(cid, "pickup"))]
+    spots       = [d for cid in spots_ids  if (d := _enrich(cid, "spot"))]
+    power_cars  = [d for cid in power_ids  if (d := _enrich(cid, "power"))]
+    caboose_car = _enrich(plan.caboose_id, "caboose") if plan.caboose_id else None
+
+    origin = db.get(Location, plan.origin_location_id) if plan.origin_location_id else None
+    area = db.get(SwitchingArea, plan.switching_area_id) if plan.switching_area_id else None
+
+    return {
+        "plan_type": plan.plan_type,
+        "origin_location_id": plan.origin_location_id,
+        "origin_name": origin.name if origin else None,
+        "switching_area_id": plan.switching_area_id,
+        "switching_area_name": area.name if area else None,
+        "setouts": setouts,
+        "pickups": pickups,
+        "spots": spots,
+        "power": power_cars,
+        "caboose": caboose_car,
+        "available_spots": plan.available_spots,
+        "built_at": plan.built_at,
+        "warnings": [],
+    }
+
+
+def _clear_dispatch_plan(db: Session):
+    plan = db.get(DispatchPlan, 1)
+    if plan:
+        db.delete(plan)
+        db.commit()
 
 
 # ── Export / Import helpers ───────────────────────────────────────────────────
@@ -601,12 +688,18 @@ def assign_slots(car_id: int, data: CarSlotsUpdate, db: Session = Depends(get_db
 
 # ── Locations ─────────────────────────────────────────────────────────────────
 
+def _location_to_dict(l: Location) -> dict:
+    return {
+        "id": l.id,
+        "name": l.name,
+        "location_type": l.location_type,
+        "switching_area_id": l.switching_area_id,
+    }
+
+
 @app.get("/api/locations")
 def list_locations(db: Session = Depends(get_db)):
-    return [
-        {"id": l.id, "name": l.name, "location_type": l.location_type}
-        for l in db.query(Location).all()
-    ]
+    return [_location_to_dict(l) for l in db.query(Location).all()]
 
 
 @app.post("/api/locations", status_code=201)
@@ -615,7 +708,7 @@ def create_location(data: LocationCreate, db: Session = Depends(get_db)):
     db.add(loc)
     db.commit()
     db.refresh(loc)
-    return {"id": loc.id, "name": loc.name, "location_type": loc.location_type}
+    return _location_to_dict(loc)
 
 
 @app.put("/api/locations/{loc_id}")
@@ -625,8 +718,9 @@ def update_location(loc_id: int, data: LocationCreate, db: Session = Depends(get
         raise HTTPException(404, "Location not found")
     loc.name = data.name
     loc.location_type = data.location_type
+    loc.switching_area_id = data.switching_area_id
     db.commit()
-    return {"id": loc.id, "name": loc.name, "location_type": loc.location_type}
+    return _location_to_dict(loc)
 
 
 @app.delete("/api/locations/{loc_id}")
@@ -667,6 +761,185 @@ def delete_location(loc_id: int, merge_into_id: Optional[int] = None, db: Sessio
         db.delete(loc)
         db.commit()
         return {"action": "deleted"}
+
+
+# ── Switching Areas ───────────────────────────────────────────────────────────
+
+@app.get("/api/switching-areas")
+def list_switching_areas(db: Session = Depends(get_db)):
+    areas = db.query(SwitchingArea).all()
+    return [switching_area_to_dict(a, db) for a in areas]
+
+
+@app.post("/api/switching-areas", status_code=201)
+def create_switching_area(data: SwitchingAreaCreate, db: Session = Depends(get_db)):
+    area = SwitchingArea(name=data.name, car_capacity=data.car_capacity)
+    db.add(area)
+    db.commit()
+    db.refresh(area)
+    return switching_area_to_dict(area, db)
+
+
+@app.put("/api/switching-areas/{area_id}")
+def update_switching_area(area_id: int, data: SwitchingAreaCreate, db: Session = Depends(get_db)):
+    area = db.get(SwitchingArea, area_id)
+    if not area:
+        raise HTTPException(404, "Switching area not found")
+    area.name = data.name
+    area.car_capacity = data.car_capacity
+    db.commit()
+    return switching_area_to_dict(area, db)
+
+
+@app.delete("/api/switching-areas/{area_id}", status_code=204)
+def delete_switching_area(area_id: int, db: Session = Depends(get_db)):
+    area = db.get(SwitchingArea, area_id)
+    if not area:
+        raise HTTPException(404, "Switching area not found")
+    db.query(Location).filter(Location.switching_area_id == area_id).update(
+        {"switching_area_id": None}, synchronize_session=False
+    )
+    db.delete(area)
+    db.commit()
+
+
+# ── Dispatcher ────────────────────────────────────────────────────────────────
+
+@app.post("/api/dispatcher/build-plan")
+def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db)):
+    area = db.get(SwitchingArea, data.switching_area_id)
+    if not area:
+        raise HTTPException(404, "Switching area not found")
+    origin = db.get(Location, data.origin_location_id)
+    if not origin:
+        raise HTTPException(404, "Origin location not found")
+
+    area_location_ids = {l.id for l in area.locations}
+    dispatch_ids = {l.id for l in db.query(Location).filter(
+        Location.location_type.in_(["staging", "yard"])
+    ).all()}
+
+    current_count = db.query(Car).filter(
+        Car.current_location_id.in_(list(area_location_ids))
+    ).count() if area_location_ids else 0
+
+    area_cars = db.query(Car).filter(
+        Car.current_location_id.in_(list(area_location_ids))
+    ).all() if area_location_ids else []
+
+    outbound = [
+        car for car in area_cars
+        if (wb := _get_active_waybill(car)) and wb.destination_id in dispatch_ids
+    ]
+
+    # Cars already inside the area that still need to be spotted to another location
+    # within the area (local switching moves — don't free capacity).
+    local_spots = [
+        car for car in area_cars
+        if (wb := _get_active_waybill(car))
+        and wb.destination_id in area_location_ids
+        and car.current_location_id != wb.destination_id
+    ]
+
+    available_spots = max(0, area.car_capacity - current_count + len(outbound))
+
+    origin_cars = db.query(Car).filter(
+        Car.current_location_id == data.origin_location_id
+    ).all()
+    inbound = [
+        car for car in origin_cars
+        if (wb := _get_active_waybill(car)) and wb.destination_id in area_location_ids
+    ]
+    consist_inbound = inbound[:available_spots]
+
+    warnings = []
+    if not consist_inbound and not outbound and not local_spots:
+        warnings.append("No eligible cars found for this origin and switching area.")
+
+    plan = db.get(DispatchPlan, 1)
+    if not plan:
+        plan = DispatchPlan(id=1)
+        db.add(plan)
+
+    plan.plan_type = "switching"
+    plan.origin_location_id = data.origin_location_id
+    plan.switching_area_id = data.switching_area_id
+    plan.destination_location_id = None
+    plan.setout_ids_json = json.dumps([c.id for c in consist_inbound])
+    plan.pickup_ids_json = json.dumps([c.id for c in outbound])
+    plan.spots_ids_json  = json.dumps([c.id for c in local_spots])
+    plan.available_spots = available_spots
+    plan.built_at = time.time()
+    db.commit()
+
+    result = dispatch_plan_to_dict(plan, db)
+    result["warnings"] = warnings
+    return result
+
+
+@app.get("/api/dispatcher/plan")
+def get_dispatch_plan(db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, 1)
+    if not plan or plan.built_at is None:
+        return None
+    return dispatch_plan_to_dict(plan, db)
+
+
+@app.delete("/api/dispatcher/plan", status_code=204)
+def clear_dispatch_plan_endpoint(db: Session = Depends(get_db)):
+    _clear_dispatch_plan(db)
+
+
+@app.patch("/api/dispatcher/plan/power")
+def update_dispatch_power(data: DispatchPowerUpdate, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, 1)
+    if not plan:
+        raise HTTPException(404, "No dispatch plan exists — build one first")
+    plan.power_ids_json = json.dumps(data.power_ids)
+    plan.caboose_id = data.caboose_id
+    db.commit()
+    return dispatch_plan_to_dict(plan, db)
+
+
+# ── Layout Status ─────────────────────────────────────────────────────────────
+
+@app.get("/api/layout-status")
+def layout_status(db: Session = Depends(get_db)):
+    areas = db.query(SwitchingArea).all()
+    area_dicts = []
+    for area in areas:
+        d = switching_area_to_dict(area, db)
+        loc_ids = [l.id for l in area.locations]
+        cars = db.query(Car).filter(Car.current_location_id.in_(loc_ids)).all() if loc_ids else []
+        d["cars"] = [_enrich_car_for_status(c) for c in cars]
+        area_dicts.append(d)
+
+    yard_locs = db.query(Location).filter(
+        Location.location_type.in_(["staging", "yard"])
+    ).all()
+    yard_dicts = []
+    for loc in yard_locs:
+        cars = db.query(Car).filter(Car.current_location_id == loc.id).all()
+        yard_dicts.append({
+            "id": loc.id,
+            "name": loc.name,
+            "location_type": loc.location_type,
+            "car_count": len(cars),
+            "cars": [_enrich_car_for_status(c) for c in cars],
+        })
+
+    return {"switching_areas": area_dicts, "yards": yard_dicts}
+
+
+def _enrich_car_for_status(car: Car) -> dict:
+    wb = _get_active_waybill(car)
+    return {
+        "id": car.id,
+        "reporting_marks": car.reporting_marks,
+        "car_number": car.car_number,
+        "car_type": car.car_type,
+        "destination_name": wb.destination.name if wb and wb.destination else None,
+    }
 
 
 # ── Industries ────────────────────────────────────────────────────────────────
@@ -1476,6 +1749,13 @@ def resume_session_clock(db: Session = Depends(get_db)):
     return _clock_to_dict(c)
 
 
+@app.post("/api/session/clock/start")
+def start_session_clock(db: Session = Depends(get_db)):
+    _start_session_clock(db)
+    c = db.get(SessionClock, 1)
+    return _clock_to_dict(c)
+
+
 # ── Session ───────────────────────────────────────────────────────────────────
 
 @app.post("/api/session/plan")
@@ -1555,12 +1835,14 @@ def operations(db: Session = Depends(get_db)):
 def export_data(db: Session = Depends(get_db)):
     from datetime import date as _date
     tables = {
+        "switching_areas":        [_row_to_dict(r) for r in db.query(SwitchingArea).all()],
         "locations":              [_row_to_dict(r) for r in db.query(Location).all()],
         "industries":             [_row_to_dict(r) for r in db.query(Industry).all()],
         "commodity_car_type_map": [_row_to_dict(r) for r in db.query(CommodityCarTypeMap).all()],
         "cars":                   [_row_to_dict(r) for r in db.query(Car).all()],
         "waybills":               [_row_to_dict(r) for r in db.query(Waybill).all()],
         "movement_logs":          [_row_to_dict(r) for r in db.query(MovementLog).all()],
+        "dispatch_plan":          [_row_to_dict(r) for r in db.query(DispatchPlan).all()],
     }
     payload = {"version": 1, "exported_at": datetime.utcnow().isoformat(), "tables": tables}
     buf = io.BytesIO()
@@ -1597,21 +1879,25 @@ async def import_data(file: UploadFile = File(...), db: Session = Depends(get_db
             (UPLOADS_DIR / Path(name).name).write_bytes(zf.read(name))
 
     # Clear in reverse FK order
+    db.query(DispatchPlan).delete(synchronize_session=False)
     db.query(MovementLog).delete(synchronize_session=False)
     db.query(Waybill).delete(synchronize_session=False)
     db.query(Car).delete(synchronize_session=False)
     db.query(CommodityCarTypeMap).delete(synchronize_session=False)
     db.query(Industry).delete(synchronize_session=False)
     db.query(Location).delete(synchronize_session=False)
+    db.query(SwitchingArea).delete(synchronize_session=False)
     db.flush()
 
-    # Insert in FK order
+    # Insert in FK order (SwitchingArea before Location)
+    _import_table(db, SwitchingArea,       tables.get("switching_areas", []))
     _import_table(db, Location,            tables.get("locations", []))
     _import_table(db, Industry,            tables.get("industries", []))
     _import_table(db, CommodityCarTypeMap, tables.get("commodity_car_type_map", []))
     _import_table(db, Car,                 tables.get("cars", []))
     _import_table(db, Waybill,             tables.get("waybills", []))
     _import_table(db, MovementLog,         tables.get("movement_logs", []))
+    _import_table(db, DispatchPlan,        tables.get("dispatch_plan", []))
     db.commit()
     return {"ok": True}
 
