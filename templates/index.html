@@ -281,49 +281,29 @@
         </div>
       </article>
 
-      <!-- Dispatcher panel — shown only when no session is active -->
+      <!-- Dispatcher panel -->
       <article id="dispatcher-panel" class="hidden" style="margin-bottom:1rem">
         <div class="section-header">
           <div class="section-header-title">
             <button id="btn-toggle-dispatcher" class="outline small">▼</button>
             <h3 style="margin:0">Virtual Dispatcher</h3>
           </div>
-          <div class="button-row">
-            <button id="btn-start-dispatch-session" class="hidden">Start Session with this Consist</button>
-          </div>
         </div>
         <div id="dispatcher-body">
-        <div class="grid">
-          <label>Origin (staging / yard)
-            <select id="disp-origin"><option value="">— select origin —</option></select>
-          </label>
-          <label>Switching Area
-            <select id="disp-area"><option value="">— select area —</option></select>
-          </label>
-        </div>
-        <div class="button-row">
-          <button id="btn-build-consist">Build Consist</button>
-          <button id="btn-clear-dispatch-plan" class="outline secondary">✕ Clear</button>
-        </div>
-        <div id="dispatch-plan-result" class="hidden" style="margin-top:0.75rem">
-          <p id="dispatch-plan-summary" class="muted" style="margin-bottom:0.5rem"></p>
-          <div id="dispatch-power-strip-preview"></div>
-          <div id="dispatch-consist-list"></div>
-          <div id="dispatch-power-section" class="hidden" style="margin-top:0.75rem">
-            <div class="grid">
-              <label>Locomotive(s)
-                <select id="disp-power" multiple size="3"></select>
-              </label>
-              <label>Caboose
-                <select id="disp-caboose">
-                  <option value="">— none —</option>
-                </select>
-              </label>
-            </div>
-            <button type="button" id="btn-assign-power" class="outline small" style="margin-top:0.5rem">Save Power Assignment</button>
+          <div class="grid">
+            <label>Origin (staging / yard)
+              <select id="disp-origin"><option value="">— select origin —</option></select>
+            </label>
+            <label>Switching Area
+              <select id="disp-area"><option value="">— select area —</option></select>
+            </label>
           </div>
-        </div>
-        <div id="dispatch-warnings" class="hidden session-warnings" style="margin-top:0.5rem"></div>
+          <div class="button-row">
+            <button id="btn-build-consist">+ Build Consist</button>
+            <button id="btn-clear-all-plans" class="outline secondary">✕ Clear All</button>
+          </div>
+          <div id="dispatch-plans-list" style="margin-top:0.75rem"></div>
+          <div id="dispatch-warnings" class="hidden session-warnings" style="margin-top:0.5rem"></div>
         </div><!-- /dispatcher-body -->
       </article>
 
@@ -561,6 +541,21 @@
           </label>
         </div>
         <button type="submit" class="small">Save Clock Settings</button>
+      </form>
+
+      <hr />
+      <div class="section-header" style="margin-top:0">
+        <h3>Operations Mode</h3>
+      </div>
+      <form id="ops-mode-form" class="inline-form">
+        <label>Protocol
+          <select id="setting-ops-mode">
+            <option value="free">Free operations (no specific protocol)</option>
+            <option value="timetable_train_order">Timetable &amp; Train Order (TT&amp;TO)</option>
+            <option value="track_warrant">Track Warrant Control (TWC)</option>
+          </select>
+        </label>
+        <button type="submit" class="small">Save Ops Mode</button>
       </form>
     </section>
 

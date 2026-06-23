@@ -12,10 +12,13 @@ let editingWaybillId = null;
 let photoPath = null;
 let stagingMergeDeleteId = null;
 let switchingAreas = [];
-let dispatchPlan = null;
+let dispatchPlans = [];
+let opsMode = "free";
+let settings = null;
 
 // ── Fast clock ────────────────────────────────────────────────────────────────
 let clockInterval = null;
+let clockSyncInterval = null;
 let clockState = null;
 
 async function fetchAndStartClock() {
@@ -25,8 +28,18 @@ async function fetchAndStartClock() {
 
 function startClockTick() {
   clearInterval(clockInterval);
+  clearInterval(clockSyncInterval);
   clockInterval = setInterval(updateClock, 1000);
+  clockSyncInterval = setInterval(syncClockState, 15000);
   updateClock();
+}
+
+async function syncClockState() {
+  try {
+    const state = await api("GET", "/api/session/clock");
+    if (!state?.started_at) { stopClock(); return; }
+    clockState = state;
+  } catch {}
 }
 
 function updateClock() {
@@ -45,7 +58,9 @@ function updateClock() {
 
 function stopClock() {
   clearInterval(clockInterval);
+  clearInterval(clockSyncInterval);
   clockInterval = null;
+  clockSyncInterval = null;
   clockState = null;
 }
 
@@ -1149,23 +1164,25 @@ async function loadOperations() {
   // Layout Status strip — always visible
   await renderLayoutStatus();
 
-  if (session) {
-    // Active session: hide dispatcher
-    hide($("#dispatcher-panel"));
-    $("#ops-header-buttons").innerHTML = ""; // cleared by renderActiveSession
-    renderActiveSession();
-    return;
-  }
-
-  // Idle: populate and show dispatcher
+  // Dispatcher always visible
   if (!locations.length || !switchingAreas.length) {
     [locations, switchingAreas] = await Promise.all([
       api("GET", "/api/locations"),
       api("GET", "/api/switching-areas"),
     ]);
   }
+  if (!settings) {
+    settings = await api("GET", "/api/settings");
+    opsMode = settings?.ops_mode || "free";
+  }
   await loadDispatcherPanel();
   show($("#dispatcher-panel"));
+
+  if (session) {
+    $("#ops-header-buttons").innerHTML = ""; // cleared by renderActiveSession
+    renderActiveSession();
+    return;
+  }
 
   $("#ops-title").textContent = "Quick Op Session";
   // Idle state: "Plan Session" as fallback below the dispatcher
@@ -1288,7 +1305,11 @@ function markCar(carId, status) {
 }
 
 function renderActiveSession() {
-  $("#ops-title").textContent = "Quick Op — Active Session";
+  const titleParts = [];
+  if (session.trainNumber) titleParts.push(`Train #${session.trainNumber}`);
+  if (session.trainName) titleParts.push(`"${session.trainName}"`);
+  $("#ops-title").textContent = titleParts.length ? titleParts.join(" ") : "Active Session";
+
   const warnEl = $("#session-warnings");
   if (session.warnings?.length) {
     warnEl.innerHTML = session.warnings.map(w => `<p style="margin:0.2rem 0">⚠ ${w}</p>`).join("");
@@ -1306,13 +1327,18 @@ function renderActiveSession() {
     <div class="fast-clock">
       <span id="clock-time">--:--</span>
       <button id="btn-clock-pause" class="outline clock-btn" title="Pause / Resume clock">⏸</button>
+      <button id="btn-clock-reset" class="outline clock-btn" title="Reset clock to start time">↺</button>
     </div>
     <button id="btn-cancel-session" class="outline secondary">✕ Cancel Session</button>
     <button id="btn-end-session" class="contrast">⬛ End Session</button>
   `;
   document.getElementById("btn-end-session").addEventListener("click", handleEndSession);
   document.getElementById("btn-clock-pause").addEventListener("click", toggleClockPause);
-  document.getElementById("btn-cancel-session").addEventListener("click", () => {
+  document.getElementById("btn-clock-reset").addEventListener("click", async () => {
+    clockState = await api("POST", "/api/session/clock/start");
+    startClockTick();
+  });
+  document.getElementById("btn-cancel-session").addEventListener("click", async () => {
     const btn = document.getElementById("btn-cancel-session");
     if (!btn.dataset.confirm) {
       btn.dataset.confirm = "1";
@@ -1324,8 +1350,12 @@ function renderActiveSession() {
     }
     btn.classList.remove("btn-confirming");
     stopClock();
+    const cancelledPlanId = session?.planId;
     session = null;
     saveSession();
+    if (cancelledPlanId) {
+      try { await api("PATCH", `/api/dispatcher/plan/${cancelledPlanId}/status`, { status: "draft" }); } catch {}
+    }
     loadOperations();
   });
 
@@ -1426,6 +1456,9 @@ async function commitEndSession(cpCars) {
     await withLoading(btn || document.body, "Finishing…", async () => {
       const result = await api("POST", "/api/session/end", { cars: payload });
       stopClock();
+      if (session?.planId) {
+        try { await api("PATCH", `/api/dispatcher/plan/${session.planId}/status`, { status: "complete" }); } catch {}
+      }
       session = null;
       saveSession();
       result.updated.forEach(updated => {
@@ -1481,6 +1514,8 @@ async function loadLayout() {
   if (settings) {
     $("#clock-start-time").value = settings.clock_start_time;
     $("#clock-speed").value = String(settings.clock_speed);
+    opsMode = settings.ops_mode || "free";
+    $("#setting-ops-mode").value = opsMode;
   }
 }
 
@@ -1604,11 +1639,24 @@ $("#car-type-form").addEventListener("submit", async e => {
 
 $("#clock-settings-form").addEventListener("submit", async e => {
   e.preventDefault();
-  await api("PUT", "/api/settings", {
+  settings = await api("PUT", "/api/settings", {
     clock_start_time: $("#clock-start-time").value,
     clock_speed: parseInt($("#clock-speed").value),
+    ops_mode: settings?.ops_mode || "free",
   });
   showToast("Clock settings saved.", "success");
+});
+
+$("#ops-mode-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const newMode = $("#setting-ops-mode").value;
+  settings = await api("PUT", "/api/settings", {
+    clock_start_time: settings?.clock_start_time || "08:00",
+    clock_speed: settings?.clock_speed || 4,
+    ops_mode: newMode,
+  });
+  opsMode = newMode;
+  showToast("Operations mode saved.", "success");
 });
 
 function renderLocationList() {
@@ -2606,7 +2654,6 @@ $("#btn-toggle-layout-status").addEventListener("click", () => {
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 
 async function loadDispatcherPanel() {
-  // Populate origin select (staging + yard locations)
   const originSel = $("#disp-origin");
   const areaSel = $("#disp-area");
   const yardLocs = locations.filter(l => l.location_type === "staging" || l.location_type === "yard");
@@ -2615,38 +2662,71 @@ async function loadDispatcherPanel() {
   areaSel.innerHTML = '<option value="">— select area —</option>' +
     switchingAreas.map(a => `<option value="${a.id}">${a.name} (${a.current_car_count ?? 0}/${a.car_capacity})</option>`).join("");
 
-  // Restore persisted plan
   try {
-    dispatchPlan = await api("GET", "/api/dispatcher/plan");
+    dispatchPlans = await api("GET", "/api/dispatcher/plans") || [];
   } catch {
-    dispatchPlan = null;
+    dispatchPlans = [];
   }
-  if (dispatchPlan) {
-    if (dispatchPlan.origin_location_id) originSel.value = dispatchPlan.origin_location_id;
-    if (dispatchPlan.switching_area_id)  areaSel.value  = dispatchPlan.switching_area_id;
-    renderDispatchPlan(dispatchPlan);
-  } else {
-    hide($("#dispatch-plan-result"));
-    hide($("#dispatch-warnings"));
-  }
+  renderDispatchPlanList();
 }
 
-function renderDispatchPlan(plan) {
-  if (!plan) { hide($("#dispatch-plan-result")); return; }
+function renderDispatchPlanList() {
+  const container = $("#dispatch-plans-list");
+  // Preserve which cards are currently expanded before re-render
+  const expanded = new Set(
+    [...document.querySelectorAll(".consist-body:not(.hidden)")].map(el => el.dataset.planId)
+  );
+  if (!dispatchPlans.length) {
+    container.innerHTML = '<p class="muted small">No consists built yet.</p>';
+    return;
+  }
+  container.innerHTML = dispatchPlans.map(plan => renderConsistCard(plan)).join("");
+  dispatchPlans.forEach(plan => {
+    const body = document.querySelector(`.consist-body[data-plan-id="${plan.id}"]`);
+    const btn  = document.querySelector(`.consist-toggle[data-plan-id="${plan.id}"]`);
+    if (!expanded.has(String(plan.id))) {
+      body?.classList.add("hidden");
+      if (btn) btn.textContent = "▶";
+    }
+    wireConsistCard(plan.id);
+  });
+}
 
-  const setouts = plan.setouts || [];
-  const pickups = plan.pickups || [];
-  const spots   = plan.spots   || [];
+function renderConsistCard(plan) {
+  const statusBadgeMap = {
+    draft:    '<span class="status-badge status-draft">Ready</span>',
+    active:   '<span class="status-badge status-active">active</span>',
+    complete: '<span class="status-badge status-complete">complete</span>',
+  };
+  const statusBadge = statusBadgeMap[plan.status || "draft"] || statusBadgeMap.draft;
 
-  const total = setouts.length + pickups.length + spots.length;
-  const spotWord = plan.available_spots !== 1 ? "spots" : "spot";
-  $("#dispatch-plan-summary").textContent =
-    `${setouts.length} set out · ${pickups.length} pick up · ${spots.length} local · ${plan.available_spots} ${spotWord} available`;
+  const trainTitle = plan.train_number
+    ? `Train #${plan.train_number}`
+    : `<em class="muted" style="font-weight:400;font-style:italic">Consist #${plan.id}</em>`;
+  const trainName  = plan.train_name ? ` · "${plan.train_name}"` : "";
+  const depTime    = plan.departure_time ? `  ${plan.departure_time}` : "";
+  const crewParts  = [
+    plan.engineer  && `Eng: ${plan.engineer}`,
+    plan.conductor && `Cond: ${plan.conductor}`,
+  ].filter(Boolean);
+  const crew = crewParts.join("  ·  ");
+
+  const instrLabel = { free: "Notes", timetable_train_order: "Train Order", track_warrant: "Track Warrant" }[opsMode] || "Notes";
+
+  const assignedElsewhere = new Set(
+    dispatchPlans.filter(p => p.id !== plan.id).flatMap(p => (p.power || []).map(c => c.id))
+  );
+  const caboosesElsewhere = new Set(
+    dispatchPlans.filter(p => p.id !== plan.id && p.caboose).map(p => p.caboose.id)
+  );
+  const locos    = cars.filter(c => c.car_type === "locomotive" && !assignedElsewhere.has(c.id));
+  const cabooses = cars.filter(c => c.car_type === "caboose"    && !caboosesElsewhere.has(c.id));
+  const assignedPowerIds  = (plan.power || []).map(c => c.id);
+  const assignedCabooseId = plan.caboose?.id ?? null;
+  const hasPower = assignedPowerIds.length > 0;
 
   function carRow(c) {
-    const imgSrc = c.photo_path
-      ? `/${c.photo_path}`
-      : (defaultCarImage(c.car_type) || null);
+    const imgSrc = c.photo_path ? `/${c.photo_path}` : (defaultCarImage(c.car_type) || null);
     const thumb = imgSrc
       ? `<div class="session-car-thumb"><img src="${imgSrc}" alt="${c.car_type}" /></div>`
       : `<div class="session-car-thumb no-photo-thumb">${c.car_type}</div>`;
@@ -2663,54 +2743,251 @@ function renderDispatchPlan(plan) {
     </div>`;
   }
 
-  $("#dispatch-power-strip-preview").innerHTML = renderPowerStrip(plan.power, plan.caboose);
+  const setouts = plan.setouts || [];
+  const pickups = plan.pickups || [];
+  const spots   = plan.spots   || [];
+  const total   = setouts.length + pickups.length + spots.length;
 
-  let html = "";
-  if (setouts.length) {
-    html += `<p class="muted small" style="margin:0.25rem 0"><strong>Set out</strong></p>`;
-    html += setouts.map(carRow).join("");
+  let carListHtml = "";
+  if (setouts.length) carListHtml += `<p class="muted small" style="margin:0.25rem 0"><strong>Set out</strong></p>` + setouts.map(carRow).join("");
+  if (spots.length)   carListHtml += `<p class="muted small" style="margin:0.5rem 0 0.25rem"><strong>Spot locally</strong></p>` + spots.map(carRow).join("");
+  if (pickups.length) carListHtml += `<p class="muted small" style="margin:0.5rem 0 0.25rem"><strong>Pick up</strong></p>` + pickups.map(carRow).join("");
+  if (!total) carListHtml = '<p class="muted small">No cars in this consist.</p>';
+
+  return `
+  <article class="consist-card" data-plan-id="${plan.id}" style="margin-bottom:0.75rem">
+    <div class="section-header">
+      <div class="section-header-title">
+        <button class="outline small consist-toggle" data-plan-id="${plan.id}">▶</button>
+        <div>
+          <div>${statusBadge} <strong>${trainTitle}${trainName}</strong>${depTime}</div>
+          ${crew ? `<div class="muted small" style="font-size:0.8rem">${crew}</div>` : ""}
+          ${!hasPower ? `<div class="muted small consist-no-power-hint" style="font-size:0.75rem;color:var(--color-warning,#e07b00)">⚠ No locomotive assigned — open to assign power</div>` : ""}
+        </div>
+      </div>
+      <div class="button-row">
+        <button class="consist-start-session" data-plan-id="${plan.id}"${(total === 0 || !hasPower) ? " disabled" : ""}>Start Session</button>
+      </div>
+    </div>
+    <div class="consist-body hidden" data-plan-id="${plan.id}">
+      <div id="consist-power-strip-${plan.id}">${renderPowerStrip(plan.power, plan.caboose)}</div>
+      <div id="consist-car-list-${plan.id}">${carListHtml}</div>
+
+      <details style="margin-top:0.75rem">
+        <summary class="muted small" style="cursor:pointer">Train identity &amp; crew</summary>
+        <div class="grid" style="margin-top:0.5rem">
+          <label>Train Number <input type="text" class="consist-train-number" data-plan-id="${plan.id}" value="${plan.train_number || ""}" placeholder="e.g. 42" /></label>
+          <label>Train Name <input type="text" class="consist-train-name" data-plan-id="${plan.id}" value="${plan.train_name || ""}" placeholder='e.g. "The Limited"' /></label>
+        </div>
+        <div class="grid">
+          <label>Departure Time <input type="time" class="consist-departure-time" data-plan-id="${plan.id}" value="${plan.departure_time || ""}" /></label>
+          <label>Engineer <input type="text" class="consist-engineer" data-plan-id="${plan.id}" value="${plan.engineer || ""}" placeholder="Engineer name" /></label>
+        </div>
+        <label>Conductor <input type="text" class="consist-conductor" data-plan-id="${plan.id}" value="${plan.conductor || ""}" placeholder="Conductor name" /></label>
+        <label>${instrLabel}
+          <textarea class="consist-special-instructions" data-plan-id="${plan.id}" rows="3" placeholder="Special instructions…">${plan.special_instructions || ""}</textarea>
+        </label>
+        <div class="button-row">
+          <button class="outline small consist-save-identity" data-plan-id="${plan.id}">Save Identity</button>
+        </div>
+      </details>
+
+      <details style="margin-top:0.5rem">
+        <summary class="muted small" style="cursor:pointer">Assign power</summary>
+        <div class="grid" style="margin-top:0.5rem">
+          <label>Locomotive(s)
+            <select multiple size="3" class="consist-power-select" data-plan-id="${plan.id}">
+              ${locos.length
+                ? locos.map(c => `<option value="${c.id}"${assignedPowerIds.includes(c.id) ? " selected" : ""}>${c.reporting_marks || "—"} ${c.car_number || ""}</option>`).join("")
+                : `<option value="" disabled>— no locomotives —</option>`}
+            </select>
+          </label>
+          <label>Caboose
+            <select class="consist-caboose-select" data-plan-id="${plan.id}">
+              <option value="">— none —</option>
+              ${cabooses.map(c => `<option value="${c.id}"${assignedCabooseId === c.id ? " selected" : ""}>${c.reporting_marks || "—"} ${c.car_number || ""}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+        <div class="button-row">
+          <button class="outline small consist-save-power" data-plan-id="${plan.id}">Save Power</button>
+        </div>
+      </details>
+
+      <div class="button-row" style="margin-top:0.75rem;justify-content:flex-end">
+        <button class="outline small consist-rebuild" data-plan-id="${plan.id}">↺ Rebuild</button>
+        <button class="outline small contrast consist-delete" data-plan-id="${plan.id}">Delete Consist</button>
+      </div>
+    </div>
+  </article>`;
+}
+
+function wireConsistCard(planId) {
+  const card = document.querySelector(`.consist-card[data-plan-id="${planId}"]`);
+  if (!card) return;
+
+  card.querySelector(`.consist-toggle[data-plan-id="${planId}"]`).addEventListener("click", () => {
+    const body = card.querySelector(`.consist-body[data-plan-id="${planId}"]`);
+    const btn  = card.querySelector(`.consist-toggle[data-plan-id="${planId}"]`);
+    const collapsed = body.classList.toggle("hidden");
+    btn.textContent = collapsed ? "▶" : "▼";
+  });
+
+  const powerSel   = card.querySelector(`.consist-power-select[data-plan-id="${planId}"]`);
+  const cabooseSel = card.querySelector(`.consist-caboose-select[data-plan-id="${planId}"]`);
+
+  function liveCardPowerStrip() {
+    const powerIds  = [...(powerSel?.selectedOptions || [])].map(o => parseInt(o.value)).filter(v => !isNaN(v));
+    const cabooseId = cabooseSel?.value ? parseInt(cabooseSel.value) : null;
+    const powerCars  = powerIds.map(id => cars.find(c => c.id === id)).filter(Boolean);
+    const cabooseCar = cabooseId ? cars.find(c => c.id === cabooseId) : null;
+    const stripEl = document.getElementById(`consist-power-strip-${planId}`);
+    if (stripEl) stripEl.innerHTML = renderPowerStrip(powerCars, cabooseCar);
   }
-  if (spots.length) {
-    html += `<p class="muted small" style="margin:0.5rem 0 0.25rem"><strong>Spot locally</strong></p>`;
-    html += spots.map(carRow).join("");
-  }
-  if (pickups.length) {
-    html += `<p class="muted small" style="margin:0.5rem 0 0.25rem"><strong>Pick up</strong></p>`;
-    html += pickups.map(carRow).join("");
-  }
-  if (!total) {
-    html += '<p class="muted small">No cars in this consist.</p>';
-  }
+  powerSel?.addEventListener("change",   liveCardPowerStrip);
+  cabooseSel?.addEventListener("change", liveCardPowerStrip);
 
-  $("#dispatch-consist-list").innerHTML = html;
-  show($("#dispatch-plan-result"));
+  card.querySelector(`.consist-save-identity[data-plan-id="${planId}"]`).addEventListener("click", async () => {
+    const btn = card.querySelector(`.consist-save-identity[data-plan-id="${planId}"]`);
+    const body = {
+      train_number:         card.querySelector(`.consist-train-number[data-plan-id="${planId}"]`).value.trim() || null,
+      train_name:           card.querySelector(`.consist-train-name[data-plan-id="${planId}"]`).value.trim() || null,
+      departure_time:       card.querySelector(`.consist-departure-time[data-plan-id="${planId}"]`).value || null,
+      engineer:             card.querySelector(`.consist-engineer[data-plan-id="${planId}"]`).value.trim() || null,
+      conductor:            card.querySelector(`.consist-conductor[data-plan-id="${planId}"]`).value.trim() || null,
+      special_instructions: card.querySelector(`.consist-special-instructions[data-plan-id="${planId}"]`).value.trim() || null,
+    };
+    try {
+      await withLoading(btn, "Saving…", async () => {
+        const updated = await api("PATCH", `/api/dispatcher/plan/${planId}/identity`, body);
+        const idx = dispatchPlans.findIndex(p => p.id === planId);
+        if (idx !== -1) dispatchPlans[idx] = updated;
+        renderDispatchPlanList();
+        showToast("Train identity saved.", "success");
+      });
+    } catch (err) {
+      showToast("Error saving identity: " + err.message, "error");
+    }
+  });
 
-  const startBtn = $("#btn-start-dispatch-session");
-  total > 0 ? show(startBtn) : hide(startBtn);
+  card.querySelector(`.consist-save-power[data-plan-id="${planId}"]`).addEventListener("click", async () => {
+    const btn = card.querySelector(`.consist-save-power[data-plan-id="${planId}"]`);
+    const powerIds  = [...(powerSel?.selectedOptions || [])].map(o => parseInt(o.value)).filter(v => !isNaN(v));
+    const cabooseId = cabooseSel?.value ? parseInt(cabooseSel.value) : null;
+    try {
+      await withLoading(btn, "Saving…", async () => {
+        const updated = await api("PATCH", `/api/dispatcher/plan/${planId}/power`, { power_ids: powerIds, caboose_id: cabooseId });
+        const idx = dispatchPlans.findIndex(p => p.id === planId);
+        if (idx !== -1) dispatchPlans[idx] = updated;
+        renderDispatchPlanList();
+        showToast("Power assignment saved.", "success");
+      });
+    } catch (err) {
+      showToast("Error saving power: " + err.message, "error");
+    }
+  });
 
-  const warnings = plan.warnings || [];
-  if (warnings.length) {
-    $("#dispatch-warnings").innerHTML = warnings.map(w => `<p>${w}</p>`).join("");
-    show($("#dispatch-warnings"));
-  } else {
-    hide($("#dispatch-warnings"));
-  }
+  card.querySelector(`.consist-start-session[data-plan-id="${planId}"]`).addEventListener("click", async () => {
+    const plan = dispatchPlans.find(p => p.id === planId);
+    if (!plan) return;
+    const btn = card.querySelector(`.consist-start-session[data-plan-id="${planId}"]`);
 
-  // Populate power/caboose selects
-  const locos    = cars.filter(c => c.car_type === "locomotive");
-  const cabooses = cars.filter(c => c.car_type === "caboose");
-  const powerSel  = $("#disp-power");
-  const cabooseSel = $("#disp-caboose");
-  const assignedPowerIds = (plan.power || []).map(c => c.id);
-  const assignedCabooseId = plan.caboose?.id ?? null;
+    if (session) {
+      if (!btn.dataset.confirm) {
+        btn.dataset.confirm = "1";
+        btn.classList.add("btn-confirming");
+        const orig = btn.textContent;
+        btn.textContent = "End current session?";
+        setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.textContent = orig; }, 4000);
+        return;
+      }
+      btn.classList.remove("btn-confirming");
+      delete btn.dataset.confirm;
+    }
 
-  powerSel.innerHTML = locos.length
-    ? locos.map(c => `<option value="${c.id}"${assignedPowerIds.includes(c.id) ? " selected" : ""}>${c.reporting_marks || "—"} ${c.car_number || ""}</option>`).join("")
-    : `<option value="" disabled>— no locomotives in roster —</option>`;
-  cabooseSel.innerHTML = `<option value="">— none —</option>` +
-    cabooses.map(c => `<option value="${c.id}"${assignedCabooseId === c.id ? " selected" : ""}>${c.reporting_marks || "—"} ${c.car_number || ""}</option>`).join("");
+    try {
+      clockState = await api("POST", "/api/session/clock/ensure");
+      if (clockState?.started_at) startClockTick();
 
-  show($("#dispatch-power-section"));
+      try { await api("PATCH", `/api/dispatcher/plan/${planId}/status`, { status: "active" }); } catch {}
+
+      const toSessionCar = (c, group) => ({
+        id: c.id,
+        marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
+        carType: c.car_type,
+        fromLocation: c.current_location_name,
+        toLocation: c.active_waybill?.destination_name || "?",
+        photoPath: c.photo_path || null,
+        industryName: c.active_waybill?.industry_name || null,
+        group,
+        status: "pending",
+      });
+
+      const firstLoco = (plan.power || [])[0];
+      const locoLabel = firstLoco
+        ? `${firstLoco.reporting_marks || ""}${firstLoco.car_number ? " " + firstLoco.car_number : ""}`.trim()
+        : "";
+
+      session = {
+        planId:              plan.id,
+        trainNumber:         plan.train_number || locoLabel || "",
+        trainName:           plan.train_name           || "",
+        departureTime:       plan.departure_time       || "",
+        engineer:            plan.engineer             || "",
+        conductor:           plan.conductor            || "",
+        specialInstructions: plan.special_instructions || "",
+        warnings: plan.warnings || [],
+        power:    plan.power    || [],
+        caboose:  plan.caboose  || null,
+        cars: [
+          ...(plan.setouts || []).map(c => toSessionCar(c, "arrivals")),
+          ...(plan.spots   || []).map(c => toSessionCar(c, "spots")),
+          ...(plan.pickups || []).map(c => toSessionCar(c, "departures")),
+        ],
+      };
+      saveSession();
+      renderActiveSession();
+      document.querySelector('[data-tab="operations"]').click();
+    } catch (err) {
+      showToast("Error starting session: " + err.message, "error");
+    }
+  });
+
+  card.querySelector(`.consist-rebuild[data-plan-id="${planId}"]`).addEventListener("click", async () => {
+    const btn = card.querySelector(`.consist-rebuild[data-plan-id="${planId}"]`);
+    try {
+      await withLoading(btn, "Rebuilding…", async () => {
+        const updated = await api("POST", `/api/dispatcher/plan/${planId}/rebuild`);
+        const idx = dispatchPlans.findIndex(p => p.id === planId);
+        if (idx !== -1) dispatchPlans[idx] = updated;
+        renderDispatchPlanList();
+        showToast("Consist rebuilt.", "success");
+      });
+    } catch (err) {
+      showToast("Error rebuilding: " + err.message, "error");
+    }
+  });
+
+  card.querySelector(`.consist-delete[data-plan-id="${planId}"]`).addEventListener("click", async () => {
+    const btn = card.querySelector(`.consist-delete[data-plan-id="${planId}"]`);
+    if (!btn.dataset.confirm) {
+      btn.dataset.confirm = "1";
+      btn.classList.add("btn-confirming");
+      const orig = btn.textContent;
+      btn.textContent = "Confirm delete?";
+      setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.textContent = orig; }, 3000);
+      return;
+    }
+    btn.classList.remove("btn-confirming");
+    delete btn.dataset.confirm;
+    try {
+      await api("DELETE", `/api/dispatcher/plan/${planId}`);
+      dispatchPlans = dispatchPlans.filter(p => p.id !== planId);
+      renderDispatchPlanList();
+    } catch (err) {
+      showToast("Error deleting consist: " + err.message, "error");
+    }
+  });
 }
 
 $("#btn-build-consist").addEventListener("click", async () => {
@@ -2720,11 +2997,12 @@ $("#btn-build-consist").addEventListener("click", async () => {
   const btn = $("#btn-build-consist");
   await withLoading(btn, "Building…", async () => {
     try {
-      dispatchPlan = await api("POST", "/api/dispatcher/build-plan", {
+      const newPlan = await api("POST", "/api/dispatcher/build-plan", {
         origin_location_id: originId,
         switching_area_id: areaId,
       });
-      renderDispatchPlan(dispatchPlan);
+      dispatchPlans.push(newPlan);
+      renderDispatchPlanList();
       await renderLayoutStatus();
     } catch (err) {
       showToast("Error building consist: " + err.message, "error");
@@ -2732,82 +3010,24 @@ $("#btn-build-consist").addEventListener("click", async () => {
   });
 });
 
-$("#btn-clear-dispatch-plan").addEventListener("click", async () => {
-  try {
-    await api("DELETE", "/api/dispatcher/plan");
-    dispatchPlan = null;
-    hide($("#dispatch-plan-result"));
-    hide($("#dispatch-warnings"));
-    hide($("#btn-start-dispatch-session"));
-  } catch (err) {
-    showToast("Error clearing plan: " + err.message, "error");
+$("#btn-clear-all-plans").addEventListener("click", async () => {
+  const btn = $("#btn-clear-all-plans");
+  if (!btn.dataset.confirm) {
+    btn.dataset.confirm = "1";
+    btn.classList.add("btn-confirming");
+    const orig = btn.textContent;
+    btn.textContent = "Clear all — confirm?";
+    setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.textContent = orig; }, 3000);
+    return;
   }
-});
-
-function liveUpdatePowerStrip() {
-  if (!dispatchPlan) return;
-  const powerIds = [...$("#disp-power").selectedOptions]
-    .map(o => parseInt(o.value)).filter(v => !isNaN(v));
-  const cabooseId = $("#disp-caboose").value ? parseInt($("#disp-caboose").value) : null;
-  const powerCars  = powerIds.map(id => cars.find(c => c.id === id)).filter(Boolean);
-  const cabooseCar = cabooseId ? cars.find(c => c.id === cabooseId) || null : null;
-  $("#dispatch-power-strip-preview").innerHTML = renderPowerStrip(powerCars, cabooseCar);
-}
-
-$("#disp-caboose").addEventListener("change", liveUpdatePowerStrip);
-$("#disp-power").addEventListener("change", liveUpdatePowerStrip);
-
-$("#btn-assign-power").addEventListener("click", async () => {
-  const powerIds = [...$("#disp-power").selectedOptions]
-    .map(o => parseInt(o.value)).filter(v => !isNaN(v));
-  const cabooseVal = $("#disp-caboose").value;
-  const cabooseId = cabooseVal ? parseInt(cabooseVal) : null;
+  btn.classList.remove("btn-confirming");
+  delete btn.dataset.confirm;
   try {
-    dispatchPlan = await api("PATCH", "/api/dispatcher/plan/power", {
-      power_ids: powerIds,
-      caboose_id: cabooseId,
-    });
-    renderDispatchPlan(dispatchPlan);
-    showToast("Power assignment saved.", "success");
+    await api("DELETE", "/api/dispatcher/plans");
+    dispatchPlans = [];
+    renderDispatchPlanList();
   } catch (err) {
-    showToast("Error saving power: " + err.message, "error");
-  }
-});
-
-$("#btn-start-dispatch-session").addEventListener("click", async () => {
-  if (!dispatchPlan) return;
-  try {
-    await api("POST", "/api/session/clock/start");
-    clockState = await api("GET", "/api/session/clock");
-    if (clockState?.started_at) startClockTick();
-
-    const toSessionCar = (c, group) => ({
-      id: c.id,
-      marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
-      carType: c.car_type,
-      fromLocation: c.current_location_name,
-      toLocation: c.active_waybill?.destination_name || "?",
-      photoPath: c.photo_path || null,
-      industryName: c.active_waybill?.industry_name || null,
-      group,
-      status: "pending",
-    });
-
-    session = {
-      warnings: dispatchPlan.warnings || [],
-      power:    dispatchPlan.power    || [],
-      caboose:  dispatchPlan.caboose  || null,
-      cars: [
-        ...(dispatchPlan.setouts || []).map(c => toSessionCar(c, "arrivals")),
-        ...(dispatchPlan.spots   || []).map(c => toSessionCar(c, "spots")),
-        ...(dispatchPlan.pickups || []).map(c => toSessionCar(c, "departures")),
-      ],
-    };
-    saveSession();
-    hide($("#dispatcher-panel"));
-    renderActiveSession();
-  } catch (err) {
-    showToast("Error starting session: " + err.message, "error");
+    showToast("Error clearing consists: " + err.message, "error");
   }
 });
 
@@ -2816,13 +3036,17 @@ $("#btn-start-dispatch-session").addEventListener("click", async () => {
   await Promise.all([
     loadRoster(),
     (async () => {
-      [locations, industries, waybillPool, carTypes, switchingAreas] = await Promise.all([
-        api("GET", "/api/locations"),
-        api("GET", "/api/industries"),
-        api("GET", "/api/waybills"),
-        api("GET", "/api/car-types"),
-        api("GET", "/api/switching-areas"),
+      [[locations, industries, waybillPool, carTypes, switchingAreas], settings] = await Promise.all([
+        Promise.all([
+          api("GET", "/api/locations"),
+          api("GET", "/api/industries"),
+          api("GET", "/api/waybills"),
+          api("GET", "/api/car-types"),
+          api("GET", "/api/switching-areas"),
+        ]),
+        api("GET", "/api/settings"),
       ]);
+      opsMode = settings?.ops_mode || "free";
       populateCarTypeSelects();
     })(),
   ]);

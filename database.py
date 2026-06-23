@@ -82,6 +82,25 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        for col, defn in [
+            ("train_number",          "TEXT"),
+            ("train_name",            "TEXT"),
+            ("departure_time",        "TEXT"),
+            ("engineer",              "TEXT"),
+            ("conductor",             "TEXT"),
+            ("special_instructions",  "TEXT"),
+            ("status",                "TEXT DEFAULT 'draft'"),
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE dispatch_plan ADD COLUMN {col} {defn}"))
+                conn.commit()
+            except Exception:
+                pass
+        try:
+            conn.execute(text("ALTER TABLE layout_settings ADD COLUMN ops_mode TEXT DEFAULT 'free'"))
+            conn.commit()
+        except Exception:
+            pass
         # One-time migration: move producer industries' data to outbound fields
         conn.execute(text("""
             UPDATE industries
