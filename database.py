@@ -22,7 +22,7 @@ def get_db():
 
 DEFAULT_CAR_TYPES = [
     "boxcar", "flatcar", "gondola", "tank car", "hopper",
-    "covered hopper", "refrigerator car", "caboose", "passenger car", "other",
+    "covered hopper", "refrigerator car", "caboose", "passenger car", "locomotive", "other",
 ]
 
 
@@ -72,6 +72,16 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE dispatch_plan ADD COLUMN power_ids_json TEXT DEFAULT '[]'"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE dispatch_plan ADD COLUMN caboose_id INTEGER REFERENCES cars(id)"))
+            conn.commit()
+        except Exception:
+            pass
         # One-time migration: move producer industries' data to outbound fields
         conn.execute(text("""
             UPDATE industries
@@ -88,6 +98,12 @@ def init_db():
         if db.query(CarType).count() == 0:
             for name in DEFAULT_CAR_TYPES:
                 db.add(CarType(name=name))
+            db.commit()
+        else:
+            existing = {ct.name for ct in db.query(CarType).all()}
+            for name in DEFAULT_CAR_TYPES:
+                if name not in existing:
+                    db.add(CarType(name=name))
             db.commit()
         # Auto-assign bundled default images for car types that have none set
         static_dir = Path("static/images/car-types")

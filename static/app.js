@@ -284,18 +284,12 @@ function defaultCarImage(carTypeName) {
   return ct?.default_photo_path ? `/${ct.default_photo_path}` : null;
 }
 
-function renderCarGrid() {
-  const grid = $("#car-grid");
-  if (!cars.length) {
-    grid.innerHTML = emptyState("🚃", "No cars yet — add one with the buttons above.");
-    return;
-  }
-  grid.innerHTML = cars.map(car => {
-    const needsMove = car.active_waybill
-      && car.active_waybill.destination_id != null
-      && car.current_location_id !== car.active_waybill.destination_id;
-    const defImg = defaultCarImage(car.car_type);
-    return `
+function carCardHTML(car) {
+  const needsMove = car.active_waybill
+    && car.active_waybill.destination_id != null
+    && car.current_location_id !== car.active_waybill.destination_id;
+  const defImg = defaultCarImage(car.car_type);
+  return `
     <div class="car-card${needsMove ? ' car-needs-move' : ''}" data-id="${car.id}">
       <div class="car-thumb">
         ${car.photo_path
@@ -314,12 +308,52 @@ function renderCarGrid() {
           : `<span class="waybill-badge muted">No waybill</span>`}
       </div>
     </div>
-  `; }).join("");
+  `;
+}
+
+function renderCarGrid() {
+  const locos   = cars.filter(c => c.car_type === "locomotive");
+  const freight = cars.filter(c => c.car_type !== "locomotive");
+
+  const poolSection  = $("#power-pool-section");
+  const poolBody     = $("#power-pool-body");
+  const poolList     = $("#power-pool-list");
+  const poolDivider  = $("#power-pool-divider");
+  const grid         = $("#car-grid");
+
+  if (locos.length) {
+    poolList.innerHTML = locos.map(carCardHTML).join("");
+    show(poolSection);
+    show(poolDivider);
+  } else {
+    hide(poolSection);
+    hide(poolDivider);
+  }
+
+  if (!freight.length && !locos.length) {
+    grid.innerHTML = emptyState("🚃", "No cars yet — add one with the buttons above.");
+  } else if (!freight.length) {
+    grid.innerHTML = "";
+  } else {
+    grid.innerHTML = freight.map(carCardHTML).join("");
+  }
 
   $$(".car-card").forEach(card => {
     card.addEventListener("click", () => openCarDetail(parseInt(card.dataset.id)));
   });
 }
+
+$("#btn-toggle-power-pool").addEventListener("click", () => {
+  const body = $("#power-pool-body");
+  const btn  = $("#btn-toggle-power-pool");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
 
 // ── Add car via photo ─────────────────────────────────────────────────────────
 let addMode = "photo"; // "photo" | "manual"
@@ -1220,10 +1254,37 @@ function renderActiveSession() {
       </div>`;
   }
 
+  // Power strip (non-interactive)
+  let powerHtml = "";
+  const sessionPower   = session.power   || [];
+  const sessionCaboose = session.caboose || null;
+  if (sessionPower.length || sessionCaboose) {
+    function powerThumb(c) {
+      const img = c.photo_path ? `/${c.photo_path}` : defaultCarImage(c.car_type);
+      return img
+        ? `<img src="${img}" alt="${c.car_type}" />`
+        : `<span style="font-size:0.65rem">${c.car_type}</span>`;
+    }
+    function powerChip(c, label) {
+      return `<div class="power-chip" title="${label}">
+        ${powerThumb(c)}
+        <span class="power-chip-marks">${c.reporting_marks || "—"} ${c.car_number || ""}</span>
+      </div>`;
+    }
+    const locoChips    = sessionPower.map(c => powerChip(c, "locomotive")).join("");
+    const cabooseChip  = sessionCaboose ? powerChip(sessionCaboose, "caboose") : "";
+    powerHtml = `<div class="session-power-strip">
+      <span class="muted small" style="margin-right:0.5rem">Power:</span>
+      ${locoChips}
+      ${locoChips && cabooseChip ? '<span class="power-strip-sep">·</span>' : ""}
+      ${cabooseChip}
+    </div>`;
+  }
+
   const noWork = !arrivals.length && !departures.length && !spots.length;
-  let html = "";
+  let html = powerHtml;
   if (noWork) {
-    html = `<p class="muted" style="text-align:center;padding:1.5rem">No cars to work this session.</p>`;
+    html += `<p class="muted" style="text-align:center;padding:1.5rem">No cars to work this session.</p>`;
   } else {
     if (arrivals.length) {
       html += `<p class="session-section-title">Set out from staging (${arrivals.length})</p>`;
@@ -2554,6 +2615,22 @@ function renderDispatchPlan(plan) {
   } else {
     hide($("#dispatch-warnings"));
   }
+
+  // Populate power/caboose selects
+  const locos    = cars.filter(c => c.car_type === "locomotive");
+  const cabooses = cars.filter(c => c.car_type === "caboose");
+  const powerSel  = $("#disp-power");
+  const cabooseSel = $("#disp-caboose");
+  const assignedPowerIds = (plan.power || []).map(c => c.id);
+  const assignedCabooseId = plan.caboose?.id ?? null;
+
+  powerSel.innerHTML = locos.length
+    ? locos.map(c => `<option value="${c.id}"${assignedPowerIds.includes(c.id) ? " selected" : ""}>${c.reporting_marks || "—"} ${c.car_number || ""}</option>`).join("")
+    : `<option value="" disabled>— no locomotives in roster —</option>`;
+  cabooseSel.innerHTML = `<option value="">— none —</option>` +
+    cabooses.map(c => `<option value="${c.id}"${assignedCabooseId === c.id ? " selected" : ""}>${c.reporting_marks || "—"} ${c.car_number || ""}</option>`).join("");
+
+  show($("#dispatch-power-section"));
 }
 
 $("#btn-build-consist").addEventListener("click", async () => {
@@ -2586,6 +2663,23 @@ $("#btn-clear-dispatch-plan").addEventListener("click", async () => {
   }
 });
 
+$("#btn-assign-power").addEventListener("click", async () => {
+  const powerIds = [...$("#disp-power").selectedOptions]
+    .map(o => parseInt(o.value)).filter(v => !isNaN(v));
+  const cabooseVal = $("#disp-caboose").value;
+  const cabooseId = cabooseVal ? parseInt(cabooseVal) : null;
+  try {
+    dispatchPlan = await api("PATCH", "/api/dispatcher/plan/power", {
+      power_ids: powerIds,
+      caboose_id: cabooseId,
+    });
+    renderDispatchPlan(dispatchPlan);
+    showToast("Power assignment saved.", "success");
+  } catch (err) {
+    showToast("Error saving power: " + err.message, "error");
+  }
+});
+
 $("#btn-start-dispatch-session").addEventListener("click", async () => {
   if (!dispatchPlan) return;
   try {
@@ -2607,6 +2701,8 @@ $("#btn-start-dispatch-session").addEventListener("click", async () => {
 
     session = {
       warnings: dispatchPlan.warnings || [],
+      power:    dispatchPlan.power    || [],
+      caboose:  dispatchPlan.caboose  || null,
       cars: [
         ...(dispatchPlan.setouts || []).map(c => toSessionCar(c, "arrivals")),
         ...(dispatchPlan.spots   || []).map(c => toSessionCar(c, "spots")),

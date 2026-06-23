@@ -123,6 +123,11 @@ class DispatchBuildRequest(BaseModel):
     switching_area_id: int
 
 
+class DispatchPowerUpdate(BaseModel):
+    power_ids: list[int] = []
+    caboose_id: Optional[int] = None
+
+
 class IndustryCreate(BaseModel):
     name: str
     location_id: int
@@ -269,6 +274,7 @@ def dispatch_plan_to_dict(plan: DispatchPlan, db: Session) -> dict:
     setout_ids = json.loads(plan.setout_ids_json or "[]")
     pickup_ids = json.loads(plan.pickup_ids_json or "[]")
     spots_ids  = json.loads(plan.spots_ids_json or "[]")
+    power_ids  = json.loads(plan.power_ids_json or "[]")
 
     def _enrich(car_id, role):
         car = db.get(Car, car_id)
@@ -278,9 +284,11 @@ def dispatch_plan_to_dict(plan: DispatchPlan, db: Session) -> dict:
         d["role"] = role
         return d
 
-    setouts = [d for cid in setout_ids if (d := _enrich(cid, "setout"))]
-    pickups = [d for cid in pickup_ids if (d := _enrich(cid, "pickup"))]
-    spots   = [d for cid in spots_ids  if (d := _enrich(cid, "spot"))]
+    setouts     = [d for cid in setout_ids if (d := _enrich(cid, "setout"))]
+    pickups     = [d for cid in pickup_ids if (d := _enrich(cid, "pickup"))]
+    spots       = [d for cid in spots_ids  if (d := _enrich(cid, "spot"))]
+    power_cars  = [d for cid in power_ids  if (d := _enrich(cid, "power"))]
+    caboose_car = _enrich(plan.caboose_id, "caboose") if plan.caboose_id else None
 
     origin = db.get(Location, plan.origin_location_id) if plan.origin_location_id else None
     area = db.get(SwitchingArea, plan.switching_area_id) if plan.switching_area_id else None
@@ -294,6 +302,8 @@ def dispatch_plan_to_dict(plan: DispatchPlan, db: Session) -> dict:
         "setouts": setouts,
         "pickups": pickups,
         "spots": spots,
+        "power": power_cars,
+        "caboose": caboose_car,
         "available_spots": plan.available_spots,
         "built_at": plan.built_at,
         "warnings": [],
@@ -876,6 +886,17 @@ def get_dispatch_plan(db: Session = Depends(get_db)):
 @app.delete("/api/dispatcher/plan", status_code=204)
 def clear_dispatch_plan_endpoint(db: Session = Depends(get_db)):
     _clear_dispatch_plan(db)
+
+
+@app.patch("/api/dispatcher/plan/power")
+def update_dispatch_power(data: DispatchPowerUpdate, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, 1)
+    if not plan:
+        raise HTTPException(404, "No dispatch plan exists — build one first")
+    plan.power_ids_json = json.dumps(data.power_ids)
+    plan.caboose_id = data.caboose_id
+    db.commit()
+    return dispatch_plan_to_dict(plan, db)
 
 
 # ── Layout Status ─────────────────────────────────────────────────────────────

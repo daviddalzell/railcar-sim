@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Rose:wght@300;400;500;600;700&family=Montserrat+Alternates:wght@400;500;600;700;800;900&display=swap" />
   <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" href="data:,">
 </head>
 <body>
   <header class="container-fluid">
@@ -104,6 +105,20 @@
         </div>
         <div id="analyzing-msg" class="hidden"><span class="spinner"></span>Analyzing photo with {{ vision_label }}…</div>
       </article>
+
+      <!-- Power Pool (locomotives only) -->
+      <section id="power-pool-section" class="hidden">
+        <div class="section-header" style="margin-top:0">
+          <div class="section-header-title">
+            <button id="btn-toggle-power-pool" class="outline small">▶</button>
+            <h3>Power Pool</h3>
+          </div>
+        </div>
+        <div id="power-pool-body" class="hidden">
+          <div id="power-pool-list" class="car-grid"></div>
+        </div>
+      </section>
+      <hr id="power-pool-divider" class="hidden" />
 
       <!-- Car grid -->
       <div id="car-grid" class="car-grid"></div>
@@ -276,6 +291,19 @@
         <div id="dispatch-plan-result" class="hidden" style="margin-top:0.75rem">
           <p id="dispatch-plan-summary" class="muted" style="margin-bottom:0.5rem"></p>
           <div id="dispatch-consist-list"></div>
+          <div id="dispatch-power-section" class="hidden" style="margin-top:0.75rem">
+            <div class="grid">
+              <label>Locomotive(s)
+                <select id="disp-power" multiple size="3"></select>
+              </label>
+              <label>Caboose
+                <select id="disp-caboose">
+                  <option value="">— none —</option>
+                </select>
+              </label>
+            </div>
+            <button type="button" id="btn-assign-power" class="outline small" style="margin-top:0.5rem">Save Power Assignment</button>
+          </div>
           <div class="button-row" style="margin-top:0.75rem">
             <button id="btn-start-dispatch-session">Start Session with this Consist</button>
           </div>
