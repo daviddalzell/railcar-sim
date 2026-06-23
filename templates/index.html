@@ -120,8 +120,16 @@
       </section>
       <hr id="power-pool-divider" class="hidden" />
 
-      <!-- Car grid -->
-      <div id="car-grid" class="car-grid"></div>
+      <!-- Freight car grid -->
+      <div class="section-header" style="margin-top:0">
+        <div class="section-header-title">
+          <button id="btn-toggle-freight-cars" class="outline small">▼</button>
+          <h3>Freight Cars</h3>
+        </div>
+      </div>
+      <div id="freight-cars-body">
+        <div id="car-grid" class="car-grid"></div>
+      </div>
 
       <!-- Move car dialog -->
       <dialog id="move-car-dialog">
@@ -275,7 +283,16 @@
 
       <!-- Dispatcher panel — shown only when no session is active -->
       <article id="dispatcher-panel" class="hidden" style="margin-bottom:1rem">
-        <h4>Virtual Dispatcher</h4>
+        <div class="section-header">
+          <div class="section-header-title">
+            <button id="btn-toggle-dispatcher" class="outline small">▼</button>
+            <h3 style="margin:0">Virtual Dispatcher</h3>
+          </div>
+          <div class="button-row">
+            <button id="btn-start-dispatch-session" class="hidden">Start Session with this Consist</button>
+          </div>
+        </div>
+        <div id="dispatcher-body">
         <div class="grid">
           <label>Origin (staging / yard)
             <select id="disp-origin"><option value="">— select origin —</option></select>
@@ -290,6 +307,7 @@
         </div>
         <div id="dispatch-plan-result" class="hidden" style="margin-top:0.75rem">
           <p id="dispatch-plan-summary" class="muted" style="margin-bottom:0.5rem"></p>
+          <div id="dispatch-power-strip-preview"></div>
           <div id="dispatch-consist-list"></div>
           <div id="dispatch-power-section" class="hidden" style="margin-top:0.75rem">
             <div class="grid">
@@ -304,21 +322,26 @@
             </div>
             <button type="button" id="btn-assign-power" class="outline small" style="margin-top:0.5rem">Save Power Assignment</button>
           </div>
-          <div class="button-row" style="margin-top:0.75rem">
-            <button id="btn-start-dispatch-session">Start Session with this Consist</button>
-          </div>
         </div>
         <div id="dispatch-warnings" class="hidden session-warnings" style="margin-top:0.5rem"></div>
+        </div><!-- /dispatcher-body -->
       </article>
 
-      <div class="section-header" id="ops-header">
-        <h2 id="ops-title">Operations</h2>
-        <div class="button-row" id="ops-header-buttons">
-          <!-- swapped by JS between idle and active session states -->
+      <article id="ops-header" style="margin-bottom:1rem">
+        <div class="section-header">
+          <div class="section-header-title">
+            <button id="btn-toggle-ops" class="outline small">▼</button>
+            <h3 id="ops-title" style="margin:0">Quick Op Session</h3>
+          </div>
+          <div class="button-row" id="ops-header-buttons">
+            <!-- swapped by JS between idle and active session states -->
+          </div>
         </div>
-      </div>
-      <div id="session-warnings" class="hidden session-warnings"></div>
-      <div id="ops-list"></div>
+        <div id="ops-body">
+          <div id="session-warnings" class="hidden session-warnings"></div>
+          <div id="ops-list"></div>
+        </div>
+      </article>
 
       <!-- End session dialog: resolve CP car locations -->
       <dialog id="end-session-dialog">
@@ -359,9 +382,13 @@
         <!-- Locations column -->
         <div>
           <div class="section-header">
-            <h3>Locations</h3>
+            <div class="section-header-title">
+              <button id="btn-toggle-locations" class="outline small">▼</button>
+              <h3>Locations</h3>
+            </div>
             <button id="btn-add-location" class="outline small">+</button>
           </div>
+          <div id="location-body">
           <form id="location-form" class="hidden inline-form">
             <input id="loc-name" type="text" placeholder="Location name" required />
             <select id="loc-type">
@@ -378,14 +405,19 @@
             <input type="hidden" id="loc-edit-id" value="" />
           </form>
           <div id="location-list"></div>
+          </div><!-- /location-body -->
         </div>
 
         <!-- Industries column -->
         <div>
           <div class="section-header">
-            <h3>Industries</h3>
+            <div class="section-header-title">
+              <button id="btn-toggle-industries" class="outline small">▼</button>
+              <h3>Industries</h3>
+            </div>
             <button id="btn-add-industry" class="outline small">+</button>
           </div>
+          <div id="industries-body">
           <form id="industry-form" class="hidden inline-form">
             <div class="suggest-row">
               <input id="ind-name" type="text" placeholder="Industry name" required />
@@ -421,6 +453,7 @@
             <input type="hidden" id="ind-edit-id" value="" />
           </form>
           <div id="industry-list"></div>
+          </div><!-- /industries-body -->
         </div>
 
       </div>
@@ -604,9 +637,9 @@
       <div class="help-section">
         <button class="help-section-header">▶ Operating Sessions</button>
         <div class="help-section-body hidden">
-          <p>Run a realistic ops session from plan to wrap-up. The Operations tab drives the session lifecycle.</p>
+          <p>Run a realistic ops session from plan to wrap-up. The Quick Op Session tab drives the session lifecycle.</p>
           <ul>
-            <li>Click <strong>🚆 Plan Session</strong> to generate the session's switch list from current car positions and waybills.</li>
+            <li>Click <strong>🚆 Start Quick Op Session</strong> to generate the session's switch list from current car positions and waybills.</li>
             <li>The switch list is divided into three groups: <em>Set out from staging</em> (cars arriving at industries), <em>Cars to spot</em> (storage cars needing placement), and <em>Pick up for staging</em> (cars departing industries).</li>
             <li>For each car, tap <strong>Done</strong> when the car has been moved to its destination, or <strong>CP</strong> (Car Placement) to temporarily park it at another location.</li>
             <li>Click any car thumbnail to open its full detail view mid-session.</li>

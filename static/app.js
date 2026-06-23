@@ -311,6 +311,31 @@ function carCardHTML(car) {
   `;
 }
 
+function renderPowerStrip(power, caboose) {
+  const locos = power || [];
+  if (!locos.length && !caboose) return "";
+  function powerThumb(c) {
+    const img = c.photo_path ? `/${c.photo_path}` : defaultCarImage(c.car_type);
+    return img
+      ? `<img src="${img}" alt="${c.car_type}" />`
+      : `<span style="font-size:0.65rem">${c.car_type}</span>`;
+  }
+  function powerChip(c, label) {
+    return `<div class="power-chip" title="${label}">
+      ${powerThumb(c)}
+      <span class="power-chip-marks">${c.reporting_marks || "—"} ${c.car_number || ""}</span>
+    </div>`;
+  }
+  const locoChips   = locos.map(c => powerChip(c, "locomotive")).join("");
+  const cabooseChip = caboose ? powerChip(caboose, "caboose") : "";
+  return `<div class="session-power-strip">
+    <span class="muted small" style="margin-right:0.5rem">Power:</span>
+    ${locoChips}
+    ${locoChips && cabooseChip ? '<span class="power-strip-sep">·</span>' : ""}
+    ${cabooseChip}
+  </div>`;
+}
+
 function renderCarGrid() {
   const locos   = cars.filter(c => c.car_type === "locomotive");
   const freight = cars.filter(c => c.car_type !== "locomotive");
@@ -346,6 +371,66 @@ function renderCarGrid() {
 $("#btn-toggle-power-pool").addEventListener("click", () => {
   const body = $("#power-pool-body");
   const btn  = $("#btn-toggle-power-pool");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-dispatcher").addEventListener("click", () => {
+  const body = $("#dispatcher-body");
+  const btn  = $("#btn-toggle-dispatcher");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-ops").addEventListener("click", () => {
+  const body = $("#ops-body");
+  const btn  = $("#btn-toggle-ops");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-freight-cars").addEventListener("click", () => {
+  const body = $("#freight-cars-body");
+  const btn  = $("#btn-toggle-freight-cars");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-locations").addEventListener("click", () => {
+  const body = $("#location-body");
+  const btn  = $("#btn-toggle-locations");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-industries").addEventListener("click", () => {
+  const body = $("#industries-body");
+  const btn  = $("#btn-toggle-industries");
   if (body.classList.contains("hidden")) {
     show(body);
     btn.textContent = "▼";
@@ -1082,10 +1167,10 @@ async function loadOperations() {
   await loadDispatcherPanel();
   show($("#dispatcher-panel"));
 
-  $("#ops-title").textContent = "Operations";
+  $("#ops-title").textContent = "Quick Op Session";
   // Idle state: "Plan Session" as fallback below the dispatcher
   $("#ops-header-buttons").innerHTML =
-    `<span class="muted" style="font-size:0.85rem">Or:</span> <button id="btn-plan-session">🚆 Plan Session automatically</button>`;
+    `<button id="btn-plan-session">Start Quick Op Session</button>`;
   document.getElementById("btn-plan-session").addEventListener("click", async () => {
     const btn = document.getElementById("btn-plan-session");
     await withLoading(btn, "Planning…", async () => {
@@ -1203,7 +1288,7 @@ function markCar(carId, status) {
 }
 
 function renderActiveSession() {
-  $("#ops-title").textContent = "Active Session";
+  $("#ops-title").textContent = "Quick Op — Active Session";
   const warnEl = $("#session-warnings");
   if (session.warnings?.length) {
     warnEl.innerHTML = session.warnings.map(w => `<p style="margin:0.2rem 0">⚠ ${w}</p>`).join("");
@@ -1272,31 +1357,7 @@ function renderActiveSession() {
   }
 
   // Power strip (non-interactive)
-  let powerHtml = "";
-  const sessionPower   = session.power   || [];
-  const sessionCaboose = session.caboose || null;
-  if (sessionPower.length || sessionCaboose) {
-    function powerThumb(c) {
-      const img = c.photo_path ? `/${c.photo_path}` : defaultCarImage(c.car_type);
-      return img
-        ? `<img src="${img}" alt="${c.car_type}" />`
-        : `<span style="font-size:0.65rem">${c.car_type}</span>`;
-    }
-    function powerChip(c, label) {
-      return `<div class="power-chip" title="${label}">
-        ${powerThumb(c)}
-        <span class="power-chip-marks">${c.reporting_marks || "—"} ${c.car_number || ""}</span>
-      </div>`;
-    }
-    const locoChips    = sessionPower.map(c => powerChip(c, "locomotive")).join("");
-    const cabooseChip  = sessionCaboose ? powerChip(sessionCaboose, "caboose") : "";
-    powerHtml = `<div class="session-power-strip">
-      <span class="muted small" style="margin-right:0.5rem">Power:</span>
-      ${locoChips}
-      ${locoChips && cabooseChip ? '<span class="power-strip-sep">·</span>' : ""}
-      ${cabooseChip}
-    </div>`;
-  }
+  const powerHtml = renderPowerStrip(session.power, session.caboose);
 
   const noWork = !arrivals.length && !departures.length && !spots.length;
   let html = powerHtml;
@@ -2587,12 +2648,12 @@ function renderDispatchPlan(plan) {
       ? `/${c.photo_path}`
       : (defaultCarImage(c.car_type) || null);
     const thumb = imgSrc
-      ? `<img src="${imgSrc}" style="width:48px;height:32px;object-fit:contain;border-radius:4px;background:#FAF0E6" />`
-      : `<div style="width:48px;height:32px;background:#eee;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:0.6rem">${c.car_type}</div>`;
+      ? `<div class="session-car-thumb"><img src="${imgSrc}" alt="${c.car_type}" /></div>`
+      : `<div class="session-car-thumb no-photo-thumb">${c.car_type}</div>`;
     const dest = c.active_waybill?.destination_name || "?";
     const from = c.current_location_name || "?";
     return `
-    <div class="ops-row" style="padding:0.3rem 0">
+    <div class="session-car-row">
       ${thumb}
       <div class="session-car-info">
         <span class="session-car-marks">${c.reporting_marks || "—"} ${c.car_number || ""} <span class="muted">${c.car_type}</span></span>
@@ -2601,6 +2662,8 @@ function renderDispatchPlan(plan) {
       ${c.active_waybill?.industry_name ? `<span class="industry-tag">${c.active_waybill.industry_name}</span>` : ""}
     </div>`;
   }
+
+  $("#dispatch-power-strip-preview").innerHTML = renderPowerStrip(plan.power, plan.caboose);
 
   let html = "";
   if (setouts.length) {
@@ -2616,14 +2679,14 @@ function renderDispatchPlan(plan) {
     html += pickups.map(carRow).join("");
   }
   if (!total) {
-    html = '<p class="muted small">No cars in this consist.</p>';
+    html += '<p class="muted small">No cars in this consist.</p>';
   }
 
   $("#dispatch-consist-list").innerHTML = html;
   show($("#dispatch-plan-result"));
 
   const startBtn = $("#btn-start-dispatch-session");
-  startBtn.disabled = total === 0;
+  total > 0 ? show(startBtn) : hide(startBtn);
 
   const warnings = plan.warnings || [];
   if (warnings.length) {
@@ -2675,10 +2738,24 @@ $("#btn-clear-dispatch-plan").addEventListener("click", async () => {
     dispatchPlan = null;
     hide($("#dispatch-plan-result"));
     hide($("#dispatch-warnings"));
+    hide($("#btn-start-dispatch-session"));
   } catch (err) {
     showToast("Error clearing plan: " + err.message, "error");
   }
 });
+
+function liveUpdatePowerStrip() {
+  if (!dispatchPlan) return;
+  const powerIds = [...$("#disp-power").selectedOptions]
+    .map(o => parseInt(o.value)).filter(v => !isNaN(v));
+  const cabooseId = $("#disp-caboose").value ? parseInt($("#disp-caboose").value) : null;
+  const powerCars  = powerIds.map(id => cars.find(c => c.id === id)).filter(Boolean);
+  const cabooseCar = cabooseId ? cars.find(c => c.id === cabooseId) || null : null;
+  $("#dispatch-power-strip-preview").innerHTML = renderPowerStrip(powerCars, cabooseCar);
+}
+
+$("#disp-caboose").addEventListener("change", liveUpdatePowerStrip);
+$("#disp-power").addEventListener("change", liveUpdatePowerStrip);
 
 $("#btn-assign-power").addEventListener("click", async () => {
   const powerIds = [...$("#disp-power").selectedOptions]
