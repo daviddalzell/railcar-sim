@@ -509,13 +509,22 @@ $("#btn-library-add").addEventListener("click", () => {
   }
 });
 
+function isBrowserUnsupportedImage(file) {
+  const ext = file.name.split(".").pop().toLowerCase();
+  return ["heic", "heif"].includes(ext) || file.type === "image/heic" || file.type === "image/heif";
+}
+
 async function processPhotoFile(file) {
   if (!file) return;
 
   $("#upload-label").textContent = file.name;
-  $("#preview-img").src = URL.createObjectURL(file);
-  show($("#upload-preview"));
   hide($("#vision-error"));
+
+  const unsupported = isBrowserUnsupportedImage(file);
+  if (!unsupported) {
+    $("#preview-img").src = URL.createObjectURL(file);
+    show($("#upload-preview"));
+  }
 
   const form = new FormData();
   form.append("file", file);
@@ -523,7 +532,11 @@ async function processPhotoFile(file) {
   if (addMode === "manual") {
     try {
       const result = await api("POST", "/api/cars/upload", form);
-      if (result.photo_path) photoPath = result.photo_path;
+      if (result.photo_path) {
+        photoPath = result.photo_path;
+        $("#preview-img").src = "/" + result.photo_path;
+        show($("#upload-preview"));
+      }
       hide($("#default-image-offer"));
     } catch (err) {
       $("#vision-error-msg").textContent = "Upload failed: " + err.message;
@@ -536,6 +549,10 @@ async function processPhotoFile(file) {
   show($("#analyzing-msg"));
   try {
     const result = await api("POST", "/api/cars/upload", form);
+    if (result.photo_path) {
+      $("#preview-img").src = "/" + result.photo_path;
+      show($("#upload-preview"));
+    }
     applyAnalysis(result);
   } catch (err) {
     hide($("#analyzing-msg"));

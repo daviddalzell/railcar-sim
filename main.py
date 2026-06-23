@@ -12,6 +12,8 @@ from typing import Optional
 import uuid
 
 from PIL import Image
+import pillow_heif
+pillow_heif.register_heif_opener()
 from dotenv import load_dotenv
 load_dotenv()
 
