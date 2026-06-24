@@ -1254,6 +1254,29 @@ button.small {
   font-size: 0.8rem;
 }
 
+.power-strip-empty {
+  display: inline-flex;
+  align-items: center;
+  height: 52px;
+  color: var(--text-muted, #888);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.power-chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted, #888);
+  font-size: 0.65rem;
+  cursor: pointer;
+  padding: 0 0.15rem;
+  line-height: 1;
+  margin-left: 0.1rem;
+}
+.power-chip-remove:hover {
+  color: var(--rail-accent, #c0392b);
+}
+
 /* Consist card status badges */
 .status-badge {
   display: inline-block;

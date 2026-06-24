@@ -326,9 +326,8 @@ function carCardHTML(car) {
   `;
 }
 
-function renderPowerStrip(power, caboose) {
+function renderPowerStrip(power, caboose, editable = false) {
   const locos = power || [];
-  if (!locos.length && !caboose) return "";
   function powerThumb(c) {
     const img = c.photo_path ? `/${c.photo_path}` : defaultCarImage(c.car_type);
     return img
@@ -336,18 +335,23 @@ function renderPowerStrip(power, caboose) {
       : `<span style="font-size:0.65rem">${c.car_type}</span>`;
   }
   function powerChip(c, label) {
+    const removeBtn = editable
+      ? `<button class="power-chip-remove" data-remove-id="${c.id}" data-remove-type="${label}" title="Remove">✕</button>`
+      : "";
     return `<div class="power-chip" title="${label}">
       ${powerThumb(c)}
       <span class="power-chip-marks">${c.reporting_marks || "—"} ${c.car_number || ""}</span>
+      ${removeBtn}
     </div>`;
   }
   const locoChips   = locos.map(c => powerChip(c, "locomotive")).join("");
   const cabooseChip = caboose ? powerChip(caboose, "caboose") : "";
+  const content = locoChips || cabooseChip
+    ? `${locoChips}${locoChips && cabooseChip ? '<span class="power-strip-sep">·</span>' : ""}${cabooseChip}`
+    : `<span class="power-strip-empty">No power assigned</span>`;
   return `<div class="session-power-strip">
     <span class="muted small" style="margin-right:0.5rem">Power:</span>
-    ${locoChips}
-    ${locoChips && cabooseChip ? '<span class="power-strip-sep">·</span>' : ""}
-    ${cabooseChip}
+    ${content}
   </div>`;
 }
 
@@ -2672,9 +2676,14 @@ async function loadDispatcherPanel() {
 
 function renderDispatchPlanList() {
   const container = $("#dispatch-plans-list");
-  // Preserve which cards are currently expanded before re-render
+  // Preserve card body expanded state
   const expanded = new Set(
     [...document.querySelectorAll(".consist-body:not(.hidden)")].map(el => el.dataset.planId)
+  );
+  // Preserve open <details> sections: Set of "planId:section" strings
+  const openDetails = new Set(
+    [...document.querySelectorAll("details[data-section][open]")]
+      .map(el => `${el.dataset.planId}:${el.dataset.section}`)
   );
   if (!dispatchPlans.length) {
     container.innerHTML = '<p class="muted small">No consists built yet.</p>';
@@ -2688,6 +2697,10 @@ function renderDispatchPlanList() {
       body?.classList.add("hidden");
       if (btn) btn.textContent = "▶";
     }
+    // Restore open details
+    document.querySelectorAll(`details[data-plan-id="${plan.id}"]`).forEach(el => {
+      if (openDetails.has(`${plan.id}:${el.dataset.section}`)) el.open = true;
+    });
     wireConsistCard(plan.id);
   });
 }
@@ -2770,11 +2783,9 @@ function renderConsistCard(plan) {
       </div>
     </div>
     <div class="consist-body hidden" data-plan-id="${plan.id}">
-      <div id="consist-power-strip-${plan.id}">${renderPowerStrip(plan.power, plan.caboose)}</div>
-      <div id="consist-car-list-${plan.id}">${carListHtml}</div>
 
-      <details style="margin-top:0.75rem">
-        <summary class="muted small" style="cursor:pointer">Train identity &amp; crew</summary>
+      <details data-section="identity" data-plan-id="${plan.id}" style="margin-top:0.75rem">
+        <summary class="muted small" style="cursor:pointer">Edit train identity &amp; crew</summary>
         <div class="grid" style="margin-top:0.5rem">
           <label>Train Number <input type="text" class="consist-train-number" data-plan-id="${plan.id}" value="${plan.train_number || ""}" placeholder="e.g. 42" /></label>
           <label>Train Name <input type="text" class="consist-train-name" data-plan-id="${plan.id}" value="${plan.train_name || ""}" placeholder='e.g. "The Limited"' /></label>
@@ -2792,7 +2803,7 @@ function renderConsistCard(plan) {
         </div>
       </details>
 
-      <details style="margin-top:0.5rem">
+      <details data-section="power" data-plan-id="${plan.id}" style="margin-top:0.5rem">
         <summary class="muted small" style="cursor:pointer">Assign power</summary>
         <div class="grid" style="margin-top:0.5rem">
           <label>Locomotive(s)
@@ -2813,6 +2824,9 @@ function renderConsistCard(plan) {
           <button class="outline small consist-save-power" data-plan-id="${plan.id}">Save Power</button>
         </div>
       </details>
+
+      <div id="consist-power-strip-${plan.id}">${renderPowerStrip(plan.power, plan.caboose, true)}</div>
+      <div id="consist-car-list-${plan.id}">${carListHtml}</div>
 
       <div class="button-row" style="margin-top:0.75rem;justify-content:flex-end">
         <button class="outline small consist-rebuild" data-plan-id="${plan.id}">↺ Rebuild</button>
@@ -2884,6 +2898,28 @@ function wireConsistCard(planId) {
       });
     } catch (err) {
       showToast("Error saving power: " + err.message, "error");
+    }
+  });
+
+  document.getElementById(`consist-power-strip-${planId}`)?.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".power-chip-remove");
+    if (!btn) return;
+    const removeId   = parseInt(btn.dataset.removeId);
+    const removeType = btn.dataset.removeType;
+    const plan = dispatchPlans.find(p => p.id === planId);
+    if (!plan) return;
+    const newPowerIds  = removeType === "caboose"
+      ? (plan.power || []).map(c => c.id)
+      : (plan.power || []).map(c => c.id).filter(id => id !== removeId);
+    const newCabooseId = removeType === "caboose" ? null : (plan.caboose?.id ?? null);
+    try {
+      const updated = await api("PATCH", `/api/dispatcher/plan/${planId}/power`, { power_ids: newPowerIds, caboose_id: newCabooseId });
+      const idx = dispatchPlans.findIndex(p => p.id === planId);
+      if (idx !== -1) dispatchPlans[idx] = updated;
+      renderDispatchPlanList();
+      showToast("Power removed.", "success");
+    } catch (err) {
+      showToast("Error removing power: " + err.message, "error");
     }
   });
 
