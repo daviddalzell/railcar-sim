@@ -2701,9 +2701,9 @@ function renderDispatchPlanList() {
   dispatchPlans.forEach(plan => {
     const body = document.querySelector(`.consist-body[data-plan-id="${plan.id}"]`);
     const btn  = document.querySelector(`.consist-toggle[data-plan-id="${plan.id}"]`);
-    if (!expanded.has(String(plan.id))) {
-      body?.classList.add("hidden");
-      if (btn) btn.textContent = "▶";
+    if (expanded.has(String(plan.id))) {
+      body?.classList.remove("hidden");
+      if (btn) btn.textContent = "▼";
     }
     // Restore open details
     document.querySelectorAll(`details[data-plan-id="${plan.id}"]`).forEach(el => {
@@ -2792,7 +2792,7 @@ function renderConsistCard(plan) {
         </div>
       </div>
       <div class="button-row">
-        <button class="consist-start-session" data-plan-id="${plan.id}"${(total === 0 || !hasPower) ? " disabled" : ""}>Start Session</button>
+        <button class="consist-start-session" data-plan-id="${plan.id}"${(total === 0 || !hasPower || !!session || plan.status === "complete") ? " disabled" : ""}>Start Session</button>
       </div>
     </div>
     <div class="consist-body hidden" data-plan-id="${plan.id}">
