@@ -4,40 +4,56 @@ This document helps AI coding agents understand conventions and patterns used in
 
 ## Python Naming Conventions
 
-### No Leading Underscores
-Do **not** use leading underscores (`_`) to prefix variable names, function names, or constants in Python. This project avoids Python's convention for name-mangling and private members.
+### Underscore prefix on functions
+
+Use leading underscores only for private helper functions that are **internal to a single module** and not intended to be called from outside it (e.g. `_run_build_algorithm` in `routers/dispatcher.py`).
+
+Do **not** use leading underscores on functions in shared modules (`converters.py`, `schemas.py`) — these are public exports and should have clean names.
+
+**Correct:**
+```python
+# In routers/dispatcher.py — private to this file
+def _run_build_algorithm(origin_id, area_id, db): ...
+
+# In converters.py — public export used by multiple routers
+def dispatch_plan_to_dict(plan, db): ...
+```
+
+**Incorrect:**
+```python
+# In converters.py — this is a public shared helper, drop the underscore
+def _dispatch_plan_to_dict(plan, db): ...  # ❌
+```
+
+Do **not** use leading underscores on module-level variables or constants.
 
 **Correct:**
 ```python
 prompts_dir = Path("prompts")
-stylize_cfg = load_stylize_config()
 media_types = {...}
 ```
 
 **Incorrect:**
 ```python
-_prompts_dir = Path("prompts")  # ❌ avoid
-_stylize_cfg = load_stylize_config()  # ❌ avoid
-_media_types = {...}  # ❌ avoid
+_prompts_dir = Path("prompts")  # ❌
+_media_types = {...}  # ❌
 ```
-
-This applies to:
-- Module-level variables and constants
-- Function definitions
-- Helper functions (use descriptive names instead)
 
 ---
 
 ## Project Structure
 
-- **main.py** — FastAPI application, routes, and request handlers
-- **models.py** — SQLAlchemy ORM models (Car, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap)
+- **main.py** — FastAPI app entry point; registers routers, mounts static files, handles startup
+- **schemas.py** — All Pydantic request/response models
+- **converters.py** — Shared model-to-dict helpers and settings/clock utilities
+- **routers/** — API route handlers, one file per domain (cars, waybills, locations, industries, commodity_map, car_types, dispatcher, session, automation, uploads, settings, operations, export_import)
+- **models.py** — SQLAlchemy ORM models
 - **database.py** — Database initialization and session management (SQLite)
-- **vision.py** — Vision provider abstractions (Anthropic, OpenAI, Ollama)
+- **vision.py** — Vision provider abstractions (Anthropic, OpenAI, Ollama, Gemini)
 - **templates/** — Jinja2 HTML templates for the web UI
 - **static/** — Frontend JavaScript and CSS
 - **prompts/** — JSON config files for vision model prompts
-- **uploads/** — Temporary directory for uploaded car photos
+- **uploads/** — Uploaded car photos (auto-created)
 
 ---
 
@@ -46,7 +62,7 @@ This applies to:
 - **Framework:** FastAPI + Uvicorn
 - **Database:** SQLite with SQLAlchemy ORM
 - **Frontend:** Vanilla JavaScript + HTML/CSS
-- **Vision APIs:** Anthropic Claude, OpenAI GPT-4o, or local Ollama
+- **Vision APIs:** Anthropic Claude, OpenAI GPT-4o, Google Gemini, or local Ollama
 - **Image Processing:** Pillow (PIL)
 
 ---

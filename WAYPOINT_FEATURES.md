@@ -68,16 +68,32 @@ Run a realistic ops session from plan to wrap-up.
 
 ---
 
+## Virtual Dispatcher
+
+Build and manage capacity-aware consists directly from the Operations tab.
+
+- **Multiple consists** — build as many consists as needed simultaneously, one per origin/switching area pair. Each appears as a collapsible card in the Dispatcher panel.
+- **Train identity** — assign a train number, name, departure time, engineer, and conductor to each consist. The identity appears in the session header when the session starts.
+- **Operations mode** — set the layout protocol in Layout Setup: Free, Timetable & Train Order (TT&TO), or Track Warrant Control (TWC). The label on the special instructions field updates accordingly ("Notes", "Train Order", or "Track Warrant").
+- **Power assignment** — assign locomotives and a caboose to each consist. A consist cannot start a session without at least one locomotive assigned. The same locomotive cannot be assigned to two consists at once.
+- **Status lifecycle** — each consist moves through Ready → active → complete. Status is shown as a colour badge on the card header.
+- **Car claiming** — cars already assigned to one consist are automatically excluded when building another.
+- **Rebuild** — click Rebuild on any card to re-run the build algorithm for that consist's origin and area, refreshing the car list while preserving identity, power, and crew.
+- **Start session** — click Start Session on a consist card to hand it off to the Quick Op workflow. If a session is already running in that browser, a confirmation prompt appears before replacing it.
+
+---
+
 ## Fast Clock
 
 Simulate prototypical railroad time during every operating session.
 
-- Fast clock starts automatically when a session begins
+- Fast clock starts automatically when a session begins; if a session is already running in another browser tab, the existing clock continues uninterrupted
 - Configure start time (e.g. 08:00) and speed multiplier in Layout Setup
 - Speed options: 1× (real time), 2×, 4×, 6×, or 12×
 - Pause and resume the clock at any time during a session
+- Click **↺** in the session header to reset the clock back to the configured start time; all connected browsers re-sync within 15 seconds
 - Clock state is stored server-side — resuming after a page refresh shows the correct model time
-- Supports multiple operators: all clients read from the same authoritative clock
+- Supports multiple operators: all clients read from the same authoritative clock, re-syncing every 15 seconds
 
 ---
 

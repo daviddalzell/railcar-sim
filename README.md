@@ -112,10 +112,26 @@ If no provider is configured (or the API key is missing), the app still works. A
 
 ```
 railcar-sim/
-├── main.py              # FastAPI app and API endpoints
+├── main.py              # FastAPI app entry point and router registration
+├── schemas.py           # Pydantic request/response models
+├── converters.py        # Shared model-to-dict helpers
 ├── models.py            # SQLAlchemy database models
 ├── database.py          # Database connection and setup
 ├── vision.py            # AI vision provider implementations
+├── routers/             # API route handlers (one file per domain)
+│   ├── cars.py
+│   ├── waybills.py
+│   ├── locations.py
+│   ├── industries.py
+│   ├── commodity_map.py
+│   ├── car_types.py
+│   ├── dispatcher.py
+│   ├── session.py
+│   ├── automation.py
+│   ├── uploads.py
+│   ├── settings.py
+│   ├── operations.py
+│   └── export_import.py
 ├── requirements.txt
 ├── pytest.ini
 ├── .env.example         # Configuration template

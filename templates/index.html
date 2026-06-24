@@ -653,8 +653,9 @@
           <ul>
             <li>Configure <strong>Start Time</strong> and <strong>Speed</strong> in Layout Setup → Fast Clock section.</li>
             <li>Speed options: 1× (real time), 2×, 4×, 6×, or 12×.</li>
-            <li>The clock starts automatically when you plan a session and appears in the session header.</li>
+            <li>The clock starts automatically when you begin a session. If another session is already running (on another browser or tab), the existing clock continues — it is not reset.</li>
             <li>Click <strong>⏸</strong> to pause the clock; click <strong>▶</strong> to resume.</li>
+            <li>Click <strong>↺</strong> to reset the clock back to the configured start time. All connected browsers re-sync within 15 seconds.</li>
             <li>Clock state is stored on the server — refreshing the page resumes the clock from the correct model time.</li>
             <li>The clock stops automatically when the session ends or is cancelled.</li>
           </ul>
@@ -719,15 +720,17 @@
       <div class="help-section">
         <button class="help-section-header">▶ Virtual Dispatcher</button>
         <div class="help-section-body hidden">
-          <p>The Virtual Dispatcher builds a capacity-aware consist for a single run from a staging yard to a switching area.</p>
+          <p>The Virtual Dispatcher builds capacity-aware consists and manages multiple trains simultaneously from the Operations tab.</p>
           <ul>
-            <li><strong>Switching Areas</strong> are named groups of locations (industries, storage, yards) with a defined car capacity. Create and manage them in Layout Setup → Switching Areas. Assign locations to a switching area using the location edit form.</li>
-            <li><strong>Capacity math</strong> — the dispatcher calculates how many cars can be set out into the switching area: <em>available spots = capacity − cars currently in area + cars being picked up from area this run</em>. Cars being picked out free up slots for inbound cars.</li>
-            <li><strong>Building a consist</strong> — select an origin (staging yard) and a switching area, then click <strong>Build Consist</strong>. The dispatcher finds cars at the origin whose active waybill points into the switching area (setouts), and cars already in the switching area whose waybill points back to a yard (pickups). The inbound count is capped by available spots.</li>
-            <li><strong>Single origin rule</strong> — all inbound cars must come from the same origin. Cars at other yards are not included in the consist.</li>
-            <li><strong>Unused eligible cars</strong> — if more cars are eligible than spots allow, the excess stays at the origin and will appear in the next consist automatically.</li>
-            <li><strong>Starting a session</strong> — click <strong>Start Session with this Consist</strong> to hand the consist off to the session workflow. Setouts appear as arrivals; pickups appear as departures. Mark each car done as normal, then end the session.</li>
-            <li><strong>Layout Status</strong> — the strip at the top of the Operations tab shows current car counts for every switching area (with capacity bars) and every yard/staging area. Click any row to expand it and see the individual cars with their waybill destinations.</li>
+            <li><strong>Building a consist</strong> — select an origin (staging yard) and a switching area, then click <strong>+ Build Consist</strong>. The dispatcher finds cars at the origin whose waybill points into the switching area (setouts), and cars already in the area whose waybill points back to a yard (pickups). The inbound count is capped by available spots.</li>
+            <li><strong>Multiple consists</strong> — you can build as many consists as needed. Each appears as a collapsible card. Cars claimed by one consist are automatically excluded from others.</li>
+            <li><strong>Capacity math</strong> — <em>available spots = capacity − cars currently in area + cars being picked up this run</em>.</li>
+            <li><strong>Train identity</strong> — expand a consist card to assign a train number, name, departure time, engineer, and conductor. Click <strong>Save Identity</strong> to persist.</li>
+            <li><strong>Assign power</strong> — expand the card and select locomotives (and optionally a caboose). The same locomotive cannot be assigned to two consists. <strong>Start Session</strong> is disabled until at least one locomotive is assigned.</li>
+            <li><strong>Operations mode</strong> — set the layout protocol in Layout Setup (Free, TT&amp;TO, or TWC). This changes the label on the special instructions field in each consist card.</li>
+            <li><strong>Starting a session</strong> — click <strong>Start Session</strong> on a consist card to hand it off to the Quick Op workflow. Setouts appear as arrivals; pickups appear as departures.</li>
+            <li><strong>Rebuild</strong> — click <strong>↺ Rebuild</strong> to refresh the car list for a consist while keeping its identity and power assignment.</li>
+            <li><strong>Layout Status</strong> — the strip at the top of the Operations tab shows current car counts for every switching area and yard. Click any row to expand and see individual cars with their destinations.</li>
           </ul>
         </div>
       </div>
