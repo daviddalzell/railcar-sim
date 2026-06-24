@@ -1,0 +1,221 @@
+import json
+import time
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import nullslast
+from sqlalchemy.orm import Session
+
+from database import get_db
+from models import Car, DispatchPlan, Location, SwitchingArea
+from converters import car_to_dict, dispatch_plan_to_dict
+from schemas import DispatchBuildRequest, DispatchPlanIdentityUpdate, DispatchPowerUpdate, DispatchPlanStatusUpdate
+
+router = APIRouter(prefix="/api", tags=["dispatcher"])
+
+
+def _get_active_waybill(car: Car):
+    return next((w for w in car.waybills if w.slot_index == car.active_waybill_slot), None)
+
+
+def _clear_dispatch_plan(db: Session):
+    db.query(DispatchPlan).delete(synchronize_session=False)
+    db.commit()
+
+
+def _run_build_algorithm(data_origin_id: int, data_area_id: int, db: Session) -> tuple:
+    """Core build logic. Returns (consist_inbound, outbound, local_spots, available_spots, warnings)."""
+    area = db.get(SwitchingArea, data_area_id)
+    origin = db.get(Location, data_origin_id)
+
+    area_location_ids = {l.id for l in area.locations}
+    dispatch_ids = {l.id for l in db.query(Location).filter(
+        Location.location_type.in_(["staging", "yard"])
+    ).all()}
+
+    # Collect car IDs already claimed by other non-complete plans
+    claimed_ids: set = set()
+    for other in db.query(DispatchPlan).filter(DispatchPlan.status != "complete").all():
+        claimed_ids |= set(json.loads(other.setout_ids_json or "[]"))
+        claimed_ids |= set(json.loads(other.pickup_ids_json or "[]"))
+        claimed_ids |= set(json.loads(other.spots_ids_json or "[]"))
+
+    current_count = db.query(Car).filter(
+        Car.current_location_id.in_(list(area_location_ids))
+    ).count() if area_location_ids else 0
+
+    area_cars = db.query(Car).filter(
+        Car.current_location_id.in_(list(area_location_ids))
+    ).all() if area_location_ids else []
+
+    outbound = [
+        car for car in area_cars
+        if car.id not in claimed_ids
+        and (wb := _get_active_waybill(car)) and wb.destination_id in dispatch_ids
+    ]
+
+    local_spots = [
+        car for car in area_cars
+        if car.id not in claimed_ids
+        and (wb := _get_active_waybill(car))
+        and wb.destination_id in area_location_ids
+        and car.current_location_id != wb.destination_id
+    ]
+
+    available_spots = max(0, area.car_capacity - current_count + len(outbound))
+
+    origin_cars = db.query(Car).filter(
+        Car.current_location_id == data_origin_id
+    ).all()
+    inbound = [
+        car for car in origin_cars
+        if car.id not in claimed_ids
+        and (wb := _get_active_waybill(car)) and wb.destination_id in area_location_ids
+    ]
+    consist_inbound = inbound[:available_spots]
+
+    warnings = []
+    if not consist_inbound and not outbound and not local_spots:
+        warnings.append("No eligible cars found for this origin and switching area.")
+
+    return consist_inbound, outbound, local_spots, available_spots, warnings
+
+
+@router.post("/dispatcher/build-plan")
+def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db)):
+    area = db.get(SwitchingArea, data.switching_area_id)
+    if not area:
+        raise HTTPException(404, "Switching area not found")
+    origin = db.get(Location, data.origin_location_id)
+    if not origin:
+        raise HTTPException(404, "Origin location not found")
+
+    consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
+        data.origin_location_id, data.switching_area_id, db
+    )
+
+    plan = DispatchPlan(
+        plan_type="switching",
+        origin_location_id=data.origin_location_id,
+        switching_area_id=data.switching_area_id,
+        setout_ids_json=json.dumps([c.id for c in consist_inbound]),
+        pickup_ids_json=json.dumps([c.id for c in outbound]),
+        spots_ids_json=json.dumps([c.id for c in local_spots]),
+        available_spots=available_spots,
+        built_at=time.time(),
+        status="draft",
+    )
+    db.add(plan)
+    db.commit()
+    db.refresh(plan)
+
+    result = dispatch_plan_to_dict(plan, db)
+    result["warnings"] = warnings
+    return result
+
+
+@router.get("/dispatcher/plans")
+def list_dispatch_plans(db: Session = Depends(get_db)):
+    plans = db.query(DispatchPlan).order_by(nullslast(DispatchPlan.departure_time), DispatchPlan.id).all()
+    return [dispatch_plan_to_dict(p, db) for p in plans]
+
+
+@router.get("/dispatcher/plan/{plan_id}")
+def get_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    return dispatch_plan_to_dict(plan, db)
+
+
+@router.delete("/dispatcher/plan/{plan_id}", status_code=204)
+def delete_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    db.delete(plan)
+    db.commit()
+
+
+@router.delete("/dispatcher/plans", status_code=204)
+def clear_all_dispatch_plans(db: Session = Depends(get_db)):
+    _clear_dispatch_plan(db)
+
+
+@router.patch("/dispatcher/plan/{plan_id}/power")
+def update_dispatch_power(plan_id: int, data: DispatchPowerUpdate, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    # Exclusivity check
+    other_plans = db.query(DispatchPlan).filter(DispatchPlan.id != plan_id).all()
+    for other in other_plans:
+        other_power = set(json.loads(other.power_ids_json or "[]"))
+        conflicts = set(data.power_ids) & other_power
+        if conflicts:
+            raise HTTPException(409, "Locomotive(s) already assigned to another consist")
+        if data.caboose_id and data.caboose_id == other.caboose_id:
+            raise HTTPException(409, "Caboose already assigned to another consist")
+    plan.power_ids_json = json.dumps(data.power_ids)
+    plan.caboose_id = data.caboose_id
+    db.commit()
+    return dispatch_plan_to_dict(plan, db)
+
+
+@router.patch("/dispatcher/plan/{plan_id}/identity")
+def update_dispatch_identity(plan_id: int, data: DispatchPlanIdentityUpdate, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    for field, value in data.model_dump(exclude_none=False).items():
+        setattr(plan, field, value)
+    db.commit()
+    return dispatch_plan_to_dict(plan, db)
+
+
+@router.patch("/dispatcher/plan/{plan_id}/status")
+def update_dispatch_status(plan_id: int, data: DispatchPlanStatusUpdate, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    if data.status not in ("draft", "active", "complete"):
+        raise HTTPException(400, "status must be draft, active, or complete")
+    plan.status = data.status
+    db.commit()
+    return dispatch_plan_to_dict(plan, db)
+
+
+@router.post("/dispatcher/plan/{plan_id}/rebuild")
+def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    if not plan.origin_location_id or not plan.switching_area_id:
+        raise HTTPException(400, "Plan has no origin or switching area to rebuild from")
+
+    area = db.get(SwitchingArea, plan.switching_area_id)
+    if not area:
+        raise HTTPException(404, "Switching area not found")
+    origin = db.get(Location, plan.origin_location_id)
+    if not origin:
+        raise HTTPException(404, "Origin location not found")
+
+    # Temporarily exclude this plan from claimed IDs so it can rebuild freely
+    plan.setout_ids_json = "[]"
+    plan.pickup_ids_json = "[]"
+    plan.spots_ids_json = "[]"
+    db.flush()
+
+    consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
+        plan.origin_location_id, plan.switching_area_id, db
+    )
+
+    plan.setout_ids_json = json.dumps([c.id for c in consist_inbound])
+    plan.pickup_ids_json = json.dumps([c.id for c in outbound])
+    plan.spots_ids_json = json.dumps([c.id for c in local_spots])
+    plan.available_spots = available_spots
+    plan.built_at = time.time()
+    db.commit()
+
+    result = dispatch_plan_to_dict(plan, db)
+    result["warnings"] = warnings
+    return result
