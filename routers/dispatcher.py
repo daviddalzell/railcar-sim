@@ -22,15 +22,12 @@ def _clear_dispatch_plan(db: Session):
     db.commit()
 
 
-def _run_build_algorithm(data_origin_id: int, data_area_id: int, db: Session) -> tuple:
+def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id: int, db: Session) -> tuple:
     """Core build logic. Returns (consist_inbound, outbound, local_spots, available_spots, warnings)."""
     area = db.get(SwitchingArea, data_area_id)
     origin = db.get(Location, data_origin_id)
 
     area_location_ids = {l.id for l in area.locations}
-    dispatch_ids = {l.id for l in db.query(Location).filter(
-        Location.location_type.in_(["staging", "yard"])
-    ).all()}
 
     # Collect car IDs already claimed by other non-complete plans
     claimed_ids: set = set()
@@ -50,7 +47,7 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, db: Session) ->
     outbound = [
         car for car in area_cars
         if car.id not in claimed_ids
-        and (wb := _get_active_waybill(car)) and wb.destination_id in dispatch_ids
+        and (wb := _get_active_waybill(car)) and wb.destination_id == destination_id
     ]
 
     local_spots = [
@@ -88,15 +85,19 @@ def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db
     origin = db.get(Location, data.origin_location_id)
     if not origin:
         raise HTTPException(404, "Origin location not found")
+    destination = db.get(Location, data.destination_location_id)
+    if not destination:
+        raise HTTPException(404, "Destination location not found")
 
     consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
-        data.origin_location_id, data.switching_area_id, db
+        data.origin_location_id, data.switching_area_id, data.destination_location_id, db
     )
 
     plan = DispatchPlan(
         plan_type="switching",
         origin_location_id=data.origin_location_id,
         switching_area_id=data.switching_area_id,
+        destination_location_id=data.destination_location_id,
         setout_ids_json=json.dumps([c.id for c in consist_inbound]),
         pickup_ids_json=json.dumps([c.id for c in outbound]),
         spots_ids_json=json.dumps([c.id for c in local_spots]),
@@ -189,8 +190,8 @@ def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")
-    if not plan.origin_location_id or not plan.switching_area_id:
-        raise HTTPException(400, "Plan has no origin or switching area to rebuild from")
+    if not plan.origin_location_id or not plan.switching_area_id or not plan.destination_location_id:
+        raise HTTPException(400, "Plan has no origin, destination, or switching area to rebuild from")
 
     area = db.get(SwitchingArea, plan.switching_area_id)
     if not area:
@@ -198,6 +199,9 @@ def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
     origin = db.get(Location, plan.origin_location_id)
     if not origin:
         raise HTTPException(404, "Origin location not found")
+    destination = db.get(Location, plan.destination_location_id)
+    if not destination:
+        raise HTTPException(404, "Destination location not found")
 
     # Temporarily exclude this plan from claimed IDs so it can rebuild freely
     plan.setout_ids_json = "[]"
@@ -206,7 +210,7 @@ def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
     db.flush()
 
     consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
-        plan.origin_location_id, plan.switching_area_id, db
+        plan.origin_location_id, plan.switching_area_id, plan.destination_location_id, db
     )
 
     plan.setout_ids_json = json.dumps([c.id for c in consist_inbound])

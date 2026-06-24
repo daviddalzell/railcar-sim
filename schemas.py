@@ -34,6 +34,7 @@ class SwitchingAreaCreate(BaseModel):
 class DispatchBuildRequest(BaseModel):
     origin_location_id: int
     switching_area_id: int
+    destination_location_id: int
 
 
 class DispatchPowerUpdate(BaseModel):

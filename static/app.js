@@ -2660,11 +2660,19 @@ $("#btn-toggle-layout-status").addEventListener("click", () => {
 async function loadDispatcherPanel() {
   const originSel = $("#disp-origin");
   const areaSel = $("#disp-area");
+  const destSel = $("#disp-destination");
   const yardLocs = locations.filter(l => l.location_type === "staging" || l.location_type === "yard");
-  originSel.innerHTML = '<option value="">— select origin —</option>' +
+  const yardOptions = '<option value="">— select —</option>' +
     yardLocs.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+  originSel.innerHTML = yardOptions;
+  destSel.innerHTML = yardOptions;
   areaSel.innerHTML = '<option value="">— select area —</option>' +
     switchingAreas.map(a => `<option value="${a.id}">${a.name} (${a.current_car_count ?? 0}/${a.car_capacity})</option>`).join("");
+
+  // Default destination to origin (turn) when origin changes, unless user has set it explicitly
+  originSel.addEventListener("change", () => {
+    if (!destSel.value) destSel.value = originSel.value;
+  });
 
   try {
     dispatchPlans = await api("GET", "/api/dispatcher/plans") || [];
@@ -2726,6 +2734,10 @@ function renderConsistCard(plan) {
 
   const instrLabel = { free: "Notes", timetable_train_order: "Train Order", track_warrant: "Track Warrant" }[opsMode] || "Notes";
 
+  const route = plan.origin_name && plan.destination_name
+    ? `<div class="muted small consist-route">${plan.origin_name}${plan.switching_area_name ? ` → ${plan.switching_area_name}` : ""} → ${plan.destination_name}</div>`
+    : "";
+
   const assignedElsewhere = new Set(
     dispatchPlans.filter(p => p.id !== plan.id).flatMap(p => (p.power || []).map(c => c.id))
   );
@@ -2775,6 +2787,7 @@ function renderConsistCard(plan) {
         <div>
           <div>${statusBadge} <strong>${trainTitle}${trainName}</strong>${depTime}</div>
           ${crew ? `<div class="muted small" style="font-size:0.8rem">${crew}</div>` : ""}
+          ${route}
           ${!hasPower ? `<div class="muted small consist-no-power-hint" style="font-size:0.75rem;color:var(--color-warning,#e07b00)">⚠ No locomotive assigned — open to assign power</div>` : ""}
         </div>
       </div>
@@ -3029,13 +3042,15 @@ function wireConsistCard(planId) {
 $("#btn-build-consist").addEventListener("click", async () => {
   const originId = parseInt($("#disp-origin").value);
   const areaId   = parseInt($("#disp-area").value);
-  if (!originId || !areaId) { showToast("Select an origin and switching area first.", "warning"); return; }
+  const destId   = parseInt($("#disp-destination").value);
+  if (!originId || !areaId || !destId) { showToast("Select an origin, switching area, and destination first.", "warning"); return; }
   const btn = $("#btn-build-consist");
   await withLoading(btn, "Building…", async () => {
     try {
       const newPlan = await api("POST", "/api/dispatcher/build-plan", {
         origin_location_id: originId,
         switching_area_id: areaId,
+        destination_location_id: destId,
       });
       dispatchPlans.push(newPlan);
       renderDispatchPlanList();

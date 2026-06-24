@@ -124,6 +124,7 @@ def dispatch_plan_to_dict(plan: DispatchPlan, db: Session) -> dict:
 
     origin = db.get(Location, plan.origin_location_id) if plan.origin_location_id else None
     area = db.get(SwitchingArea, plan.switching_area_id) if plan.switching_area_id else None
+    destination = db.get(Location, plan.destination_location_id) if plan.destination_location_id else None
 
     return {
         "id": plan.id,
@@ -133,6 +134,8 @@ def dispatch_plan_to_dict(plan: DispatchPlan, db: Session) -> dict:
         "origin_name": origin.name if origin else None,
         "switching_area_id": plan.switching_area_id,
         "switching_area_name": area.name if area else None,
+        "destination_location_id": plan.destination_location_id,
+        "destination_name": destination.name if destination else None,
         "setouts": setouts,
         "pickups": pickups,
         "spots": spots,
