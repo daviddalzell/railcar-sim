@@ -45,6 +45,7 @@ def car_to_dict(car: Car) -> dict:
         "active_waybill_slot": car.active_waybill_slot,
         "active_waybill": waybill_to_dict(active) if active else None,
         "waybill_count": len(car.waybills),
+        "cp_session_count": car.cp_session_count or 0,
     }
 
 
@@ -64,6 +65,7 @@ def industry_to_dict(i: Industry) -> dict:
         "inbound_car_types": i.inbound_car_types,
         "outbound_commodities": i.outbound_commodities,
         "outbound_car_types": i.outbound_car_types,
+        "car_capacity": i.car_capacity,
     }
 
 

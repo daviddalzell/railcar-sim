@@ -165,11 +165,13 @@ def session_end(req: SessionEndRequest, db: Session = Depends(get_db)):
             db.add(MovementLog(car_id=car.id, from_location_id=old_loc,
                                to_location_id=wb.destination_id, note="Session move"))
             car.active_waybill_slot = _advance_slot(car)
+            car.cp_session_count = 0
         elif item.status == "cp" and item.location_id:
             car.current_location_id = item.location_id
             db.add(MovementLog(car_id=car.id, from_location_id=old_loc,
                                to_location_id=item.location_id, note="Session CP"))
             # waybill NOT advanced for CP cars
+            car.cp_session_count = (car.cp_session_count or 0) + 1
         db.commit()
         db.refresh(car)
         updated.append(car_to_dict(car))

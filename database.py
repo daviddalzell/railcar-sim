@@ -101,6 +101,15 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+        for col, table, defn in [
+            ("car_capacity",     "industries", "INTEGER"),
+            ("cp_session_count", "cars",       "INTEGER DEFAULT 0"),
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {defn}"))
+                conn.commit()
+            except Exception:
+                pass
         # One-time migration: move producer industries' data to outbound fields
         conn.execute(text("""
             UPDATE industries

@@ -1000,8 +1000,8 @@ button.small {
 .session-car-row.done button { display: none; }
 
 .session-car-row.cp {
-  border-left: 4px solid var(--badge-orange);
-  background: #fef9e7;
+  border: 4px solid var(--badge-orange);
+  background: var(--rail-dark);
 }
 
 .session-car-row .session-btn-row {
@@ -1302,4 +1302,77 @@ button.small {
 
 .consist-body {
   padding-top: 0.5rem;
+}
+
+/* ── Spotting Conflicts ───────────────────────────────────────────────────── */
+.conflict-panel {
+  background: color-mix(in srgb, var(--badge-orange) 12%, var(--card-background-color));
+  border: 1px solid var(--badge-orange);
+  border-radius: var(--border-radius);
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.conflict-panel-title {
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: var(--badge-orange);
+}
+
+.conflict-group {
+  margin-bottom: 0.75rem;
+}
+
+.conflict-group:last-child {
+  margin-bottom: 0;
+}
+
+.conflict-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.conflict-car-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.conflict-will-spot {
+  background: color-mix(in srgb, var(--color-valid, #27ae60) 10%, transparent);
+}
+
+.conflict-will-cp {
+  background: color-mix(in srgb, var(--badge-orange) 10%, transparent);
+  opacity: 0.8;
+}
+
+.conflict-car-marks {
+  flex: 1;
+  font-weight: 500;
+}
+
+.aging-badge {
+  font-size: 0.75rem;
+  background: var(--badge-orange);
+  color: #fff;
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  white-space: nowrap;
+}
+
+.priority-badge {
+  font-size: 0.75rem;
+  color: var(--muted-color, #888);
+  white-space: nowrap;
+}
+
+.conflict-disposition {
+  min-width: 3.5rem;
+  text-align: right;
 }

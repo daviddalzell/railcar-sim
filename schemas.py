@@ -64,6 +64,7 @@ class IndustryCreate(BaseModel):
     inbound_car_types: str = ""
     outbound_commodities: str = ""
     outbound_car_types: str = ""
+    car_capacity: Optional[int] = None
 
 
 class WaybillCreate(BaseModel):

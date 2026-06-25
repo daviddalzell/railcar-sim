@@ -1208,6 +1208,9 @@ async function loadOperations() {
               toLocation: c.session_to_location_name,
               photoPath: c.photo_path || null,
               industryName: c.active_waybill?.industry_name || null,
+              toIndustryId: c.active_waybill?.industry_id ?? null,
+              cpSessions: c.cp_session_count || 0,
+              priority: Math.floor(Math.random() * 1000),
               group: "arrivals",
               status: "pending",
             })),
@@ -1219,6 +1222,9 @@ async function loadOperations() {
               toLocation: c.session_to_location_name,
               photoPath: c.photo_path || null,
               industryName: c.active_waybill?.industry_name || null,
+              toIndustryId: null,
+              cpSessions: 0,
+              priority: 0,
               group: "departures",
               status: "pending",
             })),
@@ -1230,6 +1236,9 @@ async function loadOperations() {
               toLocation: c.session_to_location_name,
               photoPath: c.photo_path || null,
               industryName: c.active_waybill?.industry_name || null,
+              toIndustryId: c.active_waybill?.industry_id ?? null,
+              cpSessions: c.cp_session_count || 0,
+              priority: Math.floor(Math.random() * 1000),
               group: "spots",
               status: "pending",
             })),
@@ -1290,6 +1299,82 @@ function loadSessionFromStorage() {
   catch { session = null; }
 }
 
+function detectSpottingConflicts() {
+  if (!session) return;
+  const relevant = session.cars.filter(c =>
+    (c.group === "arrivals" || c.group === "spots") && c.toIndustryId && c.status !== "cp"
+  );
+  const byIndustry = {};
+  for (const car of relevant) {
+    (byIndustry[car.toIndustryId] = byIndustry[car.toIndustryId] || []).push(car);
+  }
+  const conflicts = [];
+  for (const [indId, incoming] of Object.entries(byIndustry)) {
+    const ind = industries.find(i => i.id === parseInt(indId));
+    if (!ind?.car_capacity) continue;
+    // Count cars already spotted at this industry's location (current occupancy)
+    const indLocId = ind.location_id;
+    const currentCount = cars.filter(c => c.current_location_id === indLocId).length;
+    if (currentCount + incoming.length > ind.car_capacity) {
+      conflicts.push({ ind, capacity: ind.car_capacity, current: currentCount, cars: incoming });
+    }
+  }
+  session.conflicts = conflicts;
+}
+
+function renderSpottingConflicts() {
+  const el = document.getElementById("spotting-conflicts");
+  if (!el) return;
+  const conflicts = session?.conflicts || [];
+  if (!conflicts.length) { el.innerHTML = ""; return; }
+
+  el.innerHTML = `
+    <div class="conflict-panel">
+      <p class="conflict-panel-title">⚠ Spotting Conflicts</p>
+      ${conflicts.map(({ ind, capacity, current, cars: incoming }) => {
+        const available = capacity - current;
+        const sorted = [...incoming].sort((a, b) =>
+          b.cpSessions - a.cpSessions || a.priority - b.priority
+        );
+        return `
+        <div class="conflict-group" data-ind-id="${ind.id}">
+          <div class="conflict-group-header">
+            <span><strong>${ind.name}</strong> — ${capacity} spot${capacity !== 1 ? "s" : ""}, ${incoming.length} inbound</span>
+            <button class="outline small conflict-auto-resolve" data-ind-id="${ind.id}">Auto-resolve</button>
+          </div>
+          ${sorted.map((car, i) => `
+            <div class="conflict-car-row${i < available ? " conflict-will-spot" : " conflict-will-cp"}">
+              <span class="conflict-car-marks">${car.marks} <span class="muted">${car.carType}</span></span>
+              ${car.cpSessions > 0 ? `<span class="aging-badge">Held ${car.cpSessions} session${car.cpSessions !== 1 ? "s" : ""}</span>` : ""}
+              <span class="priority-badge">#${car.priority}</span>
+              <span class="conflict-disposition muted small">${i < available ? "✓ spot" : "→ CP"}</span>
+            </div>
+          `).join("")}
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  el.querySelectorAll(".conflict-auto-resolve").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const indId = parseInt(btn.dataset.indId);
+      const conflict = (session.conflicts || []).find(c => c.ind.id === indId);
+      if (!conflict) return;
+      const available = conflict.capacity - conflict.current;
+      const sorted = [...conflict.cars].sort((a, b) =>
+        b.cpSessions - a.cpSessions || a.priority - b.priority
+      );
+      sorted.slice(available).forEach(car => {
+        const sc = session.cars.find(c => c.id === car.id);
+        if (sc) sc.status = "cp";
+      });
+      saveSession();
+      detectSpottingConflicts();
+      renderSpottingConflicts();
+      renderActiveSession();
+    });
+  });
+}
+
 function sessionProgress() {
   if (!session) return { total: 0, done: 0, cp: 0, pending: 0 };
   const total   = session.cars.length;
@@ -1305,10 +1390,15 @@ function markCar(carId, status) {
   // toggle: clicking the same status again resets to pending
   car.status = car.status === status ? "pending" : status;
   saveSession();
+  detectSpottingConflicts();
+  renderSpottingConflicts();
   renderActiveSession();
 }
 
 function renderActiveSession() {
+  detectSpottingConflicts();
+  renderSpottingConflicts();
+
   const titleParts = [];
   if (session.trainNumber) titleParts.push(`Train #${session.trainNumber}`);
   if (session.trainName) titleParts.push(`"${session.trainName}"`);
@@ -1855,6 +1945,7 @@ function renderIndustryList() {
       $("#ind-outbound-car-types").value = ind.outbound_car_types || "";
       $("#ind-outbound-commodities").value = ind.outbound_commodities || "";
       $("#ind-edit-id").value = ind.id;
+      $("#ind-capacity").value = ind.car_capacity ?? "";
       roleToCheckboxes(ind.industry_role || "consumer");
       hide($("#inbound-commodity-warn"));
       hide($("#outbound-commodity-warn"));
@@ -1967,6 +2058,7 @@ $("#btn-add-industry").addEventListener("click", () => {
   $("#ind-inbound-commodities").value = "";
   $("#ind-outbound-car-types").value = "";
   $("#ind-outbound-commodities").value = "";
+  $("#ind-capacity").value = "";
   $("#ind-edit-id").value = "";
   roleToCheckboxes("consumer");
   hide($("#inbound-commodity-warn"));
@@ -2015,6 +2107,7 @@ $("#industry-form").addEventListener("submit", async e => {
     inbound_car_types: $("#ind-inbound-car-types").value.trim(),
     outbound_commodities: $("#ind-outbound-commodities").value.trim(),
     outbound_car_types: $("#ind-outbound-car-types").value.trim(),
+    car_capacity: $("#ind-capacity").value ? parseInt($("#ind-capacity").value) : null,
   };
   if (editId) {
     await api("PUT", `/api/industries/${editId}`, body);
@@ -2968,6 +3061,9 @@ function wireConsistCard(planId) {
         toLocation: c.active_waybill?.destination_name || "?",
         photoPath: c.photo_path || null,
         industryName: c.active_waybill?.industry_name || null,
+        toIndustryId: (group !== "departures") ? (c.active_waybill?.industry_id ?? null) : null,
+        cpSessions: (group !== "departures") ? (c.cp_session_count || 0) : 0,
+        priority: (group !== "departures") ? Math.floor(Math.random() * 1000) : 0,
         group,
         status: "pending",
       });

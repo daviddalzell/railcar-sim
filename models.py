@@ -42,6 +42,7 @@ class Industry(Base):
     inbound_car_types: Mapped[str] = mapped_column(String, default="")
     outbound_commodities: Mapped[str] = mapped_column(String, default="")
     outbound_car_types: Mapped[str] = mapped_column(String, default="")
+    car_capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     location: Mapped[Optional["Location"]] = relationship("Location", back_populates="industries")
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="industry")
@@ -58,6 +59,7 @@ class Car(Base):
     photo_path: Mapped[str] = mapped_column(String, default="")
     current_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
     active_waybill_slot: Mapped[int] = mapped_column(Integer, default=0)
+    cp_session_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     current_location: Mapped[Optional["Location"]] = relationship("Location", back_populates="cars")
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="car", order_by="Waybill.slot_index", foreign_keys="Waybill.car_id")
