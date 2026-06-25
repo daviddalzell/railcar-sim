@@ -35,6 +35,7 @@ def update_location(loc_id: int, data: LocationCreate, db: Session = Depends(get
     loc.name = data.name
     loc.location_type = data.location_type
     loc.switching_area_id = data.switching_area_id
+    loc.car_capacity = data.car_capacity
     db.commit()
     return location_to_dict(loc)
 

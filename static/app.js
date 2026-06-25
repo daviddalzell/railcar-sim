@@ -1311,12 +1311,15 @@ function detectSpottingConflicts() {
   const conflicts = [];
   for (const [indId, incoming] of Object.entries(byIndustry)) {
     const ind = industries.find(i => i.id === parseInt(indId));
-    if (!ind?.car_capacity) continue;
-    // Count cars already spotted at this industry's location (current occupancy)
-    const indLocId = ind.location_id;
-    const currentCount = cars.filter(c => c.current_location_id === indLocId).length;
-    if (currentCount + incoming.length > ind.car_capacity) {
-      conflicts.push({ ind, capacity: ind.car_capacity, current: currentCount, cars: incoming });
+    const spotNums = (ind?.spot_numbers || "").split(",").filter(s => s.trim());
+    if (!spotNums.length) continue;
+    const industryCapacity = spotNums.length;
+    const currentCount = cars.filter(c =>
+      c.current_location_id === ind.location_id &&
+      c.active_waybill?.industry_id === ind.id
+    ).length;
+    if (currentCount + incoming.length > industryCapacity) {
+      conflicts.push({ ind, capacity: industryCapacity, spotNums, current: currentCount, cars: incoming });
     }
   }
   session.conflicts = conflicts;
@@ -1331,7 +1334,7 @@ function renderSpottingConflicts() {
   el.innerHTML = `
     <div class="conflict-panel">
       <p class="conflict-panel-title">⚠ Spotting Conflicts</p>
-      ${conflicts.map(({ ind, capacity, current, cars: incoming }) => {
+      ${conflicts.map(({ ind, capacity, spotNums, current, cars: incoming }) => {
         const available = capacity - current;
         const sorted = [...incoming].sort((a, b) =>
           b.cpSessions - a.cpSessions || a.priority - b.priority
@@ -1339,7 +1342,7 @@ function renderSpottingConflicts() {
         return `
         <div class="conflict-group" data-ind-id="${ind.id}">
           <div class="conflict-group-header">
-            <span><strong>${ind.name}</strong> — ${capacity} spot${capacity !== 1 ? "s" : ""}, ${incoming.length} inbound</span>
+            <span><strong>${ind.name}</strong>${spotNums.length ? ` · spots ${spotNums.join(", ")}` : ""} — ${capacity} spot${capacity !== 1 ? "s" : ""}, ${incoming.length} inbound</span>
             <button class="outline small conflict-auto-resolve" data-ind-id="${ind.id}">Auto-resolve</button>
           </div>
           ${sorted.map((car, i) => `
@@ -1776,6 +1779,7 @@ function renderLocationList() {
       $("#loc-name").value = loc.name;
       $("#loc-type").value = loc.location_type;
       $("#loc-switching-area").value = loc.switching_area_id || "";
+      $("#loc-capacity").value = loc.car_capacity ?? "";
       $("#loc-edit-id").value = loc.id;
       show($("#location-form"));
     });
@@ -1945,7 +1949,7 @@ function renderIndustryList() {
       $("#ind-outbound-car-types").value = ind.outbound_car_types || "";
       $("#ind-outbound-commodities").value = ind.outbound_commodities || "";
       $("#ind-edit-id").value = ind.id;
-      $("#ind-capacity").value = ind.car_capacity ?? "";
+      $("#ind-spot-numbers").value = ind.spot_numbers || "";
       roleToCheckboxes(ind.industry_role || "consumer");
       hide($("#inbound-commodity-warn"));
       hide($("#outbound-commodity-warn"));
@@ -2028,6 +2032,7 @@ $("#btn-add-location").addEventListener("click", () => {
   $("#loc-name").value = "";
   $("#loc-type").value = "yard";
   $("#loc-switching-area").value = "";
+  $("#loc-capacity").value = "";
   $("#loc-edit-id").value = "";
   show($("#location-form"));
 });
@@ -2041,6 +2046,7 @@ $("#location-form").addEventListener("submit", async e => {
     name: $("#loc-name").value.trim(),
     location_type: $("#loc-type").value,
     switching_area_id: saVal ? parseInt(saVal) : null,
+    car_capacity: $("#loc-capacity").value ? parseInt($("#loc-capacity").value) : null,
   };
   if (editId) {
     await api("PUT", `/api/locations/${editId}`, body);
@@ -2058,7 +2064,7 @@ $("#btn-add-industry").addEventListener("click", () => {
   $("#ind-inbound-commodities").value = "";
   $("#ind-outbound-car-types").value = "";
   $("#ind-outbound-commodities").value = "";
-  $("#ind-capacity").value = "";
+  $("#ind-spot-numbers").value = "";
   $("#ind-edit-id").value = "";
   roleToCheckboxes("consumer");
   hide($("#inbound-commodity-warn"));
@@ -2107,7 +2113,7 @@ $("#industry-form").addEventListener("submit", async e => {
     inbound_car_types: $("#ind-inbound-car-types").value.trim(),
     outbound_commodities: $("#ind-outbound-commodities").value.trim(),
     outbound_car_types: $("#ind-outbound-car-types").value.trim(),
-    car_capacity: $("#ind-capacity").value ? parseInt($("#ind-capacity").value) : null,
+    spot_numbers: $("#ind-spot-numbers").value.trim(),
   };
   if (editId) {
     await api("PUT", `/api/industries/${editId}`, body);

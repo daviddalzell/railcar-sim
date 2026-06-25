@@ -22,6 +22,7 @@ class Location(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     location_type: Mapped[str] = mapped_column(String, default="yard")  # yard / industry / staging
     switching_area_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("switching_areas.id"), nullable=True)
+    car_capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     switching_area: Mapped[Optional["SwitchingArea"]] = relationship("SwitchingArea", back_populates="locations")
     cars: Mapped[List["Car"]] = relationship("Car", back_populates="current_location")
@@ -42,7 +43,7 @@ class Industry(Base):
     inbound_car_types: Mapped[str] = mapped_column(String, default="")
     outbound_commodities: Mapped[str] = mapped_column(String, default="")
     outbound_car_types: Mapped[str] = mapped_column(String, default="")
-    car_capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    spot_numbers: Mapped[str] = mapped_column(String, default="")
 
     location: Mapped[Optional["Location"]] = relationship("Location", back_populates="industries")
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="industry")

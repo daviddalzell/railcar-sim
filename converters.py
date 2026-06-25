@@ -65,7 +65,8 @@ def industry_to_dict(i: Industry) -> dict:
         "inbound_car_types": i.inbound_car_types,
         "outbound_commodities": i.outbound_commodities,
         "outbound_car_types": i.outbound_car_types,
-        "car_capacity": i.car_capacity,
+        "spot_numbers": i.spot_numbers or "",
+        "spot_count": len([s for s in (i.spot_numbers or "").split(",") if s.strip()]),
     }
 
 
@@ -75,6 +76,7 @@ def location_to_dict(l: Location) -> dict:
         "name": l.name,
         "location_type": l.location_type,
         "switching_area_id": l.switching_area_id,
+        "car_capacity": l.car_capacity,
     }
 
 

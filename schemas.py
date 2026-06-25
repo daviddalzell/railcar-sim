@@ -24,6 +24,7 @@ class LocationCreate(BaseModel):
     name: str
     location_type: str = "yard"
     switching_area_id: Optional[int] = None
+    car_capacity: Optional[int] = None
 
 
 class SwitchingAreaCreate(BaseModel):
@@ -64,7 +65,7 @@ class IndustryCreate(BaseModel):
     inbound_car_types: str = ""
     outbound_commodities: str = ""
     outbound_car_types: str = ""
-    car_capacity: Optional[int] = None
+    spot_numbers: str = ""
 
 
 class WaybillCreate(BaseModel):

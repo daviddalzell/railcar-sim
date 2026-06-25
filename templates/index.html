@@ -384,6 +384,7 @@
             <select id="loc-switching-area">
               <option value="">— no switching area —</option>
             </select>
+            <input id="loc-capacity" type="number" min="1" placeholder="Track capacity (optional)" style="width:14rem" />
             <button type="submit" class="small">Save</button>
             <button type="button" id="btn-cancel-location" class="outline secondary small">✕</button>
             <input type="hidden" id="loc-edit-id" value="" />
@@ -432,7 +433,7 @@
               </div>
               <small id="outbound-commodity-warn" class="hidden error-msg"></small>
             </div>
-            <input id="ind-capacity" type="number" min="1" placeholder="Spot capacity (optional)" style="width:14rem" />
+            <input id="ind-spot-numbers" type="text" placeholder="Spot numbers (e.g. 3,4)" style="width:14rem" />
             <button type="submit" class="small">Save</button>
             <button type="button" id="btn-cancel-industry" class="outline secondary small">✕</button>
             <input type="hidden" id="ind-edit-id" value="" />

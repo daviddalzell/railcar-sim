@@ -102,7 +102,8 @@ def init_db():
         except Exception:
             pass
         for col, table, defn in [
-            ("car_capacity",     "industries", "INTEGER"),
+            ("car_capacity",     "locations",  "INTEGER"),
+            ("spot_numbers",     "industries", "TEXT DEFAULT ''"),
             ("cp_session_count", "cars",       "INTEGER DEFAULT 0"),
         ]:
             try:
