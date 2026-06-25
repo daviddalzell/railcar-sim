@@ -71,6 +71,12 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
     consist_inbound = inbound[:available_spots]
 
     warnings = []
+    left_behind = len(inbound) - len(consist_inbound)
+    if left_behind > 0:
+        warnings.append(
+            f"{left_behind} car{'s' if left_behind != 1 else ''} at origin cannot be delivered — "
+            f"{area.name} is at or near capacity ({current_count}/{area.car_capacity} spots used)."
+        )
     if not consist_inbound and not outbound and not local_spots:
         warnings.append("No eligible cars found for this origin and switching area.")
 
