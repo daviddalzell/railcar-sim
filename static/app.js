@@ -385,7 +385,37 @@ function renderCarGrid() {
   $$(".car-card").forEach(card => {
     card.addEventListener("click", () => openCarDetail(parseInt(card.dataset.id)));
   });
+
+  checkOrphanedCars();
 }
+
+function checkOrphanedCars() {
+  const orphaned = cars.filter(c => c.current_location_id && !c.current_location_name);
+  const banner = $("#orphaned-cars-banner");
+  const badge  = $("#roster-badge");
+  const msg    = $("#orphaned-cars-msg");
+  if (orphaned.length) {
+    const n = orphaned.length;
+    msg.textContent = `⚠ ${n} car${n !== 1 ? "s have" : " has"} an invalid location and may not display correctly.`;
+    show(banner);
+    badge.textContent = n;
+    show(badge);
+  } else {
+    hide(banner);
+    hide(badge);
+  }
+}
+
+$("#btn-repair-cars").addEventListener("click", async () => {
+  try {
+    const result = await api("POST", "/api/cars/repair");
+    cars = await api("GET", "/api/cars");
+    renderCarGrid();
+    showToast(`Repaired ${result.repaired} car${result.repaired !== 1 ? "s" : ""}.`, "success");
+  } catch (err) {
+    showToast("Repair failed: " + err.message, "error");
+  }
+});
 
 $("#btn-toggle-power-pool").addEventListener("click", () => {
   const body = $("#power-pool-body");
@@ -946,6 +976,45 @@ $("#btn-auto-assign-car").addEventListener("click", async () => {
 // ── Assign waybill slots dialog ───────────────────────────────────────────────
 const SLOT_COUNT = 4;
 
+function buildSlotOptions(expectedOriginId, carType, currentWaybillId) {
+  const carTypeLower = (carType || "").toLowerCase();
+  const wildcards = new Set(["", "all", "any"]);
+  function typeMatches(w) {
+    const req = (w.required_car_type || "").toLowerCase();
+    return wildcards.has(req) || req === carTypeLower;
+  }
+  function originMatches(w) {
+    if (!expectedOriginId) return true;
+    if (!w.origin_id) return true;
+    return w.origin_id === expectedOriginId;
+  }
+  const eligible = waybillPool.filter(w =>
+    (w.id === currentWaybillId) || (typeMatches(w) && originMatches(w))
+  );
+  return '<option value="">— empty —</option>' +
+    eligible.map(w =>
+      `<option value="${w.id}">${w.name || w.id}` +
+      `${w.origin_name ? ` (${w.origin_name} → ${w.destination_name || "?"})` : ""}</option>`
+    ).join("");
+}
+
+function getSelectedSlotWaybill(slotIndex) {
+  const sel = $(`[data-slot="${slotIndex}"].slot-picker`, $("#waybill-slots"));
+  return sel?.value ? waybillPool.find(w => w.id === parseInt(sel.value)) : null;
+}
+
+function refreshSlot(slotIndex, carType) {
+  const sel = $(`[data-slot="${slotIndex}"].slot-picker`, $("#waybill-slots"));
+  if (!sel) return;
+  const currentVal = sel.value ? parseInt(sel.value) : null;
+  const prevWb = slotIndex > 0 ? getSelectedSlotWaybill(slotIndex - 1) : null;
+  const expectedOriginId = slotIndex === 0
+    ? (cars.find(c => c.id === selectedCarId)?.current_location_id ?? null)
+    : (prevWb?.destination_id ?? null);
+  sel.innerHTML = buildSlotOptions(expectedOriginId, carType, currentVal);
+  sel.value = currentVal || "";
+}
+
 $("#btn-edit-waybills").addEventListener("click", async () => {
   if (!selectedCarId) return;
   const car = cars.find(c => c.id === selectedCarId);
@@ -956,24 +1025,28 @@ $("#btn-edit-waybills").addEventListener("click", async () => {
   const activeSlot = car?.active_waybill_slot ?? 0;
   $("#waybill-dialog-title").textContent = `Assign Waybills — ${car?.reporting_marks || ""} ${car?.car_number || ""}`;
 
-  const poolOptions = '<option value="">— empty —</option>' +
-    waybillPool.map(w => `<option value="${w.id}">${w.name || w.id}${w.origin_name ? ` (${w.origin_name} → ${w.destination_name || "?"})` : ""}</option>`).join("");
-
   $("#waybill-slots").innerHTML = Array.from({ length: SLOT_COUNT }, (_, i) => {
-    const current = bySlot[i];
     return `
       <div class="slot-assign-row ${i === activeSlot ? "active-slot" : ""}">
         <span class="slot-num">${i + 1}${i === activeSlot ? " ★" : ""}</span>
-        <select data-slot="${i}" class="slot-picker">${poolOptions}</select>
+        <select data-slot="${i}" class="slot-picker"></select>
       </div>
     `;
   }).join("");
 
-  // Pre-select currently assigned waybills
-  assigned.forEach(w => {
-    const sel = $(`[data-slot="${w.slot_index}"].slot-picker`, $("#waybill-slots"));
-    if (sel) sel.value = w.id;
-  });
+  // Populate each slot with filtered options, pre-select current value
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    refreshSlot(i, car?.car_type);
+    if (bySlot[i]) {
+      const sel = $(`[data-slot="${i}"].slot-picker`, $("#waybill-slots"));
+      if (sel) sel.value = bySlot[i].id;
+    }
+    // Cascade: changing slot i re-filters slot i+1
+    const sel = $(`[data-slot="${i}"].slot-picker`, $("#waybill-slots"));
+    if (sel && i < SLOT_COUNT - 1) {
+      sel.addEventListener("change", () => refreshSlot(i + 1, car?.car_type));
+    }
+  }
 
   $("#waybill-dialog").showModal();
 });

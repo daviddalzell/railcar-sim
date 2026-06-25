@@ -16,7 +16,7 @@
     <nav>
       <ul><li><strong class="brand">🔀 WAYPOINT</strong></li></ul>
       <ul>
-        <li><a href="#" data-tab="roster" class="tab-link active">Car Roster</a></li>
+        <li><a href="#" data-tab="roster" class="tab-link active">Car Roster<span id="roster-badge" class="tab-badge hidden"></span></a></li>
         <li><a href="#" data-tab="operations" class="tab-link">Operations</a></li>
         <li><a href="#" data-tab="waybills" class="tab-link">Waybills</a></li>
         <li><a href="#" data-tab="layout" class="tab-link">Layout Setup</a></li>
@@ -33,6 +33,11 @@
         <h2>Car Roster</h2>
         <button id="btn-add-car" class="outline">+ Add Car via Photo</button>
         <button id="btn-add-manual" class="outline">+ Add Car Manually</button>
+      </div>
+
+      <div id="orphaned-cars-banner" class="hidden warning-banner">
+        <span id="orphaned-cars-msg"></span>
+        <button id="btn-repair-cars" class="outline small">Repair</button>
       </div>
 
       <!-- Add-car form (hidden by default) -->

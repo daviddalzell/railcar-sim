@@ -9,7 +9,7 @@ from PIL import Image
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Car, MovementLog, Waybill
+from models import Car, Location, MovementLog, Waybill
 from converters import car_to_dict, waybill_to_dict
 from schemas import AnalyzePhotoRequest, CarCreate, CarSlotsUpdate, CarUpdate, StylizeRequest
 from vision import analyze_car_photo, call_with_retry, get_provider
@@ -46,6 +46,20 @@ router = APIRouter(prefix="/api", tags=["cars"])
 def list_cars(db: Session = Depends(get_db)):
     cars = db.query(Car).all()
     return [car_to_dict(c) for c in cars]
+
+
+@router.post("/cars/repair")
+def repair_orphaned_cars(db: Session = Depends(get_db)):
+    valid_ids = {row.id for row in db.query(Location.id).all()}
+    orphaned = db.query(Car).filter(
+        Car.current_location_id.isnot(None),
+        Car.current_location_id.notin_(valid_ids)
+    ).all()
+    count = len(orphaned)
+    for car in orphaned:
+        car.current_location_id = None
+    db.commit()
+    return {"repaired": count}
 
 
 @router.post("/cars/upload")
