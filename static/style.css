@@ -104,6 +104,11 @@ body {
   --text-placeholder: #666;
   --text-strong:      #333;
 
+  /* Adaptive: light-mode defaults */
+  --consist-card-bg:     #f0f2f4;
+  --consist-card-border: #d0d5db;
+  --info-offer-bg:       #f0f2f4;
+
   --rail-blue:      #2980b9;
   --badge-blue:     #2980b9;
   --badge-muted-bg: #bdc3c7;
@@ -113,6 +118,20 @@ body {
   --badge-orange:   #d68910;
 
   --rail-green: #5c7a3e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --consist-card-bg:     var(--rail-darker);
+    --consist-card-border: var(--rail-dark);
+    --info-offer-bg:       var(--rail-dark);
+  }
+}
+
+[data-theme="dark"] {
+  --consist-card-bg:     var(--rail-darker);
+  --consist-card-border: var(--rail-dark);
+  --info-offer-bg:       var(--rail-dark);
 }
 
 main.container {
@@ -1294,8 +1313,8 @@ button.small {
 
 /* Consist cards */
 .consist-card {
-  background: var(--rail-darker);
-  border: 1px solid var(--rail-dark);
+  background: var(--consist-card-bg);
+  border: 1px solid var(--consist-card-border);
   border-radius: 6px;
   padding: 0.6rem 0.75rem;
 }
@@ -1375,6 +1394,16 @@ button.small {
 .conflict-disposition {
   min-width: 3.5rem;
   text-align: right;
+}
+
+.info-offer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--info-offer-bg);
+  border-radius: 6px;
+  margin-top: 0.5rem;
 }
 
 .warning-banner {
