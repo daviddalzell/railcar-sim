@@ -67,6 +67,7 @@
 
 body {
   font-family: "Red Rose", system-ui, sans-serif;
+  padding-top: 4.5rem;
 }
 
 .brand {
@@ -147,7 +148,11 @@ main.container {
 header.container-fluid {
   background: var(--rail-dark);
   padding: 0.4rem 1rem;
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
 }
 
 .nav-hamburger { display: none; }
