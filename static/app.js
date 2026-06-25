@@ -274,14 +274,24 @@ $("#library-upload-input").addEventListener("change", async e => {
 });
 
 // ── Tab navigation ────────────────────────────────────────────────────────────
+const navTabList   = $("#nav-tab-list");
+const navHamburger = $("#nav-hamburger");
+const navCurrentTab = $("#nav-current-tab");
+if (navCurrentTab) navCurrentTab.textContent = "Car Roster";
+if (navHamburger) {
+  navHamburger.addEventListener("click", () => navTabList.classList.toggle("nav-open"));
+}
+
 $$(".tab-link").forEach(link => {
   link.addEventListener("click", e => {
     e.preventDefault();
+    navTabList?.classList.remove("nav-open");
     const tab = link.dataset.tab;
     $$(".tab-link").forEach(l => l.classList.remove("active"));
     $$(".tab-panel").forEach(p => p.classList.add("hidden"));
     link.classList.add("active");
     $(`#tab-${tab}`).classList.remove("hidden");
+    if (navCurrentTab) navCurrentTab.textContent = link.textContent.trim();
     if (tab === "operations") loadOperations();
     if (tab === "waybills") loadWaybillPool();
     if (tab === "layout") loadLayout();
