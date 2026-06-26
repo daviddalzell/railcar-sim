@@ -18,28 +18,47 @@ let settings = null;
 
 // ── Fast clock ────────────────────────────────────────────────────────────────
 let clockInterval = null;
-let clockSyncInterval = null;
 let clockState = null;
+let _clockEventSource = null;
+
+function _applyClockState(state) {
+  clockState = state;
+  clearInterval(clockInterval);
+  clockInterval = null;
+  if (state?.started_at) {
+    clockInterval = setInterval(updateClock, 1000);
+    updateClock();
+  } else {
+    const el = $("#clock-time");
+    if (el) el.textContent = "--:--";
+  }
+  const btn = $("#btn-clock-pause");
+  if (btn) btn.textContent = state?.paused_at ? "▶" : "⏸";
+}
+
+function _openClockEventSource() {
+  if (_clockEventSource) return;
+  _clockEventSource = new EventSource("/api/session/clock/events");
+  _clockEventSource.onmessage = e => {
+    try { _applyClockState(JSON.parse(e.data)); } catch {}
+  };
+  _clockEventSource.onerror = () => {
+    _clockEventSource.close();
+    _clockEventSource = null;
+    setTimeout(_openClockEventSource, 5000);
+  };
+}
 
 async function fetchAndStartClock() {
-  clockState = await api("GET", "/api/session/clock");
-  if (clockState?.started_at) startClockTick();
+  const state = await api("GET", "/api/session/clock");
+  _applyClockState(state);
+  _openClockEventSource();
 }
 
 function startClockTick() {
   clearInterval(clockInterval);
-  clearInterval(clockSyncInterval);
   clockInterval = setInterval(updateClock, 1000);
-  clockSyncInterval = setInterval(syncClockState, 15000);
   updateClock();
-}
-
-async function syncClockState() {
-  try {
-    const state = await api("GET", "/api/session/clock");
-    if (!state?.started_at) { stopClock(); return; }
-    clockState = state;
-  } catch {}
 }
 
 function updateClock() {
@@ -58,23 +77,15 @@ function updateClock() {
 
 function stopClock() {
   clearInterval(clockInterval);
-  clearInterval(clockSyncInterval);
   clockInterval = null;
-  clockSyncInterval = null;
   clockState = null;
 }
 
 async function toggleClockPause() {
-  const btn = $("#btn-clock-pause");
   if (!clockState) return;
-  if (clockState.paused_at) {
-    clockState = await api("POST", "/api/session/clock/resume");
-    startClockTick();
-    if (btn) btn.textContent = "⏸";
-  } else {
-    clockState = await api("POST", "/api/session/clock/pause");
-    if (btn) btn.textContent = "▶";
-  }
+  const endpoint = clockState.paused_at ? "/api/session/clock/resume" : "/api/session/clock/pause";
+  const state = await api("POST", endpoint);
+  _applyClockState(state); // immediate update for this tab; SSE will sync others
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -271,6 +282,13 @@ $("#library-upload-input").addEventListener("change", async e => {
   e.target.value = "";
   if (failed) showToast(`${failed} file(s) failed to upload.`, "error");
   await refreshLibraryGrid();
+});
+
+// ── Clock bar (always-visible in ops tab) ─────────────────────────────────────
+$("#btn-clock-pause").addEventListener("click", toggleClockPause);
+$("#btn-clock-reset").addEventListener("click", async () => {
+  const state = await api("POST", "/api/session/clock/start");
+  _applyClockState(state); // immediate update for this tab; SSE will sync others
 });
 
 // ── Tab navigation ────────────────────────────────────────────────────────────
@@ -1265,6 +1283,8 @@ async function loadOperations() {
   await loadDispatcherPanel();
   show($("#dispatcher-panel"));
 
+  fetchAndStartClock();
+
   if (session) {
     $("#ops-header-buttons").innerHTML = ""; // cleared by renderActiveSession
     renderActiveSession();
@@ -1504,20 +1524,10 @@ function renderActiveSession() {
 
   $("#ops-header-buttons").innerHTML = `
     <span class="session-progress-label muted">${progressLabel}</span>
-    <div class="fast-clock">
-      <span id="clock-time">--:--</span>
-      <button id="btn-clock-pause" class="outline clock-btn" title="Pause / Resume clock">⏸</button>
-      <button id="btn-clock-reset" class="outline clock-btn" title="Reset clock to start time">↺</button>
-    </div>
     <button id="btn-cancel-session" class="outline secondary">✕ Cancel Session</button>
     <button id="btn-end-session" class="contrast">⬛ End Session</button>
   `;
   document.getElementById("btn-end-session").addEventListener("click", handleEndSession);
-  document.getElementById("btn-clock-pause").addEventListener("click", toggleClockPause);
-  document.getElementById("btn-clock-reset").addEventListener("click", async () => {
-    clockState = await api("POST", "/api/session/clock/start");
-    startClockTick();
-  });
   document.getElementById("btn-cancel-session").addEventListener("click", async () => {
     const btn = document.getElementById("btn-cancel-session");
     if (!btn.dataset.confirm) {
@@ -1595,8 +1605,6 @@ function renderActiveSession() {
   $$(".session-cp-btn").forEach(btn => {
     btn.addEventListener("click", () => markCar(parseInt(btn.dataset.id), "cp"));
   });
-
-  fetchAndStartClock();
 }
 
 async function handleEndSession() {

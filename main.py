@@ -38,7 +38,9 @@ templates = Jinja2Templates(directory="templates")
 
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
+    import asyncio
+    session._register_loop(asyncio.get_running_loop())
     init_db()
     try:
         provider = get_provider()

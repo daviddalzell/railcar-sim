@@ -1,6 +1,10 @@
+import asyncio
+import json
 import time
+from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -10,6 +14,36 @@ from schemas import LayoutSettingsUpdate, SessionEndRequest
 from converters import get_or_create_settings, settings_to_dict
 
 router = APIRouter(prefix="/api", tags=["session"])
+
+# ── SSE broadcast ─────────────────────────────────────────────────────────────
+
+_sse_subscribers: set[asyncio.Queue] = set()
+_sse_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _register_loop(loop: asyncio.AbstractEventLoop):
+    global _sse_loop
+    _sse_loop = loop
+
+
+def _broadcast_clock(payload: dict | None):
+    """Called from sync route handlers to push clock state to all SSE clients."""
+    if not _sse_loop:
+        return
+    data = json.dumps(payload)
+    for q in list(_sse_subscribers):
+        _sse_loop.call_soon_threadsafe(q.put_nowait, data)
+
+
+async def _sse_generator(queue: asyncio.Queue) -> AsyncGenerator[str, None]:
+    try:
+        while True:
+            data = await queue.get()
+            yield f"data: {data}\n\n"
+    except asyncio.CancelledError:
+        pass
+    finally:
+        _sse_subscribers.discard(queue)
 
 
 def _get_active_waybill(car: Car):
@@ -98,6 +132,20 @@ def update_settings(data: LayoutSettingsUpdate, db: Session = Depends(get_db)):
 
 # ── Session clock ─────────────────────────────────────────────────────────────
 
+@router.get("/session/clock/events")
+async def clock_events():
+    queue: asyncio.Queue = asyncio.Queue()
+    _sse_subscribers.add(queue)
+    return StreamingResponse(
+        _sse_generator(queue),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/session/clock")
 def get_session_clock(db: Session = Depends(get_db)):
     c = db.get(SessionClock, 1)
@@ -113,7 +161,9 @@ def pause_session_clock(db: Session = Depends(get_db)):
         return {"status": "already paused or no clock"}
     c.paused_at = time.time()
     db.commit()
-    return clock_to_dict(c)
+    result = clock_to_dict(c)
+    _broadcast_clock(result)
+    return result
 
 
 @router.post("/session/clock/resume")
@@ -124,14 +174,18 @@ def resume_session_clock(db: Session = Depends(get_db)):
     c.paused_accum_s += time.time() - c.paused_at
     c.paused_at = None
     db.commit()
-    return clock_to_dict(c)
+    result = clock_to_dict(c)
+    _broadcast_clock(result)
+    return result
 
 
 @router.post("/session/clock/start")
 def start_session_clock(db: Session = Depends(get_db)):
     _start_session_clock(db, force=True)
     c = db.get(SessionClock, 1)
-    return clock_to_dict(c)
+    result = clock_to_dict(c)
+    _broadcast_clock(result)
+    return result
 
 
 @router.post("/session/clock/ensure")
@@ -139,7 +193,9 @@ def ensure_session_clock(db: Session = Depends(get_db)):
     """Start the clock only if it isn't already running. Used when launching sessions so all operators share the same clock."""
     _start_session_clock(db, force=False)
     c = db.get(SessionClock, 1)
-    return clock_to_dict(c) if c else None
+    result = clock_to_dict(c) if c else None
+    _broadcast_clock(result)
+    return result
 
 
 # ── Session plan / end ────────────────────────────────────────────────────────

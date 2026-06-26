@@ -931,6 +931,18 @@ button.small {
   align-self: center;
 }
 
+#ops-clock-bar {
+  position: sticky;
+  top: 4.5rem;
+  z-index: 500;
+  background: var(--rail-dark);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.4rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
 .fast-clock {
   display: flex;
   align-items: center;
@@ -995,7 +1007,11 @@ button.small {
 }
 
 .clock-btn {
-  padding: 0.15rem 0.4rem;
+  width: 3rem !important;
+  min-width: 3rem !important;
+  max-width: 3rem !important;
+  padding: 0.15rem 0 !important;
+  text-align: center;
   font-size: 0.8rem;
   margin-bottom: 0;
   border-color: rgba(255,255,255,0.3) !important;
