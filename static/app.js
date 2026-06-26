@@ -1016,15 +1016,22 @@ function buildSlotOptions(expectedOriginId, carType, currentWaybillId) {
     if (!w.origin_id) return true;
     return w.origin_id === expectedOriginId;
   }
-  const typeFiltered = waybillPool.filter(w => w.id === currentWaybillId || typeMatches(w));
-  // Prefer origin-matched options; fall back to all type-matched if none found
-  const originFiltered = typeFiltered.filter(w => w.id === currentWaybillId || originMatches(w));
-  const eligible = originFiltered.length > 0 ? originFiltered : typeFiltered;
+  function label(w) {
+    return `${w.name || w.id}${w.origin_name ? ` (${w.origin_name} → ${w.destination_name || "?"})` : ""}`;
+  }
+
+  const current = waybillPool.filter(w => w.id === currentWaybillId);
+  const primary  = waybillPool.filter(w => w.id !== currentWaybillId && typeMatches(w) && originMatches(w));
+  const fallback = primary.length === 0
+    ? waybillPool.filter(w => w.id !== currentWaybillId && typeMatches(w))
+    : [];
+
+  const opts = list => list.map(w => `<option value="${w.id}">${label(w)}</option>`).join("");
+
   return '<option value="">— empty —</option>' +
-    eligible.map(w =>
-      `<option value="${w.id}">${w.name || w.id}` +
-      `${w.origin_name ? ` (${w.origin_name} → ${w.destination_name || "?"})` : ""}</option>`
-    ).join("");
+    opts(current) +
+    opts(primary) +
+    (fallback.length ? `<optgroup label="other locations">${opts(fallback)}</optgroup>` : "");
 }
 
 function getSelectedSlotWaybill(slotIndex) {
@@ -2031,12 +2038,12 @@ function renderIndustryList() {
       if (!ind) return;
       $("#ind-name").value = ind.name;
       $("#ind-location").value = ind.location_id || "";
-      $("#ind-inbound-car-types").value = ind.inbound_car_types || ind.accepted_car_types || "";
+      refreshSpotPickerForLocation(ind.spot_numbers || "");
+      populateCarTypeMultiSelect($("#ind-inbound-car-types"), ind.inbound_car_types || ind.accepted_car_types || "");
       $("#ind-inbound-commodities").value = ind.commodities || "";
-      $("#ind-outbound-car-types").value = ind.outbound_car_types || "";
+      populateCarTypeMultiSelect($("#ind-outbound-car-types"), ind.outbound_car_types || "");
       $("#ind-outbound-commodities").value = ind.outbound_commodities || "";
       $("#ind-edit-id").value = ind.id;
-      $("#ind-spot-numbers").value = ind.spot_numbers || "";
       roleToCheckboxes(ind.industry_role || "consumer");
       hide($("#inbound-commodity-warn"));
       hide($("#outbound-commodity-warn"));
@@ -2109,11 +2116,54 @@ function renderIndustryList() {
   });
 }
 
+function populateCarTypeMultiSelect(el, selectedStr) {
+  const selected = new Set((selectedStr || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean));
+  if (!carTypes.length) {
+    el.innerHTML = '<span class="muted" style="font-size:0.8rem">No car types defined</span>';
+    return;
+  }
+  el.innerHTML = carTypes.map(ct => {
+    const checked = selected.has(ct.name.toLowerCase()) ? " checked" : "";
+    const id = `ct-pick-${el.id}-${ct.name.replace(/\s+/g, "-")}`;
+    return `<label class="ct-pill"><input type="checkbox" value="${ct.name}"${checked} id="${id}"><span>${ct.name}</span></label>`;
+  }).join("");
+}
+
+function getMultiSelectValues(el) {
+  return Array.from(el.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value).join(", ");
+}
+
+function populateSpotPicker(el, capacity, selectedStr) {
+  const selected = new Set((selectedStr || "").split(",").map(s => s.trim()).filter(Boolean));
+  const total = capacity || 0;
+  if (!total) {
+    el.innerHTML = '<span class="muted" style="font-size:0.8rem">Select a location to see spots</span>';
+    return;
+  }
+  el.innerHTML = Array.from({ length: total }, (_, i) => {
+    const n = String(i + 1);
+    const checked = selected.has(n) ? " checked" : "";
+    return `<label class="ct-pill"><input type="checkbox" value="${n}"${checked}><span>${n}</span></label>`;
+  }).join("");
+}
+
+function getSpotPickerValues(el) {
+  return Array.from(el.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value).join(", ");
+}
+
 function populateIndustryLocationSelect() {
   const sel = $("#ind-location");
   sel.innerHTML = '<option value="">— no location —</option>' +
     locations.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
 }
+
+function refreshSpotPickerForLocation(selectedStr = "") {
+  const locId = parseInt($("#ind-location").value);
+  const loc = locations.find(l => l.id === locId);
+  populateSpotPicker($("#ind-spot-numbers"), loc?.car_capacity ?? 0, selectedStr);
+}
+
+$("#ind-location").addEventListener("change", () => refreshSpotPickerForLocation());
 
 $("#btn-add-location").addEventListener("click", () => {
   $("#loc-name").value = "";
@@ -2147,11 +2197,11 @@ $("#location-form").addEventListener("submit", async e => {
 $("#btn-add-industry").addEventListener("click", () => {
   $("#ind-name").value = "";
   $("#ind-location").value = "";
-  $("#ind-inbound-car-types").value = "";
+  populateCarTypeMultiSelect($("#ind-inbound-car-types"), "");
   $("#ind-inbound-commodities").value = "";
-  $("#ind-outbound-car-types").value = "";
+  populateCarTypeMultiSelect($("#ind-outbound-car-types"), "");
   $("#ind-outbound-commodities").value = "";
-  $("#ind-spot-numbers").value = "";
+  populateSpotPicker($("#ind-spot-numbers"), 0, "");
   $("#ind-edit-id").value = "";
   roleToCheckboxes("consumer");
   hide($("#inbound-commodity-warn"));
@@ -2171,9 +2221,9 @@ $("#btn-suggest-industry").addEventListener("click", async () => {
     const result = await api("POST", "/api/industries/suggest", { description });
     if (result.industry_role) roleToCheckboxes(result.industry_role);
     if (result.inbound_commodities)  $("#ind-inbound-commodities").value  = result.inbound_commodities;
-    if (result.inbound_car_types)    $("#ind-inbound-car-types").value    = result.inbound_car_types;
+    if (result.inbound_car_types)    populateCarTypeMultiSelect($("#ind-inbound-car-types"), result.inbound_car_types);
     if (result.outbound_commodities) $("#ind-outbound-commodities").value = result.outbound_commodities;
-    if (result.outbound_car_types)   $("#ind-outbound-car-types").value   = result.outbound_car_types;
+    if (result.outbound_car_types)   populateCarTypeMultiSelect($("#ind-outbound-car-types"), result.outbound_car_types);
   } catch (err) {
     showToast("AI suggestion failed — check ANTHROPIC_API_KEY", "error");
   } finally {
@@ -2197,10 +2247,10 @@ $("#industry-form").addEventListener("submit", async e => {
     accepted_car_types: "",
     commodities: $("#ind-inbound-commodities").value.trim(),
     industry_role: checkboxesToRole(),
-    inbound_car_types: $("#ind-inbound-car-types").value.trim(),
+    inbound_car_types: getMultiSelectValues($("#ind-inbound-car-types")),
     outbound_commodities: $("#ind-outbound-commodities").value.trim(),
-    outbound_car_types: $("#ind-outbound-car-types").value.trim(),
-    spot_numbers: $("#ind-spot-numbers").value.trim(),
+    outbound_car_types: getMultiSelectValues($("#ind-outbound-car-types")),
+    spot_numbers: getSpotPickerValues($("#ind-spot-numbers")),
   };
   if (editId) {
     await api("PUT", `/api/industries/${editId}`, body);
@@ -2288,9 +2338,9 @@ function setupCommodityAutocomplete(inputId, dropdownId, warnId) {
           accepted_car_types: "",
           commodities: $("#ind-inbound-commodities").value.trim(),
           industry_role: checkboxesToRole(),
-          inbound_car_types: $("#ind-inbound-car-types").value.trim(),
+          inbound_car_types: getMultiSelectValues($("#ind-inbound-car-types")),
           outbound_commodities: $("#ind-outbound-commodities").value.trim(),
-          outbound_car_types: $("#ind-outbound-car-types").value.trim(),
+          outbound_car_types: getMultiSelectValues($("#ind-outbound-car-types")),
         });
         await loadLayout();
       }

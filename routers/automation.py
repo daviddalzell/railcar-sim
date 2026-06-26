@@ -241,11 +241,12 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
         t = [x for x in types if x.lower() not in _WILDCARD_TYPES]
         return t[0] if t else None
 
-    def _wb_exists(name, ind_id, origin_id):
+    def _wb_exists(name, ind_id, origin_id, destination_id):
         return db.query(Waybill).filter(
             Waybill.industry_id == ind_id,
             Waybill.name == name,
             Waybill.origin_id == origin_id,
+            Waybill.destination_id == destination_id,
         ).first()
 
     def _add(wb):
@@ -287,7 +288,7 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
                 for commodity in inbound_commodities:
                     req_type = commodity_map.get(commodity.lower(), inbound_fallback)
                     in_name = f"{commodity} → {ind.name}"
-                    if not _wb_exists(in_name, ind.id, origin_id):
+                    if not _wb_exists(in_name, ind.id, origin_id, ind.location_id):
                         _add(Waybill(
                             name=in_name,
                             origin_id=origin_id,
@@ -305,7 +306,7 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
                 for commodity in outbound_commodities:
                     req_type = commodity_map.get(commodity.lower(), outbound_fallback)
                     out_name = f"{commodity} ← {ind.name}"
-                    if not _wb_exists(out_name, ind.id, ind.location_id):
+                    if not _wb_exists(out_name, ind.id, ind.location_id, origin_id):
                         _add(Waybill(
                             name=out_name,
                             origin_id=ind.location_id,
@@ -322,7 +323,7 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
             if inbound_empty_types:
                 for ct in inbound_empty_types:
                     n = f"← {ind.name} (empty {ct})"
-                    if not _wb_exists(n, ind.id, ind.location_id):
+                    if not _wb_exists(n, ind.id, ind.location_id, origin_id):
                         _add(Waybill(name=n, origin_id=ind.location_id,
                             destination_id=origin_id, industry_id=ind.id,
                             commodity="", required_car_type=ct, is_empty=True))
@@ -330,7 +331,7 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
                         skipped += 1
             elif has_inbound:
                 n = f"← {ind.name} (empty)"
-                if not _wb_exists(n, ind.id, ind.location_id):
+                if not _wb_exists(n, ind.id, ind.location_id, origin_id):
                     _add(Waybill(name=n, origin_id=ind.location_id,
                         destination_id=origin_id, industry_id=ind.id,
                         commodity="", required_car_type=None, is_empty=True))
@@ -342,7 +343,7 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
                 if outbound_empty_types:
                     for ct in outbound_empty_types:
                         n = f"→ {ind.name} (empty {ct})"
-                        if not _wb_exists(n, ind.id, origin_id):
+                        if not _wb_exists(n, ind.id, origin_id, ind.location_id):
                             _add(Waybill(name=n, origin_id=origin_id,
                                 destination_id=ind.location_id, industry_id=ind.id,
                                 commodity="", required_car_type=ct, is_empty=True))
@@ -350,7 +351,7 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
                             skipped += 1
                 else:
                     n = f"→ {ind.name} (empty)"
-                    if not _wb_exists(n, ind.id, origin_id):
+                    if not _wb_exists(n, ind.id, origin_id, ind.location_id):
                         _add(Waybill(name=n, origin_id=origin_id,
                             destination_id=ind.location_id, industry_id=ind.id,
                             commodity="", required_car_type=outbound_fallback, is_empty=True))
@@ -397,7 +398,11 @@ def auto_assign_single_car(car_id: int, db: Session = Depends(get_db)):
         db.query(Location).filter(Location.location_type.in_(["staging", "yard"])).all()
     }
     unassigned = db.query(Waybill).filter(Waybill.car_id.is_(None)).all()
-    assigned = auto_assign_one_car(car, unassigned, staging_ids, db, starting_loc=car.current_location_id)
+    # Only seed the starting location if the car is at a staging/yard — if it's
+    # at an industry, let the algorithm pick the best staging from the pool so
+    # the car gets a complete route rather than failing to find origin-matched waybills.
+    starting_loc = car.current_location_id if car.current_location_id in staging_ids else None
+    assigned = auto_assign_one_car(car, unassigned, staging_ids, db, starting_loc=starting_loc)
     db.commit()
     db.refresh(car)
     return {"assigned": assigned, "car": car_to_dict(car)}

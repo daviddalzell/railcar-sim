@@ -34,9 +34,10 @@ def test_consumer_creates_empty_return_with_car_type(client, db_session):
                     json={"origin_location_id": staging.id, "replace": False})
     assert r.status_code == 200
     empty = [w for w in r.json()["waybills"] if w["is_empty"]]
-    assert len(empty) == 1
-    assert empty[0]["name"] == "← Mill (empty hopper)"
-    assert empty[0]["required_car_type"] == "hopper"
+    # One empty return waybill per staging/yard origin location
+    assert len(empty) == 2
+    assert all(w["name"] == "← Mill (empty hopper)" for w in empty)
+    assert all(w["required_car_type"] == "hopper" for w in empty)
 
 
 def test_producer_creates_outbound_waybill(client, db_session):
@@ -50,10 +51,12 @@ def test_producer_creates_outbound_waybill(client, db_session):
                     json={"origin_location_id": staging.id, "replace": False})
     assert r.status_code == 200
     loaded = [w for w in r.json()["waybills"] if not w["is_empty"]]
-    assert len(loaded) == 1
-    assert loaded[0]["name"] == "lumber ← Sawmill"
-    assert loaded[0]["origin_id"] == yard.id
-    assert loaded[0]["destination_id"] == staging.id
+    # One outbound loaded waybill per staging/yard destination
+    assert len(loaded) == 2
+    assert all(w["name"] == "lumber ← Sawmill" for w in loaded)
+    assert all(w["origin_id"] == yard.id for w in loaded)
+    dest_ids = {w["destination_id"] for w in loaded}
+    assert staging.id in dest_ids
 
 
 def test_producer_creates_empty_delivery(client, db_session):
@@ -182,6 +185,7 @@ def test_wildcard_car_type_creates_generic_empty(client, db_session):
                     json={"origin_location_id": staging.id, "replace": False})
     assert r.status_code == 200
     empty = [w for w in r.json()["waybills"] if w["is_empty"]]
-    assert len(empty) == 1
-    assert empty[0]["name"] == "← Mill (empty)"
-    assert empty[0]["required_car_type"] is None
+    # One generic empty return per staging/yard origin location
+    assert len(empty) == 2
+    assert all(w["name"] == "← Mill (empty)" for w in empty)
+    assert all(w["required_car_type"] is None for w in empty)

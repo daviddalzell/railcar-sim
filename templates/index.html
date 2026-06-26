@@ -428,7 +428,7 @@
               <input type="checkbox" id="ind-receiver" checked /> Receives loaded cars
             </label>
             <div id="ind-inbound-section">
-              <input id="ind-inbound-car-types" type="text" placeholder="Inbound car types (comma-sep)" />
+              <div id="ind-inbound-car-types" class="car-type-picker"></div>
               <div class="commodity-wrap">
                 <input id="ind-inbound-commodities" type="text" placeholder="Inbound commodities (comma-sep)" autocomplete="off" />
                 <ul id="inbound-commodity-suggestions" class="suggestion-dropdown hidden"></ul>
@@ -439,14 +439,15 @@
               <input type="checkbox" id="ind-shipper" /> Ships loaded cars
             </label>
             <div id="ind-outbound-section" class="hidden">
-              <input id="ind-outbound-car-types" type="text" placeholder="Outbound car types (comma-sep)" />
+              <div id="ind-outbound-car-types" class="car-type-picker"></div>
               <div class="commodity-wrap">
                 <input id="ind-outbound-commodities" type="text" placeholder="Outbound commodities (comma-sep)" autocomplete="off" />
                 <ul id="outbound-commodity-suggestions" class="suggestion-dropdown hidden"></ul>
               </div>
               <small id="outbound-commodity-warn" class="hidden error-msg"></small>
             </div>
-            <input id="ind-spot-numbers" type="text" placeholder="Spot numbers (e.g. 3,4)" style="width:14rem" />
+            <label style="font-size:0.85rem;margin-bottom:0.2rem">Spot Number(s)</label>
+            <div id="ind-spot-numbers" class="spot-picker"></div>
             <button type="submit" class="small">Save</button>
             <button type="button" id="btn-cancel-industry" class="outline secondary small">✕</button>
             <input type="hidden" id="ind-edit-id" value="" />
