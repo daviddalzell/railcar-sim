@@ -95,7 +95,7 @@ class CarImportCommit(BaseModel):
 
 
 class GenerateWaybillsRequest(BaseModel):
-    origin_location_id: int
+    origin_location_id: Optional[int] = None  # ignored — waybills are generated for all staging+yard locations
     replace: bool = False
 
 

@@ -15,9 +15,12 @@ def test_consumer_creates_inbound_waybill(client, db_session):
                     json={"origin_location_id": staging.id, "replace": False})
     assert r.status_code == 200
     loaded = [w for w in r.json()["waybills"] if not w["is_empty"]]
-    assert len(loaded) == 1
-    assert loaded[0]["origin_id"] == staging.id
-    assert loaded[0]["destination_id"] == yard.id
+    # One loaded inbound waybill per staging/yard origin location
+    assert len(loaded) == 2
+    origin_ids = {w["origin_id"] for w in loaded}
+    assert staging.id in origin_ids
+    assert yard.id in origin_ids
+    assert all(w["destination_id"] == yard.id for w in loaded)
 
 
 def test_consumer_creates_empty_return_with_car_type(client, db_session):
@@ -64,8 +67,11 @@ def test_producer_creates_empty_delivery(client, db_session):
                     json={"origin_location_id": staging.id, "replace": False})
     assert r.status_code == 200
     empty = [w for w in r.json()["waybills"] if w["is_empty"]]
-    assert len(empty) == 1
-    assert empty[0]["name"] == "→ Sawmill (empty flatcar)"
+    # One empty delivery waybill per staging/yard origin location
+    assert len(empty) == 2
+    assert all(w["name"] == "→ Sawmill (empty flatcar)" for w in empty)
+    dest_ids = {w["destination_id"] for w in empty}
+    assert yard.id in dest_ids
 
 
 def test_transload_creates_inbound_and_outbound(client, db_session):
@@ -160,8 +166,9 @@ def test_commodity_map_used_for_required_car_type(client, db_session):
                     json={"origin_location_id": staging.id, "replace": False})
     assert r.status_code == 200
     loaded = [w for w in r.json()["waybills"] if not w["is_empty"]]
-    assert len(loaded) == 1
-    assert loaded[0]["required_car_type"] == "gondola"
+    # One loaded inbound waybill per staging/yard origin location
+    assert len(loaded) == 2
+    assert all(w["required_car_type"] == "gondola" for w in loaded)
 
 
 def test_wildcard_car_type_creates_generic_empty(client, db_session):

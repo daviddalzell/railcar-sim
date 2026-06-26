@@ -61,7 +61,9 @@ def _find_best_staging_for_car(unassigned, staging_ids, car_type, loaded_only=Fa
         if (w.origin_id in staging_ids
                 and w.destination_id is not None
                 and _car_type_matches(w.required_car_type, car_type)):
-            counts[w.origin_id] = counts.get(w.origin_id, 0) + 1
+            # Loaded waybills score higher so the car starts where real work is available
+            weight = 2 if not w.is_empty else 1
+            counts[w.origin_id] = counts.get(w.origin_id, 0) + weight
     if not counts:
         return None
     return max(counts, key=lambda k: counts[k])
@@ -216,6 +218,14 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
         db.query(Waybill).delete(synchronize_session=False)
         db.commit()
 
+    # Generate waybills for every staging and yard location so cars at any
+    # dispatch point get full inbound/outbound/empty routes.
+    origin_locations = db.query(Location).filter(
+        Location.location_type.in_(["staging", "yard"])
+    ).all()
+    if not origin_locations:
+        return {"created": 0, "skipped": 0, "waybills": []}
+
     industries = db.query(Industry).all()
     map_rows = db.query(CommodityCarTypeMap).all()
     commodity_map = {r.commodity: r.car_type for r in map_rows}
@@ -224,17 +234,31 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
     skipped = 0
     new_waybills = []
 
+    def parse_csv(s):
+        return [t.strip() for t in (s or "").split(",") if t.strip()]
+
+    def fallback_type(types):
+        t = [x for x in types if x.lower() not in _WILDCARD_TYPES]
+        return t[0] if t else None
+
+    def _wb_exists(name, ind_id, origin_id):
+        return db.query(Waybill).filter(
+            Waybill.industry_id == ind_id,
+            Waybill.name == name,
+            Waybill.origin_id == origin_id,
+        ).first()
+
+    def _add(wb):
+        nonlocal created
+        db.add(wb)
+        db.flush()
+        new_waybills.append(wb)
+        created += 1
+
     for ind in industries:
         if not ind.location_id:
             continue
         role = getattr(ind, "industry_role", "consumer")
-
-        def parse_csv(s):
-            return [t.strip() for t in (s or "").split(",") if t.strip()]
-
-        def fallback_type(types):
-            t = [x for x in types if x.lower() not in _WILDCARD_TYPES]
-            return t[0] if t else None
 
         # Inbound fields: commodities + car types for receiving direction
         inbound_commodities = parse_csv(ind.commodities)
@@ -242,7 +266,6 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
         inbound_fallback    = fallback_type(inbound_raw_types)
 
         # Outbound fields: commodities + car types for shipping direction
-        # Fall back to inbound fields so existing single-direction data keeps working
         outbound_commodities = parse_csv(ind.outbound_commodities or ind.commodities)
         outbound_raw_types   = parse_csv(ind.outbound_car_types or ind.accepted_car_types)
         outbound_fallback    = fallback_type(outbound_raw_types)
@@ -253,90 +276,86 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
         if not inbound_commodities and not outbound_commodities:
             continue
 
-        def _wb_exists(name, _ind_id=ind.id):
-            return db.query(Waybill).filter(
-                Waybill.industry_id == _ind_id, Waybill.name == name
-            ).first()
+        inbound_empty_types  = [ct for ct in inbound_raw_types  if ct.lower() not in _WILDCARD_TYPES]
+        outbound_empty_types = [ct for ct in outbound_raw_types if ct.lower() not in _WILDCARD_TYPES]
 
-        def _add(wb):
-            nonlocal created
-            db.add(wb)
-            db.flush()
-            new_waybills.append(wb)
-            created += 1
+        for origin_loc in origin_locations:
+            origin_id = origin_loc.id
 
-        # Inbound loaded waybills (staging → industry)
-        if has_inbound:
-            for commodity in inbound_commodities:
-                req_type = commodity_map.get(commodity.lower(), inbound_fallback)
-                in_name = f"{commodity} → {ind.name}"
-                if not _wb_exists(in_name):
-                    _add(Waybill(
-                        name=in_name,
-                        origin_id=data.origin_location_id,
-                        destination_id=ind.location_id,
-                        industry_id=ind.id,
-                        commodity=commodity,
-                        required_car_type=req_type,
-                        is_empty=False,
-                    ))
-                else:
-                    skipped += 1
+            # Inbound loaded waybills (staging/yard → industry)
+            if has_inbound:
+                for commodity in inbound_commodities:
+                    req_type = commodity_map.get(commodity.lower(), inbound_fallback)
+                    in_name = f"{commodity} → {ind.name}"
+                    if not _wb_exists(in_name, ind.id, origin_id):
+                        _add(Waybill(
+                            name=in_name,
+                            origin_id=origin_id,
+                            destination_id=ind.location_id,
+                            industry_id=ind.id,
+                            commodity=commodity,
+                            required_car_type=req_type,
+                            is_empty=False,
+                        ))
+                    else:
+                        skipped += 1
 
-        # Outbound loaded waybills (industry → staging)
-        if has_outbound:
-            for commodity in outbound_commodities:
-                req_type = commodity_map.get(commodity.lower(), outbound_fallback)
-                out_name = f"{commodity} ← {ind.name}"
-                if not _wb_exists(out_name):
-                    _add(Waybill(
-                        name=out_name,
-                        origin_id=ind.location_id,
-                        destination_id=data.origin_location_id,
-                        industry_id=ind.id,
-                        commodity=commodity,
-                        required_car_type=req_type,
-                        is_empty=False,
-                    ))
-                else:
-                    skipped += 1
+            # Outbound loaded waybills (industry → staging/yard)
+            if has_outbound:
+                for commodity in outbound_commodities:
+                    req_type = commodity_map.get(commodity.lower(), outbound_fallback)
+                    out_name = f"{commodity} ← {ind.name}"
+                    if not _wb_exists(out_name, ind.id, ind.location_id):
+                        _add(Waybill(
+                            name=out_name,
+                            origin_id=ind.location_id,
+                            destination_id=origin_id,
+                            industry_id=ind.id,
+                            commodity=commodity,
+                            required_car_type=req_type,
+                            is_empty=False,
+                        ))
+                    else:
+                        skipped += 1
 
-        # Empty return waybills (industry → staging), one per inbound car type
-        inbound_empty_types = [ct for ct in inbound_raw_types if ct.lower() not in _WILDCARD_TYPES]
-        if inbound_empty_types:
-            for ct in inbound_empty_types:
-                n = f"← {ind.name} (empty {ct})"
-                if not _wb_exists(n):
-                    _add(Waybill(name=n, origin_id=ind.location_id,
-                        destination_id=data.origin_location_id, industry_id=ind.id,
-                        commodity="", required_car_type=ct, is_empty=True))
-                else:
-                    skipped += 1
-        elif has_inbound:
-            n = f"← {ind.name} (empty)"
-            if not _wb_exists(n):
-                _add(Waybill(name=n, origin_id=ind.location_id,
-                    destination_id=data.origin_location_id, industry_id=ind.id,
-                    commodity="", required_car_type=None, is_empty=True))
-
-        # Empty delivery waybills (staging → industry), one per outbound car type
-        if has_outbound:
-            outbound_empty_types = [ct for ct in outbound_raw_types if ct.lower() not in _WILDCARD_TYPES]
-            if outbound_empty_types:
-                for ct in outbound_empty_types:
-                    n = f"→ {ind.name} (empty {ct})"
-                    if not _wb_exists(n):
-                        _add(Waybill(name=n, origin_id=data.origin_location_id,
-                            destination_id=ind.location_id, industry_id=ind.id,
+            # Empty return waybills (industry → staging/yard), one per inbound car type per origin
+            if inbound_empty_types:
+                for ct in inbound_empty_types:
+                    n = f"← {ind.name} (empty {ct})"
+                    if not _wb_exists(n, ind.id, ind.location_id):
+                        _add(Waybill(name=n, origin_id=ind.location_id,
+                            destination_id=origin_id, industry_id=ind.id,
                             commodity="", required_car_type=ct, is_empty=True))
                     else:
                         skipped += 1
-            else:
-                n = f"→ {ind.name} (empty)"
-                if not _wb_exists(n):
-                    _add(Waybill(name=n, origin_id=data.origin_location_id,
-                        destination_id=ind.location_id, industry_id=ind.id,
-                        commodity="", required_car_type=outbound_fallback, is_empty=True))
+            elif has_inbound:
+                n = f"← {ind.name} (empty)"
+                if not _wb_exists(n, ind.id, ind.location_id):
+                    _add(Waybill(name=n, origin_id=ind.location_id,
+                        destination_id=origin_id, industry_id=ind.id,
+                        commodity="", required_car_type=None, is_empty=True))
+                else:
+                    skipped += 1
+
+            # Empty delivery waybills (staging/yard → industry), one per outbound car type per origin
+            if has_outbound:
+                if outbound_empty_types:
+                    for ct in outbound_empty_types:
+                        n = f"→ {ind.name} (empty {ct})"
+                        if not _wb_exists(n, ind.id, origin_id):
+                            _add(Waybill(name=n, origin_id=origin_id,
+                                destination_id=ind.location_id, industry_id=ind.id,
+                                commodity="", required_car_type=ct, is_empty=True))
+                        else:
+                            skipped += 1
+                else:
+                    n = f"→ {ind.name} (empty)"
+                    if not _wb_exists(n, ind.id, origin_id):
+                        _add(Waybill(name=n, origin_id=origin_id,
+                            destination_id=ind.location_id, industry_id=ind.id,
+                            commodity="", required_car_type=outbound_fallback, is_empty=True))
+                    else:
+                        skipped += 1
 
     db.commit()
     for w in new_waybills:
@@ -351,7 +370,7 @@ def auto_assign_waybills(db: Session = Depends(get_db)):
 
     staging_ids = {
         loc.id for loc in
-        db.query(Location).filter(Location.location_type == "staging").all()
+        db.query(Location).filter(Location.location_type.in_(["staging", "yard"])).all()
     }
     if not staging_ids:
         return {"assigned": 0, "cars_updated": [car_to_dict(c) for c in cars]}

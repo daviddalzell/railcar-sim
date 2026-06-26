@@ -1016,9 +1016,10 @@ function buildSlotOptions(expectedOriginId, carType, currentWaybillId) {
     if (!w.origin_id) return true;
     return w.origin_id === expectedOriginId;
   }
-  const eligible = waybillPool.filter(w =>
-    (w.id === currentWaybillId) || (typeMatches(w) && originMatches(w))
-  );
+  const typeFiltered = waybillPool.filter(w => w.id === currentWaybillId || typeMatches(w));
+  // Prefer origin-matched options; fall back to all type-matched if none found
+  const originFiltered = typeFiltered.filter(w => w.id === currentWaybillId || originMatches(w));
+  const eligible = originFiltered.length > 0 ? originFiltered : typeFiltered;
   return '<option value="">— empty —</option>' +
     eligible.map(w =>
       `<option value="${w.id}">${w.name || w.id}` +
@@ -1187,9 +1188,6 @@ $("#btn-cancel-waybill-edit").addEventListener("click", () => $("#waybill-edit-d
 
 // ── Generate waybills dialog ──────────────────────────────────────────────────
 $("#btn-generate-waybills").addEventListener("click", () => {
-  const sel = $("#gen-origin-location");
-  sel.innerHTML = '<option value="">— pick a location —</option>' +
-    locations.map(l => `<option value="${l.id}">${l.name} (${l.location_type})</option>`).join("");
   $("#generate-waybills-dialog").showModal();
 });
 
@@ -1197,8 +1195,6 @@ $("#close-generate-dialog").addEventListener("click", () => $("#generate-waybill
 $("#btn-cancel-generate").addEventListener("click", () => $("#generate-waybills-dialog").close());
 
 $("#btn-confirm-generate").addEventListener("click", async () => {
-  const originId = $("#gen-origin-location").value;
-  if (!originId) { showToast("Please select an origin location.", "warn"); return; }
   const replace = document.querySelector('input[name="gen-mode"]:checked')?.value === "replace";
   const btn = $("#btn-confirm-generate");
   if (replace && !btn.dataset.confirm) {
@@ -1213,7 +1209,7 @@ $("#btn-confirm-generate").addEventListener("click", async () => {
   delete btn.dataset.confirm;
   try {
     await withLoading(btn, "Generating…", async () => {
-      const result = await api("POST", "/api/generate-waybills", { origin_location_id: parseInt(originId), replace });
+      const result = await api("POST", "/api/generate-waybills", { replace });
       $("#generate-waybills-dialog").close();
       showToast(`Created ${result.created} waybill${result.created !== 1 ? "s" : ""}, skipped ${result.skipped}.`, "success");
       await loadWaybillPool();
