@@ -1,5 +1,6 @@
 import asyncio
 import json
+import random
 import time
 from typing import AsyncGenerator
 
@@ -8,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Car, Location, MovementLog, SessionClock
+from models import Car, Location, MovementLog, SessionClock, Waybill
 from converters import car_to_dict, clock_to_dict, start_session_clock as _start_session_clock, clear_session_clock
 from schemas import LayoutSettingsUpdate, SessionEndRequest
 from converters import get_or_create_settings, settings_to_dict
@@ -50,15 +51,17 @@ def _get_active_waybill(car: Car):
     return next((w for w in car.waybills if w.slot_index == car.active_waybill_slot), None)
 
 
-def _advance_slot(car: Car) -> int:
+def _advance_slot(car: Car) -> tuple[int, bool]:
+    """Returns (new_slot, cycle_complete). cycle_complete is True when the car wraps back to slot 0."""
     assigned = sorted(w.slot_index for w in car.waybills if w.slot_index is not None)
     if not assigned:
-        return car.active_waybill_slot
+        return car.active_waybill_slot, False
     try:
         idx = assigned.index(car.active_waybill_slot)
-        return assigned[(idx + 1) % len(assigned)]
+        wrapped = idx == len(assigned) - 1
+        return assigned[(idx + 1) % len(assigned)], wrapped
     except ValueError:
-        return assigned[0]
+        return assigned[0], False
 
 
 def _build_session_plan(db: Session) -> dict:
@@ -85,9 +88,12 @@ def _build_session_plan(db: Session) -> dict:
             else:
                 departures.append(car)
 
-    arrivals   = sorted(arrivals,   key=lambda c: c.id)[:5]
-    departures = sorted(departures, key=lambda c: c.id)[:min(5, max(len(arrivals), len(departures)))]
-    spots      = sorted(spots,      key=lambda c: c.id)[:5]
+    random.shuffle(arrivals)
+    arrivals = arrivals[:5]
+    random.shuffle(departures)
+    departures = departures[:min(5, max(len(arrivals), len(departures)))]
+    random.shuffle(spots)
+    spots = spots[:5]
 
     if len(departures) < len(arrivals):
         warnings.append(
@@ -209,6 +215,11 @@ def session_plan(db: Session = Depends(get_db)):
 
 @router.post("/session/end")
 def session_end(req: SessionEndRequest, db: Session = Depends(get_db)):
+    from routers.automation import auto_assign_one_car
+    staging_ids = {l.id for l in db.query(Location).filter(
+        Location.location_type.in_(["staging", "yard"])
+    ).all()}
+
     updated = []
     for item in req.cars:
         car = db.get(Car, item.car_id)
@@ -220,8 +231,20 @@ def session_end(req: SessionEndRequest, db: Session = Depends(get_db)):
             car.current_location_id = wb.destination_id
             db.add(MovementLog(car_id=car.id, from_location_id=old_loc,
                                to_location_id=wb.destination_id, note="Session move"))
-            car.active_waybill_slot = _advance_slot(car)
+            new_slot, cycle_complete = _advance_slot(car)
+            car.active_waybill_slot = new_slot
             car.cp_session_count = 0
+            if cycle_complete:
+                # Full cycle done — clear all waybills and assign a fresh random route
+                for w in list(car.waybills):
+                    w.car_id = None
+                    w.slot_index = None
+                db.flush()
+                unassigned = db.query(Waybill).filter(Waybill.car_id.is_(None)).all()
+                random.shuffle(unassigned)
+                auto_assign_one_car(car, unassigned, staging_ids, db,
+                                    starting_loc=car.current_location_id)
+                car.active_waybill_slot = 0
         elif item.status == "cp" and item.location_id:
             car.current_location_id = item.location_id
             db.add(MovementLog(car_id=car.id, from_location_id=old_loc,

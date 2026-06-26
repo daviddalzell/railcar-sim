@@ -1,3 +1,4 @@
+import random
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -129,6 +130,8 @@ def auto_assign_one_car(car, unassigned: list, staging_ids: set, db: Session, st
     open_slots = [s for s in range(4) if s not in occupied]
     if not open_slots:
         return 0
+
+    random.shuffle(unassigned)
 
     always_empty = any(t in car.car_type.lower() for t in _ALWAYS_EMPTY_RETURN_TYPES)
 
