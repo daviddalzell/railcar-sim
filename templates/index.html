@@ -10,6 +10,10 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Rose:wght@300;400;500;600;700&family=Montserrat+Alternates:wght@400;500;600;700;800;900&display=swap" />
   <link rel="stylesheet" href="/static/style.css" />
   <link rel="icon" href="data:,">
+  {% if supabase_url %}
+  <meta name="supabase-url"      content="{{ supabase_url }}">
+  <meta name="supabase-anon-key" content="{{ supabase_anon_key }}">
+  {% endif %}
 </head>
 <body>
   <header class="container-fluid">
@@ -879,6 +883,40 @@
   </dialog>
 
   <div id="toast-container"></div>
+
+  {% if supabase_url %}
+  <!-- Supabase JS auth — only loaded in cloud (SUPABASE_URL is set) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    (async () => {
+      const url = document.querySelector('meta[name="supabase-url"]').content;
+      const key = document.querySelector('meta[name="supabase-anon-key"]').content;
+      const sb  = supabase.createClient(url, key);
+
+      // Persist token for api() helper in app.js
+      function storeSession(session) {
+        if (session?.access_token) {
+          sessionStorage.setItem("waypoint_token", session.access_token);
+        } else {
+          sessionStorage.removeItem("waypoint_token");
+        }
+      }
+
+      // Refresh token silently whenever Supabase rotates it
+      sb.auth.onAuthStateChange((_event, session) => storeSession(session));
+
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        storeSession(session);
+      } else {
+        // No session — send to Supabase hosted login, return here after
+        const loginUrl = `${url}/auth/v1/authorize?provider=email&redirect_to=${encodeURIComponent(location.href)}`;
+        window.location.href = loginUrl;
+      }
+    })();
+  </script>
+  {% endif %}
+
   <script src="/static/app.js"></script>
 </body>
 </html>

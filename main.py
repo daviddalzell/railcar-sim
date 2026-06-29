@@ -1,9 +1,22 @@
+import logging
 import os
 
 import pillow_heif
 pillow_heif.register_heif_opener()
 from dotenv import load_dotenv
 load_dotenv()
+
+# Structured JSON logging when running in cloud; plain text locally
+if os.environ.get("LOG_FORMAT") == "json":
+    from pythonjsonlogger.json import JsonFormatter
+    handler = logging.StreamHandler()
+    handler.setFormatter(JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    logging.root.handlers = [handler]
+    logging.root.setLevel(logging.INFO)
+else:
+    logging.basicConfig(level=logging.INFO)
+
+logger = logging.getLogger("waypoint")
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -69,12 +82,23 @@ _PROVIDER_LABELS = {
 }
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.get("/")
 def index(request: Request):
     provider = os.environ.get("VISION_PROVIDER", "anthropic")
     vision_label = _PROVIDER_LABELS.get(provider, f"{provider} Vision")
     return templates.TemplateResponse(
-        "index.html", {"request": request, "vision_label": vision_label}
+        "index.html", {
+            "request": request,
+            "vision_label": vision_label,
+            "supabase_url": os.environ.get("SUPABASE_URL", ""),
+            "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", ""),
+            "auth_disabled": bool(os.environ.get("AUTH_DISABLED")),
+        }
     )
 
 
