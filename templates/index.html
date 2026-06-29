@@ -885,6 +885,23 @@
   <div id="toast-container"></div>
 
   {% if supabase_url %}
+  <!-- Login modal — shown when no active session -->
+  <dialog id="login-dialog" style="max-width:360px">
+    <article>
+      <h3>Sign in to Waypoint</h3>
+      <form id="login-form" onsubmit="return false">
+        <label>Email
+          <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email">
+        </label>
+        <label>Password
+          <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password">
+        </label>
+        <p id="login-error" style="color:var(--pico-del-color,red);display:none"></p>
+        <button type="submit" id="login-submit">Sign in</button>
+      </form>
+    </article>
+  </dialog>
+
   <!-- Supabase JS auth — only loaded in cloud (SUPABASE_URL is set) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -893,7 +910,6 @@
       const key = document.querySelector('meta[name="supabase-anon-key"]').content;
       const sb  = supabase.createClient(url, key);
 
-      // Persist token for api() helper in app.js
       function storeSession(session) {
         if (session?.access_token) {
           sessionStorage.setItem("waypoint_token", session.access_token);
@@ -902,16 +918,34 @@
         }
       }
 
-      // Refresh token silently whenever Supabase rotates it
       sb.auth.onAuthStateChange((_event, session) => storeSession(session));
 
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
         storeSession(session);
       } else {
-        // No session — send to Supabase hosted login, return here after
-        const loginUrl = `${url}/auth/v1/authorize?provider=email&redirect_to=${encodeURIComponent(location.href)}`;
-        window.location.href = loginUrl;
+        // No session — show login modal
+        const dlg = document.getElementById("login-dialog");
+        dlg.showModal();
+        document.getElementById("login-form").addEventListener("submit", async () => {
+          const email    = document.getElementById("login-email").value.trim();
+          const password = document.getElementById("login-password").value;
+          const errEl    = document.getElementById("login-error");
+          const btn      = document.getElementById("login-submit");
+          btn.disabled   = true;
+          btn.textContent = "Signing in…";
+          errEl.style.display = "none";
+          const { data, error } = await sb.auth.signInWithPassword({ email, password });
+          if (error) {
+            errEl.textContent = error.message;
+            errEl.style.display = "";
+            btn.disabled = false;
+            btn.textContent = "Sign in";
+          } else {
+            storeSession(data.session);
+            dlg.close();
+          }
+        });
       }
     })();
   </script>
