@@ -96,6 +96,15 @@ function _authToken() {
   return sessionStorage.getItem("waypoint_token") || "";
 }
 
+// Returns a usable <img src> value from a photo_path (local path or CDN URL)
+// and optional pre-computed photo_url from the API.
+function photoSrc(path, url) {
+  if (url) return url;
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  return "/" + path;
+}
+
 async function api(method, path, body) {
   const opts = { method, headers: {} };
   const token = _authToken();
@@ -351,7 +360,7 @@ function carCardHTML(car) {
     <div class="car-card${needsMove ? ' car-needs-move' : ''}" data-id="${car.id}">
       <div class="car-thumb">
         ${car.photo_path
-          ? `<img src="/${car.photo_path}" alt="${car.reporting_marks} ${car.car_number}" />`
+          ? `<img src="${photoSrc(car.photo_path, car.photo_url)}" alt="${car.reporting_marks} ${car.car_number}" />`
           : defImg
             ? `<img src="${defImg}" alt="${car.car_type}" class="default-car-img" />`
             : `<div class="no-photo">${car.car_type}</div>`}
@@ -372,7 +381,7 @@ function carCardHTML(car) {
 function renderPowerStrip(power, caboose, editable = false) {
   const locos = power || [];
   function powerThumb(c) {
-    const img = c.photo_path ? `/${c.photo_path}` : defaultCarImage(c.car_type);
+    const img = c.photo_path ? photoSrc(c.photo_path, c.photo_url) : defaultCarImage(c.car_type);
     return img
       ? `<img src="${img}" alt="${c.car_type}" />`
       : `<span style="font-size:0.65rem">${c.car_type}</span>`;
@@ -711,7 +720,7 @@ async function processPhotoFile(file) {
       const result = await api("POST", "/api/cars/upload", form);
       if (result.photo_path) {
         photoPath = result.photo_path;
-        $("#preview-img").src = "/" + result.photo_path;
+        $("#preview-img").src = photoSrc(result.photo_path);
         show($("#upload-preview"));
       }
       hide($("#default-image-offer"));
@@ -727,7 +736,7 @@ async function processPhotoFile(file) {
   try {
     const result = await api("POST", "/api/cars/upload", form);
     if (result.photo_path) {
-      $("#preview-img").src = "/" + result.photo_path;
+      $("#preview-img").src = photoSrc(result.photo_path);
       show($("#upload-preview"));
     }
     applyAnalysis(result);
@@ -806,7 +815,7 @@ async function openCarDetail(carId) {
   $("#detail-body").innerHTML = `
     <div class="detail-grid">
       ${car.photo_path
-        ? `<img src="/${car.photo_path}" class="detail-photo" />`
+        ? `<img src="${photoSrc(car.photo_path, car.photo_url)}" class="detail-photo" />`
         : detailDefImg
           ? `<img src="${detailDefImg}" class="detail-photo default-car-img" />`
           : ""}
@@ -882,7 +891,7 @@ $("#btn-edit-car").addEventListener("click", () => {
   const btnText = $("#edit-photo-btn-text");
   $("#edit-photo-path").value = car.photo_path || "";
   if (car.photo_path) {
-    preview.src = "/" + car.photo_path;
+    preview.src = photoSrc(car.photo_path, car.photo_url);
     preview.style.display = "block";
     btnText.textContent = "📷 Upload Image";
   } else {
@@ -922,7 +931,7 @@ $("#edit-photo-input").addEventListener("change", async () => {
     if (result.photo_path) {
       $("#edit-photo-path").value = result.photo_path;
       const preview = $("#edit-photo-preview");
-      preview.src = "/" + result.photo_path;
+      preview.src = photoSrc(result.photo_path);
       preview.style.display = "block";
       btnText.textContent = "📷 Upload Image";
     } else {
@@ -1392,7 +1401,7 @@ async function loadOperations() {
     const dest = wb?.destination_name;
     const opsDefImg = defaultCarImage(car.car_type);
     const thumb = car.photo_path
-      ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="/${car.photo_path}" alt="" /></div>`
+      ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="${photoSrc(car.photo_path, car.photo_url)}" alt="" /></div>`
       : opsDefImg
         ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="${opsDefImg}" alt="${car.car_type}" style="width:100%;height:100%;object-fit:contain;" /></div>`
         : `<div class="session-car-thumb no-photo-thumb clickable-thumb" data-id="${car.id}">${car.car_type}</div>`;
@@ -3012,7 +3021,7 @@ function renderConsistCard(plan) {
   const hasPower = assignedPowerIds.length > 0;
 
   function carRow(c) {
-    const imgSrc = c.photo_path ? `/${c.photo_path}` : (defaultCarImage(c.car_type) || null);
+    const imgSrc = c.photo_path ? photoSrc(c.photo_path, c.photo_url) : (defaultCarImage(c.car_type) || null);
     const thumb = imgSrc
       ? `<div class="session-car-thumb"><img src="${imgSrc}" alt="${c.car_type}" /></div>`
       : `<div class="session-car-thumb no-photo-thumb">${c.car_type}</div>`;
