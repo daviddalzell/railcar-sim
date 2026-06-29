@@ -81,3 +81,29 @@ def photo_url(photo_path: str) -> str:
     if photo_path.startswith("http"):
         return photo_path          # already a full CDN URL
     return "/" + photo_path.replace("\\", "/")   # local: prepend /
+
+
+def list_uploaded_files() -> list[dict]:
+    """List user-uploaded files (not static defaults). Returns [{path, url}]."""
+    if _using_supabase():
+        client = _get_client()
+        try:
+            items = client.storage.from_(_BUCKET).list("uploads")
+        except Exception:
+            return []
+        result = []
+        for item in items:
+            if not item.get("name"):
+                continue
+            storage_path = f"uploads/{item['name']}"
+            url = client.storage.from_(_BUCKET).get_public_url(storage_path)
+            result.append({"path": url, "url": url})
+        return result
+    else:
+        UPLOADS_DIR.mkdir(exist_ok=True)
+        result = []
+        _img_exts = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+        for f in sorted(UPLOADS_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            if f.is_file() and f.suffix.lower() in _img_exts:
+                result.append({"path": str(f), "url": "/" + str(f)})
+        return result
