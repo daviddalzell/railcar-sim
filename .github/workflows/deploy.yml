@@ -62,5 +62,13 @@ jobs:
 
       - name: Smoke test — health check
         run: |
-          sleep 10
-          curl --fail "${{ secrets.WAYPOINT_URL }}/health"
+          for i in $(seq 1 12); do
+            echo "Attempt $i/12..."
+            if curl --silent --fail "${{ secrets.WAYPOINT_URL }}/health"; then
+              echo "Health check passed."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Health check failed after 2 minutes."
+          exit 1
