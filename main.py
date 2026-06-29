@@ -43,6 +43,7 @@ from routers import (
     uploads,
     operations,
     export_import,
+    settings,
 )
 
 _auth = [Depends(get_current_user)]
@@ -118,5 +119,6 @@ app.include_router(automation.router,    dependencies=_auth)
 app.include_router(uploads.router,       dependencies=_auth)
 app.include_router(operations.router,    dependencies=_auth)
 app.include_router(export_import.router, dependencies=_auth)
+app.include_router(settings.router,      dependencies=_auth)
 # SSE endpoint registered without auth — EventSource can't send headers
 app.include_router(session.sse_router)

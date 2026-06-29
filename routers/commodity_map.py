@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from database import get_db
 from models import CommodityCarTypeMap
@@ -40,13 +41,14 @@ def seed_commodity_map(db: Session = Depends(get_db)):
 
 
 @router.post("/commodity-car-type-map/suggest")
-def suggest_commodity_endpoint(data: CommoditySuggestRequest, db: Session = Depends(get_db)):
-    if not get_provider().is_available():
+def suggest_commodity_endpoint(request: Request, data: CommoditySuggestRequest, db: Session = Depends(get_db)):
+    tenant = getattr(request.state, "tenant", None)
+    if not get_provider(tenant).is_available():
         raise HTTPException(503, "No AI provider available — check your API key settings")
     existing = {r.commodity: r.car_type for r in db.query(CommodityCarTypeMap).all()}
     try:
         from vision import suggest_commodity_car_type
-        result = suggest_commodity_car_type(data.commodity, existing)
+        result = suggest_commodity_car_type(data.commodity, existing, tenant)
     except Exception as e:
         raise HTTPException(500, str(e))
     return {"car_type": result.get("car_type", "boxcar")}

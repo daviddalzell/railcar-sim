@@ -131,6 +131,9 @@ def _normalize(data: dict) -> dict:
 # ── Abstract base ─────────────────────────────────────────────────────────────
 
 class VisionProvider(ABC):
+    def __init__(self, api_key: str | None = None):
+        self._api_key = api_key
+
     @abstractmethod
     def analyze(self, image_path: str) -> dict: ...
 
@@ -141,14 +144,17 @@ class VisionProvider(ABC):
 # ── Anthropic ─────────────────────────────────────────────────────────────────
 
 class AnthropicVisionProvider(VisionProvider):
+    def _key(self) -> str | None:
+        return self._api_key or os.environ.get("ANTHROPIC_API_KEY")
+
     def is_available(self) -> bool:
-        return bool(os.environ.get("ANTHROPIC_API_KEY"))
+        return bool(self._key())
 
     def analyze(self, image_path: str) -> dict:
         import anthropic
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        api_key = self._key()
         if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY environment variable not set")
+            raise RuntimeError("No Anthropic API key configured")
 
         b64, media_type = _load_image(image_path)
         client = anthropic.Anthropic(api_key=api_key)
@@ -171,14 +177,17 @@ class AnthropicVisionProvider(VisionProvider):
 # ── OpenAI ────────────────────────────────────────────────────────────────────
 
 class OpenAIVisionProvider(VisionProvider):
+    def _key(self) -> str | None:
+        return self._api_key or os.environ.get("OPENAI_API_KEY")
+
     def is_available(self) -> bool:
-        return bool(os.environ.get("OPENAI_API_KEY"))
+        return bool(self._key())
 
     def analyze(self, image_path: str) -> dict:
         import openai
-        api_key = os.environ.get("OPENAI_API_KEY")
+        api_key = self._key()
         if not api_key:
-            raise RuntimeError("OPENAI_API_KEY environment variable not set")
+            raise RuntimeError("No OpenAI API key configured")
 
         b64, media_type = _load_image(image_path)
         client = openai.OpenAI(api_key=api_key)
@@ -286,14 +295,17 @@ class OllamaVisionProvider(VisionProvider):
 # ── Gemini ────────────────────────────────────────────────────────────────────
 
 class GeminiVisionProvider(VisionProvider):
+    def _key(self) -> str | None:
+        return self._api_key or os.environ.get("GEMINI_API_KEY")
+
     def is_available(self) -> bool:
-        return bool(os.environ.get("GEMINI_API_KEY"))
+        return bool(self._key())
 
     def analyze(self, image_path: str) -> dict:
         from google import genai
         from google.genai import types
 
-        api_key = os.environ.get("GEMINI_API_KEY")
+        api_key = self._key()
         model_name = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
         client = genai.Client(api_key=api_key)
@@ -320,27 +332,41 @@ _PROVIDERS: dict[str, type[VisionProvider]] = {
 }
 
 
-def get_provider() -> VisionProvider:
-    name = os.environ.get("VISION_PROVIDER", "anthropic")
+def get_provider(tenant=None) -> VisionProvider:
+    if tenant and getattr(tenant, "vision_provider", None):
+        name = tenant.vision_provider
+    else:
+        name = os.environ.get("VISION_PROVIDER", "anthropic")
     cls = _PROVIDERS.get(name)
     if not cls:
         raise ValueError(f"Unknown VISION_PROVIDER '{name}'. Valid options: {list(_PROVIDERS)}")
-    return cls()
+    api_key = getattr(tenant, f"{name}_api_key", None) if tenant else None
+    return cls(api_key=api_key)
 
 
-def analyze_car_photo(image_path: str) -> dict:
-    return get_provider().analyze(image_path)
+def analyze_car_photo(image_path: str, tenant=None) -> dict:
+    return get_provider(tenant).analyze(image_path)
 
 
-def _text_complete(prompt: str) -> str:
-    """Run a text-only prompt using the configured VISION_PROVIDER."""
-    provider = os.environ.get("VISION_PROVIDER", "anthropic")
+def _text_complete(prompt: str, tenant=None) -> str:
+    """Run a text-only prompt using the configured provider, with optional tenant key override."""
+    if tenant and getattr(tenant, "vision_provider", None):
+        provider = tenant.vision_provider
+    else:
+        provider = os.environ.get("VISION_PROVIDER", "anthropic")
+
+    def _key(name: str) -> str | None:
+        if tenant:
+            k = getattr(tenant, f"{name}_api_key", None)
+            if k:
+                return k
+        return os.environ.get(f"{name.upper()}_API_KEY")
 
     if provider == "anthropic":
         import anthropic
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        api_key = _key("anthropic")
         if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY not set")
+            raise RuntimeError("No Anthropic API key configured")
         client = anthropic.Anthropic(api_key=api_key)
         model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
         msg = call_with_retry(lambda: client.messages.create(
@@ -351,9 +377,9 @@ def _text_complete(prompt: str) -> str:
 
     if provider == "openai":
         import openai
-        api_key = os.environ.get("OPENAI_API_KEY")
+        api_key = _key("openai")
         if not api_key:
-            raise RuntimeError("OPENAI_API_KEY not set")
+            raise RuntimeError("No OpenAI API key configured")
         client = openai.OpenAI(api_key=api_key)
         model = os.environ.get("OPENAI_MODEL", "gpt-4o")
         resp = call_with_retry(lambda: client.chat.completions.create(
@@ -375,9 +401,9 @@ def _text_complete(prompt: str) -> str:
 
     if provider == "gemini":
         from google import genai
-        api_key = os.environ.get("GEMINI_API_KEY")
+        api_key = _key("gemini")
         if not api_key:
-            raise RuntimeError("GEMINI_API_KEY not set")
+            raise RuntimeError("No Gemini API key configured")
         model_name = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
         client = genai.Client(api_key=api_key)
         resp = call_with_retry(lambda: client.models.generate_content(model=model_name, contents=[prompt]))
@@ -386,7 +412,7 @@ def _text_complete(prompt: str) -> str:
     raise ValueError(f"Unknown VISION_PROVIDER '{provider}'")
 
 
-def suggest_commodity_car_type(commodity: str, existing_map: dict[str, str]) -> dict:
+def suggest_commodity_car_type(commodity: str, existing_map: dict[str, str], tenant=None) -> dict:
     """Return AI-suggested car type for a commodity, constrained to CAR_TYPES."""
     car_types_str = ", ".join(CAR_TYPES)
     existing_str = (
@@ -410,10 +436,10 @@ Return ONLY a JSON object with no markdown, no explanation:
   "car_type": "<one of the valid car types above>"
 }}"""
 
-    return _parse_json_response(_text_complete(prompt))
+    return _parse_json_response(_text_complete(prompt, tenant))
 
 
-def suggest_industry(description: str, existing_industries: list[str], known_commodities: list[str] | None = None) -> dict:
+def suggest_industry(description: str, existing_industries: list[str], known_commodities: list[str] | None = None, tenant=None) -> dict:
     """Return AI-suggested commodities, accepted_car_types, and industry_role for a new industry."""
     car_types_str = ", ".join(CAR_TYPES)
     existing_str = (", ".join(existing_industries)) if existing_industries else "none yet"
@@ -446,4 +472,4 @@ consumer = receives loaded cars only (e.g. factory consuming raw materials)
 producer = ships loaded cars only (e.g. mine, grain elevator)
 transload = both receives AND ships, potentially different commodities each direction (e.g. grain elevator receives grain, ships flour)"""
 
-    return _parse_json_response(_text_complete(prompt))
+    return _parse_json_response(_text_complete(prompt, tenant))

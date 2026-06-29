@@ -337,6 +337,7 @@ $$(".tab-link").forEach(link => {
     if (tab === "operations") loadOperations();
     if (tab === "waybills") loadWaybillPool();
     if (tab === "layout") loadLayout();
+    if (tab === "settings") loadSettings();
   });
 });
 
@@ -3355,6 +3356,56 @@ $("#btn-clear-all-plans").addEventListener("click", async () => {
     renderDispatchPlanList();
   } catch (err) {
     showToast("Error clearing consists: " + err.message, "error");
+  }
+});
+
+// ── Settings tab ──────────────────────────────────────────────────────────────
+async function loadSettings() {
+  const data = await api("GET", "/api/tenant-settings");
+  if (!data) return;
+
+  const providerSel = $("#settings-provider");
+  if (providerSel) providerSel.value = data.vision_provider || "gemini";
+
+  const note = $("#settings-source-note");
+  if (note) note.textContent = data.source === "env"
+    ? "Running in local dev mode — keys are read from environment variables and cannot be changed here."
+    : "";
+
+  const setStatus = (id, set) => {
+    const el = $(id);
+    if (el) el.textContent = set ? "✓ Key is set" : "No key configured";
+  };
+  setStatus("#settings-gemini-status",    data.gemini_key_set);
+  setStatus("#settings-anthropic-status", data.anthropic_key_set);
+  setStatus("#settings-openai-status",    data.openai_key_set);
+
+  const saveBtn = $("#settings-save-btn");
+  if (saveBtn && data.source === "env") saveBtn.disabled = true;
+}
+
+$("#settings-save-btn")?.addEventListener("click", async () => {
+  const msg = $("#settings-save-msg");
+  const body = {
+    vision_provider: $("#settings-provider")?.value || null,
+  };
+  const gemini    = $("#settings-gemini-key")?.value;
+  const anthropic = $("#settings-anthropic-key")?.value;
+  const openai    = $("#settings-openai-key")?.value;
+  if (gemini    !== undefined) body.gemini_api_key    = gemini;
+  if (anthropic !== undefined) body.anthropic_api_key = anthropic;
+  if (openai    !== undefined) body.openai_api_key    = openai;
+
+  const result = await api("PATCH", "/api/tenant-settings", body);
+  if (result?.ok) {
+    if (msg) msg.textContent = "Saved.";
+    // Clear key fields and reload status indicators
+    ["#settings-gemini-key", "#settings-anthropic-key", "#settings-openai-key"].forEach(id => {
+      const el = $(id);
+      if (el) el.value = "";
+    });
+    await loadSettings();
+    setTimeout(() => { if (msg) msg.textContent = ""; }, 3000);
   }
 });
 

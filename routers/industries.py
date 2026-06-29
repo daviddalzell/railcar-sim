@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from database import get_db
 from models import CommodityCarTypeMap, Industry, Waybill
@@ -46,14 +47,15 @@ def delete_industry(ind_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/industries/suggest")
-def suggest_industry_endpoint(data: IndustrySuggestRequest, db: Session = Depends(get_db)):
-    if not get_provider().is_available():
+def suggest_industry_endpoint(request: Request, data: IndustrySuggestRequest, db: Session = Depends(get_db)):
+    tenant = getattr(request.state, "tenant", None)
+    if not get_provider(tenant).is_available():
         raise HTTPException(503, "No AI provider available — check your API key settings")
     existing = [r.name for r in db.query(Industry).all()]
     known_commodities = [r.commodity for r in db.query(CommodityCarTypeMap).all()]
     try:
         from vision import suggest_industry
-        result = suggest_industry(data.description, existing, known_commodities)
+        result = suggest_industry(data.description, existing, known_commodities, tenant)
     except Exception as e:
         raise HTTPException(500, str(e))
     return {

@@ -27,6 +27,7 @@
         <li><a href="#" data-tab="waybills" class="tab-link">Waybills</a></li>
         <li><a href="#" data-tab="layout" class="tab-link">Layout Setup</a></li>
         <li><a href="#" data-tab="help" class="tab-link">Help</a></li>
+        <li><a href="#" data-tab="settings" class="tab-link">Settings</a></li>
       </ul>
     </nav>
   </header>
@@ -772,6 +773,44 @@
         </div>
       </div>
 
+    </section>
+
+    <section id="tab-settings" class="tab-panel hidden">
+      <div class="section-header"><h2>Settings</h2></div>
+      <div id="settings-content" style="max-width:520px;">
+        <p class="muted" id="settings-source-note"></p>
+
+        <label>AI Vision Provider
+          <select id="settings-provider">
+            <option value="gemini">Gemini (Google)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="openai">OpenAI (GPT-4o)</option>
+            <option value="ollama">Ollama (local)</option>
+          </select>
+        </label>
+
+        <fieldset>
+          <legend>API Keys</legend>
+          <p class="muted" style="font-size:0.85em;margin-bottom:0.75rem;">Leave a field blank to keep the existing key. Enter a new value to replace it.</p>
+          <label>Gemini API Key
+            <input type="password" id="settings-gemini-key" placeholder="AIza… (leave blank to keep current)" autocomplete="off" />
+            <small id="settings-gemini-status"></small>
+          </label>
+          <label>Anthropic API Key
+            <input type="password" id="settings-anthropic-key" placeholder="sk-ant-… (leave blank to keep current)" autocomplete="off" />
+            <small id="settings-anthropic-status"></small>
+          </label>
+          <label>OpenAI API Key
+            <input type="password" id="settings-openai-key" placeholder="sk-… (leave blank to keep current)" autocomplete="off" />
+            <small id="settings-openai-status"></small>
+          </label>
+        </fieldset>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;">
+          <button id="settings-save-btn">Save Settings</button>
+          <span id="settings-save-msg" class="muted" style="align-self:center;"></span>
+        </div>
+      </div>
     </section>
 
   </main>

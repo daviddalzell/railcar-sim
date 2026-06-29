@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from PIL import Image
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 import storage
 from database import get_db
@@ -62,7 +63,7 @@ def repair_orphaned_cars(db: Session = Depends(get_db)):
 
 
 @router.post("/cars/upload")
-async def upload_car_photo(file: UploadFile = File(...), skip_analysis: bool = False):
+async def upload_car_photo(request: Request, file: UploadFile = File(...), skip_analysis: bool = False):
     raw_bytes = await file.read()
     # Convert to JPEG in-memory
     try:
@@ -79,8 +80,9 @@ async def upload_car_photo(file: UploadFile = File(...), skip_analysis: bool = F
     if skip_analysis:
         return {"photo_path": photo_path, "car_type": "", "color": "", "car_number": "", "reporting_marks": ""}
 
+    tenant = getattr(request.state, "tenant", None)
     try:
-        provider = get_provider()
+        provider = get_provider(tenant)
     except ValueError:
         provider = None
 
@@ -93,10 +95,10 @@ async def upload_car_photo(file: UploadFile = File(...), skip_analysis: bool = F
             if photo_path.startswith("http"):
                 tmp = Path(f"/tmp/{filename}")
                 tmp.write_bytes(jpeg_bytes)
-                analysis = analyze_car_photo(str(tmp))
+                analysis = analyze_car_photo(str(tmp), tenant)
                 tmp.unlink(missing_ok=True)
             else:
-                analysis = analyze_car_photo(photo_path)
+                analysis = analyze_car_photo(photo_path, tenant)
         except Exception as e:
             analysis = {"car_type": "other", "color": "", "car_number": "", "reporting_marks": ""}
             analysis["_error"] = str(e)
@@ -106,7 +108,7 @@ async def upload_car_photo(file: UploadFile = File(...), skip_analysis: bool = F
 
 
 @router.post("/cars/analyze-photo")
-def analyze_existing_photo(data: AnalyzePhotoRequest):
+def analyze_existing_photo(request: Request, data: AnalyzePhotoRequest):
     photo_path = data.photo_path
     if photo_path.startswith("http"):
         # Supabase CDN URL — download to a temp file for analysis
@@ -122,8 +124,9 @@ def analyze_existing_photo(data: AnalyzePhotoRequest):
             raise HTTPException(404, "Photo not found")
         local_path = photo_path
         tmp = None
+    tenant = getattr(request.state, "tenant", None)
     try:
-        analysis = analyze_car_photo(local_path)
+        analysis = analyze_car_photo(local_path, tenant)
     except Exception as e:
         analysis = {"car_type": "other", "color": "", "car_number": "", "reporting_marks": ""}
         analysis["_error"] = str(e)
@@ -135,13 +138,14 @@ def analyze_existing_photo(data: AnalyzePhotoRequest):
 
 
 @router.post("/cars/stylize")
-def stylize_car_photo(data: StylizeRequest):
+def stylize_car_photo(request: Request, data: StylizeRequest):
     from google import genai
     from google.genai import types
 
-    api_key = os.environ.get("GEMINI_API_KEY")
+    tenant = getattr(request.state, "tenant", None)
+    api_key = (getattr(tenant, "gemini_api_key", None) if tenant else None) or os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        raise HTTPException(400, "GEMINI_API_KEY is not configured")
+        raise HTTPException(400, "No Gemini API key configured")
 
     photo_path = data.photo_path
     if photo_path.startswith("http"):
