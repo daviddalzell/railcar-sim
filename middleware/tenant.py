@@ -100,7 +100,15 @@ class TenantMiddleware(BaseHTTPMiddleware):
 
         tenant = _lookup(slug)
         if not tenant:
-            return Response(f"Unknown tenant: {slug!r}", status_code=404)
+            # Fall back to the default tenant if one is configured.
+            # Set DEFAULT_TENANT_SLUG to allow access via the Fly.io hostname
+            # or any non-subdomain URL before custom DNS is wired up.
+            import os
+            default_slug = os.environ.get("DEFAULT_TENANT_SLUG")
+            if default_slug:
+                tenant = _lookup(default_slug)
+            if not tenant:
+                return Response(f"Unknown tenant: {slug!r}", status_code=404)
 
         if tenant.subscription_status == "suspended":
             expires = tenant.subscription_expires_at
