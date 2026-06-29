@@ -1340,6 +1340,7 @@ async function loadOperations() {
               fromLocation: c.session_from_location_name,
               toLocation: c.session_to_location_name,
               photoPath: c.photo_path || null,
+              photoUrl: c.photo_url || null,
               industryName: c.active_waybill?.industry_name || null,
               toIndustryId: c.active_waybill?.industry_id ?? null,
               cpSessions: c.cp_session_count || 0,
@@ -1354,6 +1355,7 @@ async function loadOperations() {
               fromLocation: c.session_from_location_name,
               toLocation: c.session_to_location_name,
               photoPath: c.photo_path || null,
+              photoUrl: c.photo_url || null,
               industryName: c.active_waybill?.industry_name || null,
               toIndustryId: null,
               cpSessions: 0,
@@ -1368,6 +1370,7 @@ async function loadOperations() {
               fromLocation: c.session_from_location_name,
               toLocation: c.session_to_location_name,
               photoPath: c.photo_path || null,
+              photoUrl: c.photo_url || null,
               industryName: c.active_waybill?.industry_name || null,
               toIndustryId: c.active_waybill?.industry_id ?? null,
               cpSessions: c.cp_session_count || 0,
@@ -1587,7 +1590,7 @@ function renderActiveSession() {
     const statusClass = car.status === "done" ? " done" : car.status === "cp" ? " cp" : "";
     const sessionDefImg = defaultCarImage(car.carType);
     const thumb = car.photoPath
-      ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="/${car.photoPath}" alt="" /></div>`
+      ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="${photoSrc(car.photoPath, car.photoUrl)}" alt="" /></div>`
       : sessionDefImg
         ? `<div class="session-car-thumb clickable-thumb" data-id="${car.id}"><img src="${sessionDefImg}" alt="${car.carType}" style="width:100%;height:100%;object-fit:contain;" /></div>`
         : `<div class="session-car-thumb no-photo-thumb clickable-thumb" data-id="${car.id}">${car.carType}</div>`;
