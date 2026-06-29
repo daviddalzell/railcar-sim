@@ -15,6 +15,9 @@ from schemas import LayoutSettingsUpdate, SessionEndRequest
 from converters import get_or_create_settings, settings_to_dict
 
 router = APIRouter(prefix="/api", tags=["session"])
+# SSE events endpoint must be on a separate router so it can be registered
+# without auth — browser EventSource cannot send Authorization headers.
+sse_router = APIRouter(prefix="/api", tags=["session"])
 
 # ── SSE broadcast ─────────────────────────────────────────────────────────────
 
@@ -138,7 +141,7 @@ def update_settings(data: LayoutSettingsUpdate, db: Session = Depends(get_db)):
 
 # ── Session clock ─────────────────────────────────────────────────────────────
 
-@router.get("/session/clock/events")
+@sse_router.get("/session/clock/events")
 async def clock_events():
     queue: asyncio.Queue = asyncio.Queue()
     _sse_subscribers.add(queue)

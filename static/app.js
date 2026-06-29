@@ -92,8 +92,14 @@ async function toggleClockPause() {
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
+function _authToken() {
+  return sessionStorage.getItem("waypoint_token") || "";
+}
+
 async function api(method, path, body) {
   const opts = { method, headers: {} };
+  const token = _authToken();
+  if (token) opts.headers["Authorization"] = `Bearer ${token}`;
   if (body && !(body instanceof FormData)) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
@@ -101,6 +107,11 @@ async function api(method, path, body) {
     opts.body = body;
   }
   const res = await fetch(path, opts);
+  if (res.status === 401) {
+    // Token missing or expired — redirect to login if a Supabase login URL is configured
+    const loginUrl = document.querySelector("meta[name=supabase-login-url]")?.content;
+    if (loginUrl) { window.location.href = loginUrl; return; }
+  }
   if (res.status === 204) return null;
   let data;
   try {
@@ -271,7 +282,11 @@ $("#library-upload-input").addEventListener("change", async e => {
     try {
       const fd = new FormData();
       fd.append("file", files[i]);
-      const resp = await fetch("/api/cars/upload?skip_analysis=true", { method: "POST", body: fd });
+      const token = _authToken();
+      const resp = await fetch("/api/cars/upload?skip_analysis=true", {
+        method: "POST", body: fd,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!resp.ok) throw new Error(await resp.text());
     } catch {
       failed++;
@@ -899,8 +914,11 @@ $("#edit-photo-input").addEventListener("change", async () => {
   try {
     const fd = new FormData();
     fd.append("file", file);
-    const result = await fetch("/api/cars/upload?skip_analysis=true", { method: "POST", body: fd })
-      .then(r => r.json());
+    const token = _authToken();
+    const result = await fetch("/api/cars/upload?skip_analysis=true", {
+      method: "POST", body: fd,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then(r => r.json());
     if (result.photo_path) {
       $("#edit-photo-path").value = result.photo_path;
       const preview = $("#edit-photo-preview");
@@ -2598,7 +2616,11 @@ $("#import-cars-file").addEventListener("change", async e => {
     fd.append("file", file);
     fd.append("mode", "add");
     fd.append("dry_run", "true");
-    const result = await fetch("/api/import/cars", { method: "POST", body: fd }).then(async r => {
+    const token = _authToken();
+    const result = await fetch("/api/import/cars", {
+      method: "POST", body: fd,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then(async r => {
       if (!r.ok) throw new Error(await r.text());
       return r.json();
     });
@@ -2655,9 +2677,12 @@ $("#btn-import-cars-confirm").addEventListener("click", async () => {
 
   // Re-send the file with dry_run=false
   try {
+    const token = _authToken();
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     const resp = await fetch("/api/import/cars/commit", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ cars: importCarsPreviewData.rows, mode }),
     });
     const result = await resp.json();

@@ -13,6 +13,9 @@ from starlette.requests import Request
 from database import init_db
 from vision import get_provider, OllamaVisionProvider
 
+from fastapi import Depends
+
+from auth import get_current_user
 from routers import (
     cars,
     waybills,
@@ -27,6 +30,8 @@ from routers import (
     operations,
     export_import,
 )
+
+_auth = [Depends(get_current_user)]
 
 # Re-export helpers that tests import directly from main
 from routers.export_import import parse_csv_cars  # noqa: F401
@@ -71,15 +76,17 @@ def index(request: Request):
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-app.include_router(cars.router)
-app.include_router(waybills.router)
-app.include_router(locations.router)
-app.include_router(industries.router)
-app.include_router(commodity_map.router)
-app.include_router(car_types.router)
-app.include_router(dispatcher.router)
-app.include_router(session.router)
-app.include_router(automation.router)
-app.include_router(uploads.router)
-app.include_router(operations.router)
-app.include_router(export_import.router)
+app.include_router(cars.router,          dependencies=_auth)
+app.include_router(waybills.router,      dependencies=_auth)
+app.include_router(locations.router,     dependencies=_auth)
+app.include_router(industries.router,    dependencies=_auth)
+app.include_router(commodity_map.router, dependencies=_auth)
+app.include_router(car_types.router,     dependencies=_auth)
+app.include_router(dispatcher.router,    dependencies=_auth)
+app.include_router(session.router,       dependencies=_auth)
+app.include_router(automation.router,    dependencies=_auth)
+app.include_router(uploads.router,       dependencies=_auth)
+app.include_router(operations.router,    dependencies=_auth)
+app.include_router(export_import.router, dependencies=_auth)
+# SSE endpoint registered without auth — EventSource can't send headers
+app.include_router(session.sse_router)
