@@ -1,0 +1,17 @@
+[lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E501",   # line too long
+    "F401",   # unused import (re-exports are intentional)
+    "E402",   # module level import not at top (load_dotenv() must run first)
+    "E741",   # ambiguous variable name `l` (SQLAlchemy list comprehension pattern)
+    "E711",   # comparison to None (SQLAlchemy requires == None in filter())
+    "E712",   # comparison to False (SQLAlchemy requires == False in filter())
+    "F841",   # local variable assigned but never used (test scaffolding)
+    "E401",   # multiple imports on one line (test files)
+]
+
+exclude = [
+    ".venv",
+    "alembic/versions",
+]
