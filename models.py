@@ -1,8 +1,29 @@
+import os
 from datetime import datetime
 from typing import List, Optional
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
+
+_is_sqlite = os.environ.get("DATABASE_URL", "sqlite:///./railcar.db").startswith("sqlite")
+
+
+class Tenant(Base):
+    """Registry of all tenants. Lives in the shared public schema."""
+    __tablename__ = "tenants"
+    __table_args__ = {} if _is_sqlite else {"schema": "public"}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    schema_name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    subscription_status: Mapped[str] = mapped_column(String, default="active")
+    subscription_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    gemini_api_key: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    anthropic_api_key: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    openai_api_key: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    vision_provider: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class SwitchingArea(Base):

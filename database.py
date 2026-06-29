@@ -15,8 +15,13 @@ class Base(DeclarativeBase):
     pass
 
 
-def get_db():
+def get_db(request=None):
     db = SessionLocal()
+    if not _is_sqlite and request is not None:
+        tenant = getattr(request.state, "tenant", None)
+        schema = getattr(tenant, "schema_name", None) if tenant else None
+        if schema and schema != "public":
+            db.execute(text(f"SET search_path TO {schema}, public"))
     try:
         yield db
     finally:
@@ -30,7 +35,7 @@ DEFAULT_CAR_TYPES = [
 
 
 def init_db():
-    from models import Car, CarType, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock, SwitchingArea, DispatchPlan  # noqa: F401
+    from models import Car, CarType, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock, SwitchingArea, DispatchPlan, Tenant  # noqa: F401
     Base.metadata.create_all(bind=engine)
     if not _is_sqlite:
         # Postgres schema is managed by Alembic; only seed default data below.

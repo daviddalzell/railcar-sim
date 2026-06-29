@@ -24,6 +24,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
 from database import init_db
+from middleware.tenant import TenantMiddleware
 from vision import get_provider, OllamaVisionProvider
 
 from fastapi import Depends
@@ -50,6 +51,7 @@ _auth = [Depends(get_current_user)]
 from routers.export_import import parse_csv_cars  # noqa: F401
 
 app = FastAPI(title="Waypoint")
+app.add_middleware(TenantMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 # Only serve uploads locally — in cloud, photos are on Supabase Storage CDN
 if not os.environ.get("SUPABASE_URL"):
