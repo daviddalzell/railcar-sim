@@ -70,3 +70,36 @@ def update_settings(request: Request, data: TenantSettingsUpdate, db: Session = 
     invalidate_tenant_cache(tenant_ctx.slug)
     return {"ok": True}
 
+
+class InviteOperatorRequest(BaseModel):
+    email: str
+    role: str = "operator"
+
+
+@router.post("/tenant-settings/invite", status_code=200)
+def invite_operator(request: Request, data: InviteOperatorRequest, db: Session = Depends(get_db)):
+    import os
+    tenant_ctx = getattr(request.state, "tenant", None)
+    if not tenant_ctx or tenant_ctx.id == 0:
+        raise HTTPException(400, "Invitations require a cloud tenant — not available in local dev mode")
+
+    if data.role not in ("operator", "admin"):
+        raise HTTPException(400, "Role must be 'operator' or 'admin'")
+
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_KEY")
+    if not (supabase_url and supabase_key):
+        raise HTTPException(503, "Supabase not configured on this server")
+
+    try:
+        from supabase import create_client
+        client = create_client(supabase_url, supabase_key)
+        resp = client.auth.admin.invite_user_by_email(
+            data.email,
+            options={"data": {"tenant_slug": tenant_ctx.slug, "role": data.role}},
+        )
+        user_id = getattr(resp.user, "id", None)
+        return {"ok": True, "user_id": user_id}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to send invite: {e}")
+

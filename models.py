@@ -23,6 +23,7 @@ class Tenant(Base):
     anthropic_api_key: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     openai_api_key: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     vision_provider: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    patreon_member_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
 
 

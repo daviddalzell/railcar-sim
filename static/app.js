@@ -3409,6 +3409,19 @@ $("#settings-save-btn")?.addEventListener("click", async () => {
   }
 });
 
+$("#invite-send-btn")?.addEventListener("click", async () => {
+  const email = $("#invite-email")?.value?.trim();
+  const role  = $("#invite-role")?.value || "operator";
+  const msg   = $("#invite-msg");
+  if (!email) { if (msg) msg.textContent = "Enter an email address."; return; }
+  const result = await api("POST", "/api/tenant-settings/invite", { email, role });
+  if (result?.ok) {
+    if (msg) msg.textContent = `Invite sent to ${email}.`;
+    if ($("#invite-email")) $("#invite-email").value = "";
+    setTimeout(() => { if (msg) msg.textContent = ""; }, 4000);
+  }
+});
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 (async function init() {
   await Promise.all([

@@ -810,6 +810,24 @@
           <button id="settings-save-btn">Save Settings</button>
           <span id="settings-save-msg" class="muted" style="align-self:center;"></span>
         </div>
+
+        <fieldset style="margin-top:2rem;">
+          <legend>Invite Member</legend>
+          <p class="muted" style="font-size:0.85em;margin-bottom:0.75rem;">Send a magic-link invitation. Operators can run sessions; admins can also manage layout settings.</p>
+          <label>Email
+            <input type="email" id="invite-email" placeholder="member@example.com" autocomplete="off" />
+          </label>
+          <label>Role
+            <select id="invite-role">
+              <option value="operator">Operator</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          <div style="display:flex;gap:0.75rem;margin-top:0.75rem;">
+            <button id="invite-send-btn">Send Invite</button>
+            <span id="invite-msg" class="muted" style="align-self:center;"></span>
+          </div>
+        </fieldset>
       </div>
     </section>
 
