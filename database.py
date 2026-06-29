@@ -1,10 +1,13 @@
+import os
 from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-DATABASE_URL = "sqlite:///./railcar.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./railcar.db")
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+_is_sqlite = DATABASE_URL.startswith("sqlite")
+_connect_args = {"check_same_thread": False} if _is_sqlite else {}
+engine = create_engine(DATABASE_URL, connect_args=_connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -29,8 +32,11 @@ DEFAULT_CAR_TYPES = [
 def init_db():
     from models import Car, CarType, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock, SwitchingArea, DispatchPlan  # noqa: F401
     Base.metadata.create_all(bind=engine)
-    # Run all column migrations before any ORM queries so SQLAlchemy doesn't
-    # try to SELECT columns that don't exist yet on older databases.
+    if not _is_sqlite:
+        # Postgres schema is managed by Alembic; only seed default data below.
+        _seed_defaults()
+        return
+    # SQLite only: run column migrations so older local databases stay compatible.
     with engine.connect() as conn:
         try:
             conn.execute(text("ALTER TABLE waybills ADD COLUMN required_car_type TEXT"))
@@ -122,6 +128,11 @@ def init_db():
               AND (outbound_commodities IS NULL OR outbound_commodities = '')
         """))
         conn.commit()
+    _seed_defaults()
+
+
+def _seed_defaults():
+    from models import CarType  # noqa: F401 — local import avoids circular dep
     db = SessionLocal()
     try:
         if db.query(CarType).count() == 0:
