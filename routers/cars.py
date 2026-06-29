@@ -1,5 +1,5 @@
+import io
 import os
-import shutil
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -8,13 +8,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from PIL import Image
 from sqlalchemy.orm import Session
 
+import storage
 from database import get_db
 from models import Car, Location, MovementLog, Waybill
 from converters import car_to_dict, waybill_to_dict
 from schemas import AnalyzePhotoRequest, CarCreate, CarSlotsUpdate, CarUpdate, StylizeRequest
 from vision import analyze_car_photo, call_with_retry, get_provider
-
-UPLOADS_DIR = Path("uploads")
 
 _PROMPTS_DIR = Path("prompts")
 
@@ -64,21 +63,21 @@ def repair_orphaned_cars(db: Session = Depends(get_db)):
 
 @router.post("/cars/upload")
 async def upload_car_photo(file: UploadFile = File(...), skip_analysis: bool = False):
-    suffix = Path(file.filename).suffix if file.filename else ".jpg"
-    raw = UPLOADS_DIR / f"{uuid.uuid4().hex}{suffix}"
-    with raw.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
-    dest = raw.with_suffix(".jpg")
+    raw_bytes = await file.read()
+    # Convert to JPEG in-memory
     try:
-        with Image.open(raw) as img:
-            img.convert("RGB").save(dest, "JPEG", quality=85)
-        if raw != dest:
-            raw.unlink(missing_ok=True)
+        buf = io.BytesIO()
+        with Image.open(io.BytesIO(raw_bytes)) as img:
+            img.convert("RGB").save(buf, "JPEG", quality=85)
+        jpeg_bytes = buf.getvalue()
     except Exception:
-        dest = raw  # fall back to original if conversion fails
+        jpeg_bytes = raw_bytes  # fall back to original if conversion fails
+
+    filename = f"{uuid.uuid4().hex}.jpg"
+    photo_path = storage.upload(filename, jpeg_bytes, "image/jpeg")
 
     if skip_analysis:
-        return {"photo_path": str(dest), "car_type": "", "color": "", "car_number": "", "reporting_marks": ""}
+        return {"photo_path": photo_path, "car_type": "", "color": "", "car_number": "", "reporting_marks": ""}
 
     try:
         provider = get_provider()
@@ -89,25 +88,49 @@ async def upload_car_photo(file: UploadFile = File(...), skip_analysis: bool = F
         analysis = {"car_type": "other", "color": "", "car_number": "", "reporting_marks": ""}
     else:
         try:
-            analysis = analyze_car_photo(str(dest))
+            # analyze_car_photo accepts a path or URL-like string; for Supabase URLs
+            # we write a temp file since the vision module expects a filesystem path
+            if photo_path.startswith("http"):
+                tmp = Path(f"/tmp/{filename}")
+                tmp.write_bytes(jpeg_bytes)
+                analysis = analyze_car_photo(str(tmp))
+                tmp.unlink(missing_ok=True)
+            else:
+                analysis = analyze_car_photo(photo_path)
         except Exception as e:
             analysis = {"car_type": "other", "color": "", "car_number": "", "reporting_marks": ""}
             analysis["_error"] = str(e)
 
-    analysis["photo_path"] = str(dest)
+    analysis["photo_path"] = photo_path
     return analysis
 
 
 @router.post("/cars/analyze-photo")
 def analyze_existing_photo(data: AnalyzePhotoRequest):
-    if not Path(data.photo_path).exists():
-        raise HTTPException(404, "Photo not found")
+    photo_path = data.photo_path
+    if photo_path.startswith("http"):
+        # Supabase CDN URL — download to a temp file for analysis
+        try:
+            raw = storage.read_bytes(photo_path)
+        except Exception:
+            raise HTTPException(404, "Photo not found")
+        tmp = Path(f"/tmp/{uuid.uuid4().hex}.jpg")
+        tmp.write_bytes(raw)
+        local_path = str(tmp)
+    else:
+        if not Path(photo_path).exists():
+            raise HTTPException(404, "Photo not found")
+        local_path = photo_path
+        tmp = None
     try:
-        analysis = analyze_car_photo(data.photo_path)
+        analysis = analyze_car_photo(local_path)
     except Exception as e:
         analysis = {"car_type": "other", "color": "", "car_number": "", "reporting_marks": ""}
         analysis["_error"] = str(e)
-    analysis["photo_path"] = data.photo_path
+    finally:
+        if tmp:
+            tmp.unlink(missing_ok=True)
+    analysis["photo_path"] = photo_path
     return analysis
 
 
@@ -120,14 +143,20 @@ def stylize_car_photo(data: StylizeRequest):
     if not api_key:
         raise HTTPException(400, "GEMINI_API_KEY is not configured")
 
-    src = Path(data.photo_path)
-    if not src.exists():
-        raise HTTPException(404, "Source photo not found")
+    photo_path = data.photo_path
+    if photo_path.startswith("http"):
+        try:
+            image_bytes = storage.read_bytes(photo_path)
+        except Exception:
+            raise HTTPException(404, "Source photo not found")
+    else:
+        src = Path(photo_path)
+        if not src.exists():
+            raise HTTPException(404, "Source photo not found")
+        image_bytes = src.read_bytes()
 
     try:
         client = genai.Client(api_key=api_key)
-        image_bytes = src.read_bytes()
-
         response = call_with_retry(lambda: client.models.generate_content(
             model=STYLIZE_MODEL,
             contents=[
@@ -153,9 +182,9 @@ def stylize_car_photo(data: StylizeRequest):
     except Exception as e:
         raise HTTPException(500, str(e))
 
-    out_path = UPLOADS_DIR / f"{uuid.uuid4().hex}_stylized.png"
-    out_path.write_bytes(img_bytes)
-    return {"stylized_path": str(out_path), "url": "/" + str(out_path)}
+    filename = f"{uuid.uuid4().hex}_stylized.png"
+    stylized_path = storage.upload(filename, img_bytes, "image/png")
+    return {"stylized_path": stylized_path, "url": storage.photo_url(stylized_path)}
 
 
 @router.post("/cars", status_code=201)
@@ -175,7 +204,7 @@ def update_car(car_id: int, data: CarUpdate, db: Session = Depends(get_db)):
     updates = data.model_dump(exclude_none=True)
     new_path = updates.get("photo_path")
     if new_path and new_path != car.photo_path and car.photo_path:
-        Path(car.photo_path).unlink(missing_ok=True)
+        storage.delete(car.photo_path)
     for field, value in updates.items():
         setattr(car, field, value)
     db.commit()
@@ -192,8 +221,7 @@ def delete_car(car_id: int, db: Session = Depends(get_db)):
         w.car_id = None
         w.slot_index = None
     db.query(MovementLog).filter(MovementLog.car_id == car_id).delete(synchronize_session=False)
-    if car.photo_path:
-        Path(car.photo_path).unlink(missing_ok=True)
+    storage.delete(car.photo_path)
     db.delete(car)
     db.commit()
 

@@ -6,6 +6,7 @@ from sqlalchemy import DateTime as SADateTime
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session
 
+import storage
 from models import Car, CommodityCarTypeMap, DispatchPlan, Industry, LayoutSettings, Location, SessionClock, SwitchingArea, Waybill
 
 
@@ -40,6 +41,7 @@ def car_to_dict(car: Car) -> dict:
         "car_number": car.car_number,
         "reporting_marks": car.reporting_marks,
         "photo_path": car.photo_path,
+        "photo_url": storage.photo_url(car.photo_path or ""),
         "current_location_id": car.current_location_id,
         "current_location_name": car.current_location.name if car.current_location else None,
         "active_waybill_slot": car.active_waybill_slot,

@@ -38,7 +38,11 @@ from routers.export_import import parse_csv_cars  # noqa: F401
 
 app = FastAPI(title="Waypoint")
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Only serve uploads locally — in cloud, photos are on Supabase Storage CDN
+if not os.environ.get("SUPABASE_URL"):
+    from pathlib import Path as _Path
+    _Path("uploads").mkdir(exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 templates = Jinja2Templates(directory="templates")
 
 
