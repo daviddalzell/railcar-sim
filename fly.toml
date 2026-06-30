@@ -21,8 +21,8 @@ primary_region = 'ord'
 
   [[http_service.checks]]
     interval = '30s'
-    timeout = '5s'
-    grace_period = '10s'
+    timeout = '10s'
+    grace_period = '45s'
     method = 'GET'
     path = '/health'
 
