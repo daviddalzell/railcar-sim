@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 David Dalzell
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """CLI: python -m admin.provision_tenant --slug=... --name=... --admin-email=..."""
 import argparse
 import sys

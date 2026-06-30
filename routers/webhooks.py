@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 David Dalzell
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Patreon webhook handler.
 
 Set PATREON_WEBHOOK_SECRET as a Fly.io secret matching the value in

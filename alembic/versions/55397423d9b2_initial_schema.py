@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 David Dalzell
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """initial_schema
 
 Revision ID: 55397423d9b2

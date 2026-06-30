@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 David Dalzell
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Add public.tenants registry and seed demo tenant
 
 Revision ID: 101f1f64b2f3

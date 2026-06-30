@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 David Dalzell
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Tenant provisioning: create schema, tables, and Supabase auth user."""
 import os
 import re

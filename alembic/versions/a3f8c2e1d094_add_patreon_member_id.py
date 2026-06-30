@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 David Dalzell
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Add patreon_member_id to public.tenants
 
 Revision ID: a3f8c2e1d094

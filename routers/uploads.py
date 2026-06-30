@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 David Dalzell
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 David Dalzell
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from models import Waybill
 from tests.conftest import make_car, make_location, make_waybill
 

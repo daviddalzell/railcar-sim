@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 David Dalzell
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Storage abstraction: Supabase Storage (cloud) or local uploads/ directory (local dev).
 
 All public functions return/accept a `photo_path` value that is stored in the DB:
