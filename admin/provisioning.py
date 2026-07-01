@@ -13,7 +13,12 @@ RESERVED_SLUGS = frozenset([
     "www", "api", "waypoint", "static", "health", "demo",
     "admin", "app", "signup", "webhook", "webhooks",
 ])
-LATEST_REVISION = "a3f8c2e1d094"
+def _get_alembic_head() -> str:
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    cfg = Config("alembic.ini")
+    script = ScriptDirectory.from_config(cfg)
+    return script.get_current_head()
 
 
 # ── Slug helpers ──────────────────────────────────────────────────────────────
@@ -132,7 +137,7 @@ def _create_tenant_schema(engine, Base, schema_name: str) -> None:
         """))
         conn.execute(
             text("INSERT INTO alembic_version (version_num) VALUES (:v) ON CONFLICT DO NOTHING"),
-            {"v": LATEST_REVISION},
+            {"v": _get_alembic_head()},
         )
 
 

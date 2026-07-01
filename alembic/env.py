@@ -4,7 +4,7 @@
 import os
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 from alembic import context
 
@@ -42,8 +42,18 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    x_args = context.get_x_argument(as_dictionary=True)
+    schema = x_args.get("schema")
+
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        if schema:
+            connection.execute(text(f'SET search_path TO "{schema}", public'))
+            connection.commit()
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            version_table_schema=schema if schema else None,
+        )
         with context.begin_transaction():
             context.run_migrations()
 
