@@ -1,6 +1,6 @@
-# Rail Car Movement Simulator
+# Waypoint — Model Railroad Operations
 
-A web app for managing a model railroad car roster, waybills, and operations. Optionally uses an AI vision model to identify car details from a photo.
+A web app for managing a model railroad car roster, waybills, and operations. Optionally uses an AI vision model to identify car details from a photo. Supports multi-tenant cloud deployment via Fly.io + Supabase.
 
 ---
 
@@ -11,7 +11,7 @@ A web app for managing a model railroad car roster, waybills, and operations. Op
 
 ---
 
-## Setup
+## Local development setup
 
 ### 1. Clone the repository
 
@@ -43,33 +43,130 @@ This runs the test suite before every commit and blocks the commit if any test f
 
 ### 5. Configure environment variables
 
-Copy the example config file and edit it:
-
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and fill in the values for your chosen vision provider (see [Vision Providers](#vision-providers) below). If you skip this step the app still works — you just fill in car details manually after uploading a photo.
+Open `.env` and fill in the values for your chosen vision provider (see [Vision Providers](#vision-providers) below). If you skip this step the app still works — fill in car details manually after uploading a photo.
 
----
-
-## Running the app
+### 6. Run the app
 
 ```bash
 .venv/bin/python3 -m uvicorn main:app --reload
 ```
 
-Then open [http://localhost:8000](http://localhost:8000) in your browser.
+Open [http://localhost:8000](http://localhost:8000). The `--reload` flag restarts the server on source changes.
 
-The `--reload` flag restarts the server automatically when you edit source files. Drop it for a stable/production run.
+Locally the app uses SQLite (`railcar.db` in the project root, created automatically). No database setup required.
+
+---
+
+## Cloud deployment (Fly.io + Supabase)
+
+### Prerequisites
+
+- [flyctl](https://fly.io/docs/hands-on/install-flyctl/) installed and authenticated
+- A [Supabase](https://supabase.com) project (free tier is fine)
+- A [Patreon](https://www.patreon.com) creator account (for subscription-based tenant provisioning)
+
+### Required Fly secrets
+
+Set these with `flyctl secrets set KEY=value --app waypoint-app`:
+
+| Secret | Where to get it |
+|---|---|
+| `DATABASE_URL` | Supabase → Project Settings → Database → Connection string (Transaction pooler, port 6543) |
+| `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
+| `SUPABASE_KEY` | Supabase → Project Settings → API → `service_role` secret key |
+| `SUPABASE_ANON_KEY` | Supabase → Project Settings → API → `anon` public key |
+| `PATREON_WEBHOOK_SECRET` | Patreon creator portal → My integrations → Webhooks → secret |
+| `VISION_PROVIDER` | One of: `gemini`, `anthropic`, `openai`, `ollama` |
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com) → API keys |
+| `DEFAULT_TENANT_SLUG` | Slug of the fallback tenant when no subdomain is present (e.g. `demo`) |
+
+### Deploy
+
+```bash
+flyctl deploy --app waypoint-app
+```
+
+On every deploy the startup command runs `python -m admin.migrate_all_tenants`, which applies `alembic upgrade head` to the `public` schema and to every `t_{slug}` tenant schema before uvicorn starts.
+
+### Custom domain (wildcard subdomain)
+
+Each tenant is served at `{slug}.yourdomain.com`. Once your DNS is configured:
+
+```bash
+flyctl certs add "*.yourdomain.com" --app waypoint-app
+```
+
+Point a wildcard `CNAME` (`*.yourdomain.com`) at your Fly app hostname.
+
+---
+
+## Multi-tenant architecture
+
+Each Supabase/Postgres tenant gets its own schema (`t_{slug}`) that is fully isolated from other tenants. The `public` schema holds the `tenants` registry and is used by the built-in demo tenant.
+
+Tenant resolution: the app reads the subdomain from the `Host` header and looks up the matching row in `public.tenants`. The `DEFAULT_TENANT_SLUG` secret provides a fallback for non-subdomain access (e.g. direct Fly hostname).
+
+### Provisioning a tenant manually
+
+```bash
+python -m admin.provision_tenant \
+  --slug myclub \
+  --name "My Club" \
+  --admin-email admin@example.com
+```
+
+This creates the `t_myclub` schema, all tables, and sends a Supabase Auth invite to the admin email.
+
+### Patreon webhook (automatic provisioning)
+
+1. In the Patreon creator portal → **My integrations → Webhooks**, create a webhook pointing to `https://your-fly-hostname/webhooks/patreon` and subscribe to `members:pledge:create`, `members:pledge:delete`, and `members:pledge:update`.
+2. Copy the webhook secret into `PATREON_WEBHOOK_SECRET`.
+
+When a new patron pledges, a tenant is automatically provisioned and the patron receives a Supabase magic-link invite. When a patron cancels, the tenant enters a 30-day grace period before suspension.
+
+### Per-tenant AI settings
+
+Tenant admins can configure their own vision provider and API keys in the **Settings** tab. These override the server-level environment variables for that tenant only.
+
+---
+
+## Running migrations across all tenants
+
+The Dockerfile CMD does this automatically on every deploy. To run it manually (e.g. after adding a new migration in development):
+
+```bash
+python -m admin.migrate_all_tenants
+```
+
+To add a new migration:
+
+```bash
+alembic revision --autogenerate -m "describe the change"
+```
+
+Then commit the generated file. The next deploy will apply it to all tenant schemas.
 
 ---
 
 ## Vision Providers
 
-The app can analyse a photo of a model railroad car and pre-fill the car type, colour, number, and reporting marks. Set `VISION_PROVIDER` in your `.env` file to choose a provider.
+The app can analyse a photo of a model railroad car and pre-fill the car type, colour, number, and reporting marks. Set `VISION_PROVIDER` in your `.env` file (local) or as a Fly secret (cloud).
 
-### Anthropic (default)
+### Gemini (cloud default)
+
+```env
+VISION_PROVIDER=gemini
+GEMINI_API_KEY=your-key-here
+# GEMINI_MODEL=gemini-2.0-flash-lite   # optional
+```
+
+Get a key at [Google AI Studio](https://aistudio.google.com) → API keys.
+
+### Anthropic
 
 Uses Claude's vision API.
 
@@ -100,11 +197,11 @@ VISION_PROVIDER=ollama
 # OLLAMA_BASE_URL=http://localhost:11434/v1   # optional, this is the default
 ```
 
-When the app starts it will automatically launch the Ollama daemon if it isn't already running, and pull the configured model if it hasn't been downloaded yet. The first pull may take several minutes depending on model size — progress is printed to the server console.
+When the app starts it will automatically launch the Ollama daemon if it isn't already running, and pull the configured model if it hasn't been downloaded yet. The first pull may take several minutes.
 
 ### No vision provider
 
-If no provider is configured (or the API key is missing), the app still works. After uploading a photo you can fill in the car details manually.
+If no provider is configured (or the API key is missing), the app still works — fill in car details manually after uploading a photo.
 
 ---
 
@@ -115,9 +212,11 @@ railcar-sim/
 ├── main.py              # FastAPI app entry point and router registration
 ├── schemas.py           # Pydantic request/response models
 ├── converters.py        # Shared model-to-dict helpers
-├── models.py            # SQLAlchemy database models
-├── database.py          # Database connection and setup
+├── models.py            # SQLAlchemy database models (incl. Tenant)
+├── database.py          # DB connection; schema-switching get_db()
 ├── vision.py            # AI vision provider implementations
+├── auth.py              # Supabase JWT verification
+├── storage.py           # Supabase Storage / local uploads helper
 ├── routers/             # API route handlers (one file per domain)
 │   ├── cars.py
 │   ├── waybills.py
@@ -129,26 +228,28 @@ railcar-sim/
 │   ├── session.py
 │   ├── automation.py
 │   ├── uploads.py
-│   ├── settings.py
+│   ├── settings.py      # Tenant-level AI settings + operator invites
 │   ├── operations.py
-│   └── export_import.py
-├── requirements.txt
-├── pytest.ini
-├── .env.example         # Configuration template
+│   ├── export_import.py
+│   └── webhooks.py      # Patreon webhook handler (unauthenticated)
+├── middleware/
+│   └── tenant.py        # Host-header → tenant resolution middleware
+├── admin/
+│   ├── provisioning.py          # provision/suspend/reactivate tenant
+│   ├── provision_tenant.py      # CLI: python -m admin.provision_tenant
+│   └── migrate_all_tenants.py   # CLI: python -m admin.migrate_all_tenants
+├── alembic/             # Database migrations
+│   └── versions/
 ├── scripts/
-│   └── hooks/
-│       └── pre-commit   # Git pre-commit hook (activate with step 4 above)
+│   ├── hooks/pre-commit         # Git pre-commit hook
+│   └── supabase_init.sql        # One-time Supabase setup SQL
 ├── static/              # CSS and JavaScript
 ├── templates/           # HTML template
 ├── tests/               # Pytest test suite
-└── uploads/             # Uploaded car photos (auto-created)
+├── Dockerfile
+├── fly.toml
+└── .env.example         # Configuration template
 ```
-
----
-
-## Database
-
-The app uses SQLite and creates `railcar.db` automatically in the project root on first run. No database setup is required.
 
 ---
 
@@ -197,3 +298,9 @@ The visual design is driven by CSS custom properties defined in `static/style.cs
 4. Commit
 
 For an automated token export, install the [Tokens Studio for Figma](https://tokens.studio) plugin — it can export a `tokens.json` that a small script can apply directly to `style.css`.
+
+---
+
+## License
+
+[AGPL-3.0-or-later](LICENSE) — Copyright 2026 David Dalzell
