@@ -104,6 +104,8 @@ def _handle_pledge_create(member: dict) -> None:
             return
 
         base_slug = slugify(email.split("@")[0])
+        if len(base_slug) < 3:
+            base_slug = member["member_id"].replace("-", "")[:8]
         slug = unique_slug(base_slug, db)
         name = member["full_name"] or email
     finally:
