@@ -128,6 +128,15 @@ def _create_tenant_schema(engine, Base, schema_name: str) -> None:
             if table.schema is None:  # skip public.tenants
                 conn.execute(CreateTable(table, if_not_exists=True))
 
+        # Reset all sequences to 1 so new tenant PKs start clean
+        for table in Base.metadata.sorted_tables:
+            if table.schema is not None:
+                continue
+            for col in table.columns:
+                if col.autoincrement and col.primary_key:
+                    seq = f"{table.name}_id_seq"
+                    conn.execute(text(f"ALTER SEQUENCE IF EXISTS {seq} RESTART WITH 1"))
+
         # Create alembic_version table and mark as fully migrated
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS alembic_version (
