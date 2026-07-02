@@ -42,8 +42,13 @@ def _is_retryable(exc: Exception) -> bool:
     """Return True if this exception is a transient provider error worth retrying."""
     try:
         import anthropic
-        if isinstance(exc, (anthropic.RateLimitError, anthropic.OverloadedError,
-                            anthropic.InternalServerError)):
+        retryable = [anthropic.RateLimitError, anthropic.InternalServerError]
+        # OverloadedError (529) was removed in newer SDK versions; use APIStatusError fallback
+        if hasattr(anthropic, "OverloadedError"):
+            retryable.append(anthropic.OverloadedError)
+        if isinstance(exc, tuple(retryable)):
+            return True
+        if isinstance(exc, anthropic.APIStatusError) and exc.status_code in (429, 529, 500):
             return True
     except ImportError:
         pass
