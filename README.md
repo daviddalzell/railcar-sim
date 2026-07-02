@@ -303,4 +303,4 @@ For an automated token export, install the [Tokens Studio for Figma](https://tok
 
 ## License
 
-[AGPL-3.0-or-later](LICENSE) — Copyright 2026 David Dalzell
+[MIT](LICENSE) — Copyright 2026 David Dalzell

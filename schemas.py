@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 David Dalzell
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from typing import Optional
 from pydantic import BaseModel

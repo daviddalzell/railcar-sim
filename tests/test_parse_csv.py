@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 David Dalzell
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))

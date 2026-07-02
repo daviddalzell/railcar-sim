@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 David Dalzell
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 """Add public.tenants registry and seed demo tenant
 
