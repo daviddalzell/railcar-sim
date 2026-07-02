@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from starlette.requests import Request
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./railcar.db")
 
@@ -18,7 +19,7 @@ class Base(DeclarativeBase):
     pass
 
 
-def get_db(request=None):
+def get_db(request: Request = None):
     db = SessionLocal()
     if not _is_sqlite and request is not None:
         tenant = getattr(request.state, "tenant", None)
