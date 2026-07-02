@@ -8,6 +8,9 @@ primary_region = 'ord'
 
 [build]
 
+[deploy]
+  release_command = "python -m admin.migrate_all_tenants"
+
 [env]
   LOG_FORMAT = 'json'
   PORT = '8000'
