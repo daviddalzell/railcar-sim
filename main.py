@@ -95,6 +95,17 @@ def health():
     return {"status": "ok"}
 
 
+@app.post("/admin/sync-patreon")
+def admin_sync_patreon(request: Request):
+    from fastapi import HTTPException
+    secret = os.environ.get("SYNC_SECRET")
+    if not secret or request.headers.get("X-Sync-Secret") != secret:
+        raise HTTPException(403, "Forbidden")
+    from admin.sync_patreon import sync
+    result = sync()
+    return result
+
+
 @app.get("/signup")
 def signup(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})

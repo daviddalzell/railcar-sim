@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 David Dalzell
+# SPDX-License-Identifier: MIT
+
+name: Patreon membership sync
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # every hour
+  workflow_dispatch:        # allow manual trigger from GitHub UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sync endpoint
+        run: |
+          response=$(curl --silent --show-error --fail \
+            --max-time 60 \
+            -X POST \
+            -H "X-Sync-Secret: ${{ secrets.SYNC_SECRET }}" \
+            "${{ secrets.WAYPOINT_URL }}/admin/sync-patreon")
+          echo "$response"
