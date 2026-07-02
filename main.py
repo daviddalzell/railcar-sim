@@ -95,6 +95,11 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/signup")
+def signup(request: Request):
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+
 @app.get("/")
 def index(request: Request):
     provider = os.environ.get("VISION_PROVIDER", "anthropic")

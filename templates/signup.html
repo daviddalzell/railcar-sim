@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<!-- SPDX-FileCopyrightText: 2026 David Dalzell -->
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Get Started — Waypoint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Rose:wght@300;400;500;600;700&family=Montserrat+Alternates:wght@400;500;600;700;800;900&display=swap" />
+  <link rel="icon" href="data:,">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --rail-accent:    #c0392b;
+      --rail-dark:      #2c3e50;
+      --rail-light:     #ecf0f1;
+      --text-muted:     #888;
+      --text-secondary: #555;
+      --border-light:   #ddd;
+      --card-radius:    8px;
+    }
+
+    body {
+      font-family: 'Red Rose', sans-serif;
+      background: #f8f9fa;
+      color: var(--rail-dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--rail-dark);
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand {
+      font-family: 'Montserrat Alternates', sans-serif;
+      font-weight: 800;
+      font-size: 1.2rem;
+      letter-spacing: 0.05em;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 3rem 1.5rem 4rem;
+    }
+
+    .hero {
+      text-align: center;
+      max-width: 560px;
+      margin-bottom: 3rem;
+    }
+
+    .hero h1 {
+      font-family: 'Montserrat Alternates', sans-serif;
+      font-weight: 800;
+      font-size: clamp(1.8rem, 5vw, 2.6rem);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+    }
+
+    .hero p {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 2.5rem;
+    }
+
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      background: #fff;
+      border: 1px solid var(--border-light);
+      border-radius: var(--card-radius);
+      padding: 1.2rem 1.4rem;
+    }
+
+    .step-num {
+      flex-shrink: 0;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background: var(--rail-accent);
+      color: #fff;
+      font-family: 'Montserrat Alternates', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .step-body strong {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.2rem;
+    }
+
+    .step-body span {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .cta {
+      display: inline-block;
+      background: var(--rail-accent);
+      color: #fff;
+      font-family: 'Montserrat Alternates', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.03em;
+      padding: 0.85rem 2.2rem;
+      border-radius: var(--card-radius);
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+
+    .cta:hover { opacity: 0.88; }
+
+    .already {
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .already a {
+      color: var(--rail-accent);
+      text-decoration: none;
+    }
+
+    .already a:hover { text-decoration: underline; }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-light);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="brand">🔀 WAYPOINT</span>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h1>Model railroad ops,<br>anywhere you run.</h1>
+      <p>Waypoint is a cloud-based car routing and operations tool for model railroaders. Manage your roster, generate waybills, and run sessions — from any browser.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Subscribe on Patreon</strong>
+          <span>Click the button below to become a member. Monthly membership gives you your own private Waypoint instance.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Check your email</strong>
+          <span>Within a minute of subscribing, you'll receive a magic-link invite from Waypoint. Click it to set up your account — no password needed.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>Start operating</strong>
+          <span>Your layout lives at <em>yourname</em>.waypoint-ops.com — private to you, ready to go.</span>
+        </div>
+      </div>
+    </div>
+
+    <a class="cta" href="https://www.patreon.com/cw/waypoint_ops" target="_blank" rel="noopener">
+      Subscribe on Patreon
+    </a>
+
+    <p class="already">
+      Already a member? <a href="/">Sign in to your layout</a>
+    </p>
+  </main>
+
+  <footer>
+    &copy; 2026 David Dalzell &mdash; <a href="https://www.patreon.com/cw/waypoint_ops" style="color:inherit">Patreon</a>
+  </footer>
+</body>
+</html>
