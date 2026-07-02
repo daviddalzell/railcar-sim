@@ -48,9 +48,10 @@ def main() -> None:
 
 
 def _alembic_upgrade(schema: str | None = None) -> None:
-    cmd = ["alembic", "upgrade", "head"]
+    cmd = ["alembic"]
     if schema:
         cmd += ["-x", f"schema={schema}"]
+    cmd += ["upgrade", "head"]
     result = subprocess.run(cmd)
     if result.returncode != 0:
         print(f"[migrate] ERROR: alembic upgrade failed for schema={schema!r}", file=sys.stderr)
