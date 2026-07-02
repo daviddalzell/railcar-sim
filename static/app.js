@@ -3375,13 +3375,18 @@ async function loadSettings() {
     ? "Running in local dev mode — keys are read from environment variables and cannot be changed here."
     : "";
 
-  const setStatus = (id, set) => {
+  const setStatus = (id, field, set) => {
     const el = $(id);
-    if (el) el.textContent = set ? "✓ Key is set" : "No key configured";
+    if (!el) return;
+    if (set) {
+      el.innerHTML = `✓ Key is set &nbsp;<a href="#" class="clear-key-link" data-field="${field}" style="color:#c0392b;font-size:0.85em;">× Clear</a>`;
+    } else {
+      el.textContent = "No key configured";
+    }
   };
-  setStatus("#settings-gemini-status",    data.gemini_key_set);
-  setStatus("#settings-anthropic-status", data.anthropic_key_set);
-  setStatus("#settings-openai-status",    data.openai_key_set);
+  setStatus("#settings-gemini-status",    "gemini_api_key",    data.gemini_key_set);
+  setStatus("#settings-anthropic-status", "anthropic_api_key", data.anthropic_key_set);
+  setStatus("#settings-openai-status",    "openai_api_key",    data.openai_key_set);
 
   const saveBtn = $("#settings-save-btn");
   if (saveBtn && data.source === "env") saveBtn.disabled = true;
@@ -3395,14 +3400,13 @@ $("#settings-save-btn")?.addEventListener("click", async () => {
   const gemini    = $("#settings-gemini-key")?.value;
   const anthropic = $("#settings-anthropic-key")?.value;
   const openai    = $("#settings-openai-key")?.value;
-  if (gemini    !== undefined) body.gemini_api_key    = gemini;
-  if (anthropic !== undefined) body.anthropic_api_key = anthropic;
-  if (openai    !== undefined) body.openai_api_key    = openai;
+  if (gemini)    body.gemini_api_key    = gemini;
+  if (anthropic) body.anthropic_api_key = anthropic;
+  if (openai)    body.openai_api_key    = openai;
 
   const result = await api("PATCH", "/api/tenant-settings", body);
   if (result?.ok) {
     if (msg) msg.textContent = "Saved.";
-    // Clear key fields and reload status indicators
     ["#settings-gemini-key", "#settings-anthropic-key", "#settings-openai-key"].forEach(id => {
       const el = $(id);
       if (el) el.value = "";
@@ -3410,6 +3414,15 @@ $("#settings-save-btn")?.addEventListener("click", async () => {
     await loadSettings();
     setTimeout(() => { if (msg) msg.textContent = ""; }, 3000);
   }
+});
+
+document.addEventListener("click", async e => {
+  const link = e.target.closest(".clear-key-link");
+  if (!link) return;
+  e.preventDefault();
+  const field = link.dataset.field;
+  const result = await api("PATCH", "/api/tenant-settings", { [field]: "" });
+  if (result?.ok) await loadSettings();
 });
 
 $("#invite-send-btn")?.addEventListener("click", async () => {
