@@ -3,7 +3,7 @@
 
 import os
 from pathlib import Path
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from starlette.requests import Request
 
@@ -25,7 +25,12 @@ def get_db(request: Request = None):
         tenant = getattr(request.state, "tenant", None)
         schema = getattr(tenant, "schema_name", None) if tenant else None
         if schema and schema != "public":
-            db.execute(text(f"SET search_path TO {schema}, public"))
+            # Re-set search_path at the start of every transaction so it survives
+            # PgBouncer transaction-mode pooling (which may reassign the server
+            # connection between transactions, losing session-level SET settings).
+            @event.listens_for(db, "after_begin")
+            def _set_search_path(session, transaction, connection):
+                connection.execute(text(f"SET LOCAL search_path TO {schema}, public"))
     try:
         yield db
     finally:
