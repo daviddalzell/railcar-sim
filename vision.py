@@ -64,6 +64,9 @@ def _is_retryable(exc: Exception) -> bool:
         from google.genai import errors as _ge
         if isinstance(exc, _ge.APIError):
             code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+            status = str(getattr(exc, "status", "") or "").upper()
+            if "RESOURCE_EXHAUSTED" in status or "quota" in str(exc).lower():
+                return False  # quota=0 won't clear with retries
             if code in (429, 500, 503):
                 return True
     except ImportError:

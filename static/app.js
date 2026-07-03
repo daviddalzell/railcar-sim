@@ -131,7 +131,7 @@ async function api(method, path, body) {
   } catch {
     throw new Error(`Server error (${res.status})`);
   }
-  if (!res.ok) throw new Error(data.detail || "Request failed");
+  if (!res.ok) { const err = new Error(data.detail || "Request failed"); err.status = res.status; throw err; }
   return data;
 }
 
@@ -548,6 +548,7 @@ $("#btn-toggle-industries").addEventListener("click", () => {
 // ── Add car via photo ─────────────────────────────────────────────────────────
 let addMode = "photo"; // "photo" | "manual"
 let stylizedPath = null;
+let stylizeQuotaExceeded = false;
 
 function showStylizeIdle() {
   show($("#stylize-idle"));
@@ -556,7 +557,16 @@ function showStylizeIdle() {
   hide($("#stylize-error"));
 }
 
+function _applyStylizeQuotaUI() {
+  const btn = $("#btn-stylize");
+  if (!btn) return;
+  btn.disabled = true;
+  btn.title = "Image generation requires a paid Gemini API key";
+  updateDefaultImageOffer();
+}
+
 async function runStylize() {
+  if (stylizeQuotaExceeded) return;
   hide($("#stylize-idle"));
   hide($("#stylize-result"));
   hide($("#stylize-error"));
@@ -569,9 +579,17 @@ async function runStylize() {
     show($("#stylize-result"));
   } catch (err) {
     hide($("#stylize-processing"));
-    $("#stylize-error-msg").textContent = "Stylize failed: " + err.message;
-    show($("#stylize-error"));
-    show($("#stylize-idle"));
+    if (err.status === 402) {
+      stylizeQuotaExceeded = true;
+      $("#stylize-error-msg").textContent = err.message;
+      show($("#stylize-error"));
+      show($("#stylize-idle"));
+      _applyStylizeQuotaUI();
+    } else {
+      $("#stylize-error-msg").textContent = "Stylize failed: " + err.message;
+      show($("#stylize-error"));
+      show($("#stylize-idle"));
+    }
   }
 }
 
@@ -635,6 +653,7 @@ function applyAnalysis(result) {
     stylizedPath = null;
     showStylizeIdle();
     show($("#stylize-section"));
+    if (stylizeQuotaExceeded) _applyStylizeQuotaUI();
   }
 }
 

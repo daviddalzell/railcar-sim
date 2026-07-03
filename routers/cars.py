@@ -187,6 +187,24 @@ def stylize_car_photo(request: Request, data: StylizeRequest):
     except HTTPException:
         raise
     except Exception as e:
+        try:
+            from google.genai.errors import ClientError as _GErr
+            if isinstance(e, _GErr):
+                code = getattr(e, "code", 0) or 0
+                status = str(getattr(e, "status", "") or "").upper()
+                msg = str(e).lower()
+                if code in (403, 429) and (
+                    "RESOURCE_EXHAUSTED" in status or "quota" in msg or "billing" in msg
+                ):
+                    raise HTTPException(
+                        402,
+                        "Image generation is not available with the free Gemini API tier"
+                        " — a paid key is required.",
+                    )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
         raise HTTPException(500, str(e))
 
     filename = f"{uuid.uuid4().hex}_stylized.png"
