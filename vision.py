@@ -12,6 +12,8 @@ import urllib.request
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+MAX_IMAGE_PX = 1024  # longest side cap before sending to any vision API
+
 CAR_TYPES = [
     "boxcar", "flatcar", "gondola", "tank car", "hopper",
     "covered hopper", "refrigerator car", "caboose", "passenger car", "other",
@@ -164,7 +166,7 @@ class AnthropicVisionProvider(VisionProvider):
         if not api_key:
             raise RuntimeError("No Anthropic API key configured")
 
-        b64, media_type = _load_image(image_path)
+        b64, media_type = _load_image(image_path, max_px=MAX_IMAGE_PX)
         client = anthropic.Anthropic(api_key=api_key)
         model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 
@@ -197,7 +199,7 @@ class OpenAIVisionProvider(VisionProvider):
         if not api_key:
             raise RuntimeError("No OpenAI API key configured")
 
-        b64, media_type = _load_image(image_path)
+        b64, media_type = _load_image(image_path, max_px=MAX_IMAGE_PX)
         client = openai.OpenAI(api_key=api_key)
         model = os.environ.get("OPENAI_MODEL", "gpt-4o")
 
@@ -317,8 +319,8 @@ class GeminiVisionProvider(VisionProvider):
         model_name = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
         client = genai.Client(api_key=api_key)
-        image_bytes = Path(image_path).read_bytes()
-        media_type = _MEDIA_TYPES.get(Path(image_path).suffix.lower(), "image/jpeg")
+        b64, media_type = _load_image(image_path, max_px=MAX_IMAGE_PX)
+        image_bytes = base64.b64decode(b64)
 
         response = call_with_retry(lambda: client.models.generate_content(
             model=model_name,
