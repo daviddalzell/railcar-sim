@@ -3,7 +3,7 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
 import storage
@@ -16,14 +16,22 @@ UPLOADS_DIR = Path("uploads")
 router = APIRouter(prefix="/api", tags=["uploads"])
 
 
+def _tenant_folder(request: Request) -> str:
+    """Return the storage folder for the current tenant (schema name, or 'uploads' fallback)."""
+    tenant = getattr(request.state, "tenant", None)
+    schema = getattr(tenant, "schema_name", None) if tenant else None
+    return schema if schema else "uploads"
+
+
 @router.get("/uploads")
-def list_uploads(db: Session = Depends(get_db)):
+def list_uploads(request: Request, db: Session = Depends(get_db)):
+    folder = _tenant_folder(request)
     assigned = {car.photo_path for car in db.query(Car).all() if car.photo_path}
     for ct in db.query(CarType).all():
         if ct.default_photo_path:
             assigned.add(ct.default_photo_path)
     files = []
-    for item in storage.list_uploaded_files():
+    for item in storage.list_uploaded_files(folder):
         files.append({
             "path": item["path"],
             "url": item["url"],
@@ -44,13 +52,14 @@ def list_uploads(db: Session = Depends(get_db)):
 
 
 @router.post("/uploads/purge")
-def purge_uploads(db: Session = Depends(get_db)):
+def purge_uploads(request: Request, db: Session = Depends(get_db)):
+    folder = _tenant_folder(request)
     assigned = {car.photo_path for car in db.query(Car).all() if car.photo_path}
     for ct in db.query(CarType).all():
         if ct.default_photo_path:
             assigned.add(ct.default_photo_path)
     deleted = 0
-    for item in storage.list_uploaded_files():
+    for item in storage.list_uploaded_files(folder):
         if item["path"] not in assigned:
             storage.delete(item["path"])
             deleted += 1
@@ -68,7 +77,8 @@ def delete_upload(data: DeleteUploadRequest):
 
 
 @router.post("/uploads/delete-many", status_code=200)
-def delete_uploads(data: DeleteUploadsRequest, db: Session = Depends(get_db)):
+def delete_uploads(request: Request, data: DeleteUploadsRequest, db: Session = Depends(get_db)):
+    folder = _tenant_folder(request)
     assigned = {car.photo_path for car in db.query(Car).all() if car.photo_path}
     for ct in db.query(CarType).all():
         if ct.default_photo_path:
@@ -77,6 +87,10 @@ def delete_uploads(data: DeleteUploadsRequest, db: Session = Depends(get_db)):
     protected = 0
     for path_str in data.paths:
         if path_str in assigned:
+            protected += 1
+            continue
+        # Extra guard: only delete files within this tenant's folder
+        if folder not in path_str:
             protected += 1
             continue
         storage.delete(path_str)

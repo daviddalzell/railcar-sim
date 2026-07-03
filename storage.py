@@ -35,18 +35,22 @@ def _using_supabase() -> bool:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def upload(filename: str, data: bytes, content_type: str = "image/jpeg") -> str:
-    """Store a file and return the photo_path value to persist in the DB."""
+def upload(filename: str, data: bytes, content_type: str = "image/jpeg", folder: str = "uploads") -> str:
+    """Store a file and return the photo_path value to persist in the DB.
+
+    folder: sub-path within the bucket/uploads dir (e.g. tenant schema name).
+    """
     if _using_supabase():
         client = _get_client()
-        storage_path = f"uploads/{filename}"
+        storage_path = f"{folder}/{filename}"
         client.storage.from_(_BUCKET).upload(
             storage_path, data, {"content-type": content_type, "upsert": "true"}
         )
         return client.storage.from_(_BUCKET).get_public_url(storage_path)
     else:
-        UPLOADS_DIR.mkdir(exist_ok=True)
-        dest = UPLOADS_DIR / filename
+        dest_dir = UPLOADS_DIR / folder if folder != "uploads" else UPLOADS_DIR
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / filename
         dest.write_bytes(data)
         return str(dest)
 
@@ -86,27 +90,28 @@ def photo_url(photo_path: str) -> str:
     return "/" + photo_path.replace("\\", "/")   # local: prepend /
 
 
-def list_uploaded_files() -> list[dict]:
-    """List user-uploaded files (not static defaults). Returns [{path, url}]."""
+def list_uploaded_files(folder: str = "uploads") -> list[dict]:
+    """List user-uploaded files in folder (not static defaults). Returns [{path, url}]."""
     if _using_supabase():
         client = _get_client()
         try:
-            items = client.storage.from_(_BUCKET).list("uploads")
+            items = client.storage.from_(_BUCKET).list(folder)
         except Exception:
             return []
         result = []
         for item in items:
             if not item.get("name"):
                 continue
-            storage_path = f"uploads/{item['name']}"
+            storage_path = f"{folder}/{item['name']}"
             url = client.storage.from_(_BUCKET).get_public_url(storage_path)
             result.append({"path": url, "url": url})
         return result
     else:
-        UPLOADS_DIR.mkdir(exist_ok=True)
+        scan_dir = UPLOADS_DIR / folder if folder != "uploads" else UPLOADS_DIR
+        scan_dir.mkdir(parents=True, exist_ok=True)
         result = []
         _img_exts = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-        for f in sorted(UPLOADS_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+        for f in sorted(scan_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
             if f.is_file() and f.suffix.lower() in _img_exts:
                 result.append({"path": str(f), "url": "/" + str(f)})
         return result

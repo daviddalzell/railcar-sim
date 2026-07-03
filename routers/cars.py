@@ -77,13 +77,14 @@ async def upload_car_photo(request: Request, file: UploadFile = File(...), skip_
     except Exception:
         jpeg_bytes = raw_bytes  # fall back to original if conversion fails
 
+    tenant = getattr(request.state, "tenant", None)
+    folder = getattr(tenant, "schema_name", None) or "uploads"
     filename = f"{uuid.uuid4().hex}.jpg"
-    photo_path = storage.upload(filename, jpeg_bytes, "image/jpeg")
+    photo_path = storage.upload(filename, jpeg_bytes, "image/jpeg", folder=folder)
 
     if skip_analysis:
         return {"photo_path": photo_path, "car_type": "", "color": "", "car_number": "", "reporting_marks": ""}
 
-    tenant = getattr(request.state, "tenant", None)
     try:
         provider = get_provider(tenant)
     except ValueError:
@@ -208,7 +209,9 @@ def stylize_car_photo(request: Request, data: StylizeRequest):
         raise HTTPException(500, str(e))
 
     filename = f"{uuid.uuid4().hex}_stylized.png"
-    stylized_path = storage.upload(filename, img_bytes, "image/png")
+    tenant = getattr(request.state, "tenant", None)
+    folder = getattr(tenant, "schema_name", None) or "uploads"
+    stylized_path = storage.upload(filename, img_bytes, "image/png", folder=folder)
     return {"stylized_path": stylized_path, "url": storage.photo_url(stylized_path)}
 
 
