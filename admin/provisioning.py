@@ -54,6 +54,35 @@ def unique_slug(base: str, db) -> str:
 
 # ── Core provisioning ─────────────────────────────────────────────────────────
 
+def _seed_car_types(schema_name: str) -> None:
+    """Seed default car types into a tenant schema if the table is empty."""
+    from database import SessionLocal, DEFAULT_CAR_TYPES
+    from models import CarType
+    from pathlib import Path
+    from sqlalchemy import text
+
+    db = SessionLocal()
+    try:
+        db.execute(text(f'SET search_path TO "{schema_name}", public'))
+        if db.query(CarType).count() > 0:
+            return
+        for name in DEFAULT_CAR_TYPES:
+            db.add(CarType(name=name))
+        db.flush()
+        static_dir = Path("static/images/car-types")
+        if static_dir.exists():
+            for ct in db.query(CarType).all():
+                slug = ct.name.replace(" ", "-")
+                for ext in (".svg", ".png", ".jpg", ".jpeg", ".webp"):
+                    if (static_dir / f"{slug}{ext}").exists():
+                        ct.default_photo_path = str(static_dir / f"{slug}{ext}")
+                        break
+        db.commit()
+        print(f"[provision] Seeded {db.query(CarType).count()} car types into {schema_name}")
+    finally:
+        db.close()
+
+
 def provision_tenant(
     slug: str,
     name: str,
@@ -86,6 +115,7 @@ def provision_tenant(
 
         # 1+2. Create schema and all tenant tables
         _create_tenant_schema(engine, Base, schema_name)
+        _seed_car_types(schema_name)
 
         # 3. Insert tenant row
         tenant = Tenant(
