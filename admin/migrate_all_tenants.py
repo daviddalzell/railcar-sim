@@ -46,6 +46,30 @@ def main() -> None:
 
     print(f"[migrate] Done — {len(schemas)} tenant(s) migrated")
 
+    # Sync sequences after migrations to guard against any drift
+    _sync_sequences(engine, [s for _, s in schemas])
+
+
+SEQUENCE_TABLES = [
+    "cars", "car_types", "locations", "industries", "waybills",
+    "movement_logs", "switching_areas", "dispatch_plan",
+]
+
+
+def _sync_sequences(engine, schemas: list) -> None:
+    """Advance each table's PK sequence to max(id) so inserts never conflict."""
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        for schema in schemas:
+            conn.execute(text(f'SET search_path TO "{schema}", public'))
+            for table in SEQUENCE_TABLES:
+                max_id = conn.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM {table}")).scalar()
+                conn.execute(
+                    text("SELECT setval(pg_get_serial_sequence(:t, :c), :v, true)"),
+                    {"t": table, "c": "id", "v": max(max_id, 1)},
+                )
+    print(f"[migrate] Sequences synced for {len(schemas)} schema(s)")
+
 
 def _alembic_upgrade(schema: str | None = None) -> None:
     cmd = ["alembic"]
