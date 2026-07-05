@@ -31,6 +31,7 @@ def list_uploads(request: Request, db: Session = Depends(get_db)):
         if ct.default_photo_path:
             assigned.add(ct.default_photo_path)
     files = []
+    seen_paths = set()
     for item in storage.list_uploaded_files(folder):
         files.append({
             "path": item["path"],
@@ -38,6 +39,22 @@ def list_uploads(request: Request, db: Session = Depends(get_db)):
             "assigned": item["path"] in assigned,
             "is_default": False,
         })
+        seen_paths.add(item["path"])
+    # Include photos assigned to cars/car-types that aren't in the tenant storage
+    # folder — these come from imported data and have paths pointing elsewhere.
+    static_prefix = "static/"
+    for path in assigned:
+        if path in seen_paths:
+            continue
+        if path.startswith(static_prefix) or path.startswith("/" + static_prefix):
+            continue
+        files.append({
+            "path": path,
+            "url": storage.photo_url(path),
+            "assigned": True,
+            "is_default": False,
+        })
+        seen_paths.add(path)
     static_car_dir = Path("static/images/car-types")
     if static_car_dir.exists():
         for f in sorted(static_car_dir.iterdir(), key=lambda x: x.name):
