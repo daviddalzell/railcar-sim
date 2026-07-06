@@ -3435,6 +3435,9 @@ async function loadSettings() {
   const data = await api("GET", "/api/tenant-settings");
   if (!data) return;
 
+  const nameInput = $("#settings-tenant-name");
+  if (nameInput && data.name !== undefined) nameInput.value = data.name;
+
   const providerSel = $("#settings-provider");
   if (providerSel) providerSel.value = data.vision_provider || "gemini";
 
@@ -3463,6 +3466,7 @@ async function loadSettings() {
 $("#settings-save-btn")?.addEventListener("click", async () => {
   const msg = $("#settings-save-msg");
   const body = {
+    name: $("#settings-tenant-name")?.value?.trim() || null,
     vision_provider: $("#settings-provider")?.value || null,
   };
   const gemini    = $("#settings-gemini-key")?.value;

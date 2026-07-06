@@ -17,6 +17,7 @@ VALID_PROVIDERS = ("gemini", "anthropic", "openai", "ollama")
 
 
 class TenantSettingsUpdate(BaseModel):
+    name: str | None = None
     vision_provider: str | None = None
     gemini_api_key: str | None = None
     anthropic_api_key: str | None = None
@@ -39,6 +40,7 @@ def get_settings(request: Request, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(404, "Tenant not found")
     return {
+        "name": row.name or "",
         "vision_provider": row.vision_provider or os.environ.get("VISION_PROVIDER", "gemini"),
         "gemini_key_set": bool(row.gemini_api_key or os.environ.get("GEMINI_API_KEY")),
         "anthropic_key_set": bool(row.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY")),
@@ -56,10 +58,15 @@ def update_settings(request: Request, data: TenantSettingsUpdate, db: Session = 
     if data.vision_provider is not None and data.vision_provider not in VALID_PROVIDERS:
         raise HTTPException(400, f"Invalid provider. Must be one of: {', '.join(VALID_PROVIDERS)}")
 
+    if data.name is not None and not data.name.strip():
+        raise HTTPException(400, "Tenant name cannot be blank")
+
     row = db.query(Tenant).filter(Tenant.id == tenant_ctx.id).first()
     if not row:
         raise HTTPException(404, "Tenant not found")
 
+    if data.name is not None:
+        row.name = data.name.strip()
     if data.vision_provider is not None:
         row.vision_provider = data.vision_provider
     # Empty string clears a key; None means no change
