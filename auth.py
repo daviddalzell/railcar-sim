@@ -37,6 +37,10 @@ async def get_current_user(
     if os.environ.get("AUTH_DISABLED"):
         return {"id": "local", "email": "local@dev", "role": "admin", "tenant_slug": "local"}
 
+    tenant = getattr(request.state, "tenant", None)
+    if getattr(tenant, "slug", None) == "demo":
+        return {"id": "demo", "email": "demo@waypoint-ops.com", "role": "operator", "tenant_slug": "demo"}
+
     if credentials is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -63,6 +67,12 @@ async def require_admin(user: Annotated[dict, Depends(get_current_user)]) -> dic
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
+
+
+def is_demo(request: Request) -> bool:
+    """Return True when the request is for the public demo tenant."""
+    tenant = getattr(request.state, "tenant", None)
+    return getattr(tenant, "slug", None) == "demo"
 
 
 # Convenience type aliases for use in router signatures

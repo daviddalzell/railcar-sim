@@ -51,6 +51,9 @@ def get_settings(request: Request, db: Session = Depends(get_db)):
 
 @router.patch("/tenant-settings", status_code=200)
 def update_settings(request: Request, data: TenantSettingsUpdate, db: Session = Depends(get_db)):
+    from auth import is_demo
+    if is_demo(request):
+        raise HTTPException(403, "Settings cannot be changed in the demo")
     tenant_ctx = getattr(request.state, "tenant", None)
     if not tenant_ctx or tenant_ctx.id == 0:
         raise HTTPException(400, "Settings cannot be saved in local dev mode — set env vars directly")
@@ -91,6 +94,9 @@ class InviteOperatorRequest(BaseModel):
 def invite_operator(request: Request, data: InviteOperatorRequest, db: Session = Depends(get_db),
                     user: dict = Depends(get_current_user)):
     import os
+    from auth import is_demo
+    if is_demo(request):
+        raise HTTPException(403, "Invitations are disabled in the demo")
     if (user or {}).get("role") != "admin":
         raise HTTPException(403, "Admin access required")
 

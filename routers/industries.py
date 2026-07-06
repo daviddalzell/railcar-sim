@@ -40,7 +40,10 @@ def update_industry(ind_id: int, data: IndustryCreate, db: Session = Depends(get
 
 
 @router.delete("/industries/{ind_id}", status_code=204)
-def delete_industry(ind_id: int, db: Session = Depends(get_db)):
+def delete_industry(request: Request, ind_id: int, db: Session = Depends(get_db)):
+    from auth import is_demo
+    if is_demo(request):
+        raise HTTPException(403, "Deleting industries is disabled in the demo")
     ind = db.get(Industry, ind_id)
     if not ind:
         raise HTTPException(404, "Industry not found")

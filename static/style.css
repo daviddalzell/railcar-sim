@@ -1625,3 +1625,17 @@ button.small {
   border-color: var(--pico-primary-background, #1a6fb5);
   color: #fff;
 }
+
+#demo-banner {
+  background: #1a5fa8;
+  color: #fff;
+  text-align: center;
+  padding: .55rem 1rem;
+  font-size: .875rem;
+  font-weight: 500;
+}
+#demo-banner a {
+  color: #afd4ff;
+  margin-left: .5rem;
+  white-space: nowrap;
+}

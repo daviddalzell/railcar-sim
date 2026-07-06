@@ -18,6 +18,12 @@
   {% endif %}
 </head>
 <body>
+  {% if is_demo %}
+  <div id="demo-banner">
+    You're exploring a sample layout — data resets nightly.
+    <a href="https://www.patreon.com/waypoint_ops" target="_blank" rel="noopener">Subscribe to create your own →</a>
+  </div>
+  {% endif %}
   <header class="container-fluid">
     <nav>
       <ul><li><strong class="brand">🔀 WAYPOINT</strong></li></ul>

@@ -109,6 +109,17 @@ def admin_sync_patreon(request: Request):
     return result
 
 
+@app.post("/admin/reset-demo")
+def admin_reset_demo(request: Request):
+    from fastapi import HTTPException
+    secret = os.environ.get("SYNC_SECRET")
+    if not secret or request.headers.get("X-Sync-Secret") != secret:
+        raise HTTPException(403, "Forbidden")
+    from admin.seed_demo import seed_demo
+    seed_demo()
+    return {"ok": True}
+
+
 @app.get("/signup")
 def signup(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
@@ -118,6 +129,8 @@ def signup(request: Request):
 def index(request: Request):
     provider = os.environ.get("VISION_PROVIDER", "anthropic")
     vision_label = _PROVIDER_LABELS.get(provider, f"{provider} Vision")
+    tenant = getattr(request.state, "tenant", None)
+    is_demo = getattr(tenant, "slug", "") == "demo"
     return templates.TemplateResponse(
         "index.html", {
             "request": request,
@@ -125,6 +138,7 @@ def index(request: Request):
             "supabase_url": os.environ.get("SUPABASE_URL", ""),
             "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", ""),
             "auth_disabled": bool(os.environ.get("AUTH_DISABLED")),
+            "is_demo": is_demo,
         }
     )
 

@@ -242,7 +242,10 @@ def update_car(car_id: int, data: CarUpdate, db: Session = Depends(get_db)):
 
 
 @router.delete("/cars/{car_id}", status_code=204)
-def delete_car(car_id: int, db: Session = Depends(get_db)):
+def delete_car(request: Request, car_id: int, db: Session = Depends(get_db)):
+    from auth import is_demo
+    if is_demo(request):
+        raise HTTPException(403, "Deleting cars is disabled in the demo")
     car = db.get(Car, car_id)
     if not car:
         raise HTTPException(404, "Car not found")

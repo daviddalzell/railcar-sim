@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from database import get_db
 from models import Car, Location, MovementLog, SwitchingArea, Waybill
@@ -44,7 +45,10 @@ def update_location(loc_id: int, data: LocationCreate, db: Session = Depends(get
 
 
 @router.delete("/locations/{loc_id}")
-def delete_location(loc_id: int, merge_into_id: Optional[int] = None, db: Session = Depends(get_db)):
+def delete_location(request: Request, loc_id: int, merge_into_id: Optional[int] = None, db: Session = Depends(get_db)):
+    from auth import is_demo
+    if is_demo(request):
+        raise HTTPException(403, "Deleting locations is disabled in the demo")
     loc = db.get(Location, loc_id)
     if not loc:
         raise HTTPException(404, "Location not found")
@@ -112,7 +116,10 @@ def update_switching_area(area_id: int, data: SwitchingAreaCreate, db: Session =
 
 
 @router.delete("/switching-areas/{area_id}", status_code=204)
-def delete_switching_area(area_id: int, db: Session = Depends(get_db)):
+def delete_switching_area(request: Request, area_id: int, db: Session = Depends(get_db)):
+    from auth import is_demo
+    if is_demo(request):
+        raise HTTPException(403, "Deleting switching areas is disabled in the demo")
     area = db.get(SwitchingArea, area_id)
     if not area:
         raise HTTPException(404, "Switching area not found")
