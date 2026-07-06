@@ -254,11 +254,19 @@ async function refreshLibraryGrid() {
           : f.assigned
             ? '<span class="lib-badge">in use</span>'
             : "";
+        const filename = f.path.split("/").pop() || "image.jpg";
+        const actions = f.is_default ? "" : `
+          <div class="lib-actions">
+            <a class="lib-action-btn" href="${f.url}" download="${filename}" title="Download"
+               onclick="event.stopPropagation()">⬇</a>
+            <button class="lib-action-btn lib-delete-btn" data-path="${f.path}" title="Delete"
+                    onclick="event.stopPropagation()">🗑</button>
+          </div>`;
         return `
         <div class="lib-thumb${f.assigned ? " lib-assigned" : ""}${sel}"
              data-path="${f.path}" data-url="${f.url}" data-is-default="${f.is_default}">
           <img src="${f.url}" alt="" loading="lazy" />
-          ${badge}
+          ${badge}${actions}
         </div>`;
       }).join("");
       $$(".lib-thumb").forEach(el => {
@@ -3485,6 +3493,28 @@ $("#settings-save-btn")?.addEventListener("click", async () => {
     });
     await loadSettings();
     setTimeout(() => { if (msg) msg.textContent = ""; }, 3000);
+  }
+});
+
+document.addEventListener("click", async e => {
+  const delBtn = e.target.closest(".lib-delete-btn");
+  if (delBtn) {
+    delBtn.disabled = true;
+    const path = delBtn.dataset.path;
+    try {
+      const result = await api("POST", "/api/uploads/delete-many", { paths: [path] });
+      if (result?.deleted > 0) {
+        showToast("Image deleted", "success");
+        selectedLibraryPaths.delete(path);
+        await refreshLibraryGrid();
+      } else {
+        showToast("Image is in use and cannot be deleted", "warning");
+        delBtn.disabled = false;
+      }
+    } catch {
+      delBtn.disabled = false;
+    }
+    return;
   }
 });
 

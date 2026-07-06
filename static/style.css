@@ -883,6 +883,34 @@ button.small {
   background: var(--rail-green);
 }
 
+.lib-actions {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.lib-thumb:hover .lib-actions { opacity: 1; }
+
+.lib-action-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 8px;
+  line-height: 1;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.lib-action-btn:hover { opacity: 0.75; }
+
 .upload-zone-actions {
   display: flex;
   flex-direction: column;
