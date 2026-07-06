@@ -953,7 +953,7 @@
 
   <div id="toast-container"></div>
 
-  {% if supabase_url %}
+  {% if supabase_url and not is_demo %}
   <!-- Login modal — shown when no active session -->
   <dialog id="login-dialog" style="max-width:360px">
     <article>
