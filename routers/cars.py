@@ -86,6 +86,14 @@ async def upload_car_photo(request: Request, file: UploadFile = File(...), skip_
     if skip_analysis:
         return {"photo_path": photo_path, "car_type": "", "color": "", "car_number": "", "reporting_marks": ""}
 
+    from auth import is_demo
+    import demo_limits
+    if is_demo(request) and not demo_limits.check_and_increment("analysis"):
+        analysis = {"car_type": "other", "color": "", "car_number": "", "reporting_marks": ""}
+        analysis["photo_path"] = photo_path
+        analysis["_error"] = "Demo analysis limit reached (10/hr) — subscribe to use AI features on your own layout."
+        return analysis
+
     try:
         provider = get_provider(tenant)
     except ValueError:
@@ -114,6 +122,10 @@ async def upload_car_photo(request: Request, file: UploadFile = File(...), skip_
 
 @router.post("/cars/analyze-photo")
 def analyze_existing_photo(request: Request, data: AnalyzePhotoRequest):
+    from auth import is_demo
+    import demo_limits
+    if is_demo(request) and not demo_limits.check_and_increment("analysis"):
+        raise HTTPException(429, "Demo analysis limit reached (10/hr) — subscribe to use AI features on your own layout.")
     photo_path = data.photo_path
     if photo_path.startswith("http"):
         # Supabase CDN URL — download to a temp file for analysis
@@ -144,6 +156,10 @@ def analyze_existing_photo(request: Request, data: AnalyzePhotoRequest):
 
 @router.post("/cars/stylize")
 def stylize_car_photo(request: Request, data: StylizeRequest):
+    from auth import is_demo
+    import demo_limits
+    if is_demo(request) and not demo_limits.check_and_increment("stylize"):
+        raise HTTPException(429, "Demo stylize limit reached (5/hr) — subscribe to use AI features on your own layout.")
     from google import genai
     from google.genai import types
 
