@@ -11,7 +11,8 @@
 > - Supports Claude, GPT-4o, Gemini, and local Ollama vision models
 > - Waybill cards support up to 4 sequential movements per car
 > - Fast clock simulates prototypical railroad time at 1×, 2×, 4×, 6×, or 12× speed
-> - Full layout backup and restore in a single ZIP file
+> - Full layout backup and restore in a single ZIP file — car photos included
+> - Real-time crew notifications keep dispatchers and operators in sync across devices
 
 ---
 
@@ -24,6 +25,7 @@ Build your fleet in minutes, not hours.
 - Generate a stylized illustration of each car with one click
 - Add cars manually or select photos from a shared library
 - Edit any detail at any time; delete cars cleanly with full history cleanup
+- **Photo Library** — view all uploaded car images in a grid; hover any photo to download or delete it; default images are protected from deletion
 
 ---
 
@@ -83,6 +85,22 @@ Build and manage capacity-aware consists directly from the Operations tab.
 
 ---
 
+## Live Crew Notifications
+
+Keep every operator in the loop without interrupting the session.
+
+- Real-time events are pushed instantly to all connected browsers via Server-Sent Events (SSE)
+- Notifications appear as non-intrusive toasts — no manual refresh needed
+- **Session started** — crew members see a toast when the dispatcher opens a session, including car count
+- **Session ended** — crew members see a summary when the session is closed
+- **Consist created** — notifies all operators when a new dispatch plan is built
+- **Crew assigned** — notifies when an engineer or conductor is named on a consist
+- **Status change** — notifies when a consist goes active or completes
+- Self-suppression: your own actions do not produce a notification for you
+- Reconnects automatically if the connection drops
+
+---
+
 ## Fast Clock
 
 Simulate prototypical railroad time during every operating session.
@@ -110,11 +128,20 @@ Reduce manual data entry at every step.
 
 ---
 
+## Settings & Account
+
+- **Tenant display name** — admins can update the layout's display name at any time from Settings
+- **Invite operators** — send email invitations to crew members; assign operator or admin role
+- **AI provider** — choose and configure your preferred vision model from Settings
+- **Password reset** — operators can request a reset link from the login screen; no admin action required
+
+---
+
 ## Data & Backup
 
 Your layout data, safe and portable.
 
-- Export a complete snapshot: locations, industries, cars, waybills, photos, and movement logs
-- Restore any backup with a single import — great for sharing layouts or recovering from errors
+- Export a complete snapshot: locations, industries, cars, waybills, photos, and movement logs — car photos are downloaded from cloud storage and bundled into the ZIP
+- Restore any backup with a single import — photos are re-uploaded to your tenant's storage automatically; no broken image links after restore
 - Purge orphaned photos to keep storage tidy
 - Per-car movement history records the last 5 moves with timestamps and notes
