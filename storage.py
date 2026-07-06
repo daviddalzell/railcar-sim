@@ -87,7 +87,9 @@ def photo_url(photo_path: str) -> str:
         return ""
     if photo_path.startswith("http"):
         return photo_path          # already a full CDN URL
-    return "/" + photo_path.replace("\\", "/")   # local: prepend /
+    if _using_supabase():
+        return ""                  # local-style path on a cloud deployment — file is gone
+    return "/" + photo_path.replace("\\", "/")   # local dev: prepend /
 
 
 def list_uploaded_files(folder: str = "uploads") -> list[dict]:
