@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import DateTime as SADateTime
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from database import get_db
 from models import Car, CarType, CommodityCarTypeMap, DispatchPlan, Industry, Location, MovementLog, SwitchingArea, Waybill
@@ -119,6 +120,7 @@ def parse_jmri_cars(content: str) -> tuple[list[dict], list[str]]:
 
 @router.get("/export")
 def export_data(db: Session = Depends(get_db)):
+    import urllib.request
     from datetime import date as _date
     tables = {
         "switching_areas":        [row_to_dict(r) for r in db.query(SwitchingArea).all()],
@@ -136,8 +138,17 @@ def export_data(db: Session = Depends(get_db)):
         zf.writestr("data.json", json.dumps(payload, indent=2))
         for car_row in tables["cars"]:
             photo = car_row.get("photo_path") or ""
-            if photo and Path(photo).exists():
-                zf.write(photo, arcname=f"photos/{Path(photo).name}")
+            if not photo:
+                continue
+            fname = Path(photo.split("?")[0]).name
+            if photo.startswith("http"):
+                try:
+                    with urllib.request.urlopen(photo) as resp:  # noqa: S310
+                        zf.writestr(f"photos/{fname}", resp.read())
+                except Exception:
+                    pass
+            elif Path(photo).exists():
+                zf.write(photo, arcname=f"photos/{fname}")
     buf.seek(0)
     filename = f"railcar-backup-{_date.today().isoformat()}.zip"
     return StreamingResponse(buf, media_type="application/zip",
@@ -145,7 +156,8 @@ def export_data(db: Session = Depends(get_db)):
 
 
 @router.post("/import")
-async def import_data(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def import_data(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    import storage as _storage
     if not (file.filename or "").endswith(".zip"):
         raise HTTPException(400, "File must be a .zip archive")
     content = await file.read()
@@ -159,10 +171,23 @@ async def import_data(file: UploadFile = File(...), db: Session = Depends(get_db
         raise HTTPException(400, "ZIP does not contain data.json")
     tables = payload.get("tables", {})
 
-    # Restore photos before clearing DB
+    # Re-upload photos into the current tenant's storage and build a remap table
+    tenant = getattr(request.state, "tenant", None)
+    folder = getattr(tenant, "schema_name", None) or "uploads"
+    photo_remap: dict[str, str] = {}  # original filename -> new photo_path
     for name in zf.namelist():
         if name.startswith("photos/") and name != "photos/":
-            (UPLOADS_DIR / Path(name).name).write_bytes(zf.read(name))
+            fname = Path(name).name
+            new_path = _storage.upload(fname, zf.read(name), "image/jpeg", folder=folder)
+            photo_remap[fname] = new_path
+
+    # Remap photo_path values in car rows to the newly uploaded locations
+    for car_row in tables.get("cars", []):
+        old = car_row.get("photo_path") or ""
+        if old:
+            old_fname = Path(old.split("?")[0]).name
+            if old_fname in photo_remap:
+                car_row["photo_path"] = photo_remap[old_fname]
 
     # Clear in reverse FK order
     db.query(DispatchPlan).delete(synchronize_session=False)
