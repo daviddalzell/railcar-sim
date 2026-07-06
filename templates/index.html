@@ -948,6 +948,7 @@
   <dialog id="login-dialog" style="max-width:360px">
     <article>
       <h3>Sign in to Waypoint</h3>
+      <!-- Sign-in form -->
       <form id="login-form" onsubmit="return false">
         <label>Email
           <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email">
@@ -955,8 +956,41 @@
         <label>Password
           <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password">
         </label>
+        <p style="text-align:right;margin-top:0.25rem;margin-bottom:0.5rem">
+          <a href="#" id="link-forgot-pw" style="font-size:0.85em">Forgot password?</a>
+        </p>
         <p id="login-error" style="color:var(--pico-del-color,red);display:none"></p>
         <button type="submit" id="login-submit">Sign in</button>
+      </form>
+      <!-- Reset-request form (hidden until "Forgot password?" clicked) -->
+      <form id="reset-form" onsubmit="return false" style="display:none">
+        <p style="margin-bottom:0.75rem;font-size:0.9em">Enter your email and we'll send a reset link.</p>
+        <label>Email
+          <input type="email" id="reset-email" placeholder="you@example.com" required autocomplete="email">
+        </label>
+        <p id="reset-error" style="color:var(--pico-del-color,red);display:none"></p>
+        <p id="reset-sent" style="color:green;display:none">Check your email for a reset link.</p>
+        <button type="submit" id="reset-submit">Send reset link</button>
+        <p style="text-align:center;margin-top:0.5rem">
+          <a href="#" id="link-back-to-login" style="font-size:0.85em">← Back to sign in</a>
+        </p>
+      </form>
+    </article>
+  </dialog>
+
+  <!-- Set-new-password dialog — shown after clicking a reset link -->
+  <dialog id="set-password-dialog" style="max-width:360px">
+    <article>
+      <h3>Set new password</h3>
+      <form id="set-password-form" onsubmit="return false">
+        <label>New password
+          <input type="password" id="new-password" placeholder="At least 6 characters" required autocomplete="new-password">
+        </label>
+        <label>Confirm password
+          <input type="password" id="confirm-password" placeholder="Repeat password" required autocomplete="new-password">
+        </label>
+        <p id="set-password-error" style="color:var(--pico-del-color,red);display:none"></p>
+        <button type="submit" id="set-password-submit">Update password</button>
       </form>
     </article>
   </dialog>
@@ -977,7 +1011,40 @@
         }
       }
 
-      sb.auth.onAuthStateChange((_event, session) => storeSession(session));
+      function showSetPasswordDialog() {
+        const spDlg = document.getElementById("set-password-dialog");
+        spDlg.showModal();
+        document.getElementById("set-password-form").addEventListener("submit", async () => {
+          const pw1  = document.getElementById("new-password").value;
+          const pw2  = document.getElementById("confirm-password").value;
+          const errEl = document.getElementById("set-password-error");
+          const btn  = document.getElementById("set-password-submit");
+          errEl.style.display = "none";
+          if (pw1 !== pw2) {
+            errEl.textContent = "Passwords do not match.";
+            errEl.style.display = "";
+            return;
+          }
+          btn.disabled = true;
+          btn.textContent = "Updating…";
+          const { error } = await sb.auth.updateUser({ password: pw1 });
+          if (error) {
+            errEl.textContent = error.message;
+            errEl.style.display = "";
+            btn.disabled = false;
+            btn.textContent = "Update password";
+          } else {
+            spDlg.close();
+          }
+        }, { once: true });
+      }
+
+      sb.auth.onAuthStateChange((event, session) => {
+        storeSession(session);
+        if (event === "PASSWORD_RECOVERY") {
+          showSetPasswordDialog();
+        }
+      });
 
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
@@ -986,6 +1053,22 @@
         // No session — show login modal
         const dlg = document.getElementById("login-dialog");
         dlg.showModal();
+
+        // Toggle between sign-in and reset-request forms
+        document.getElementById("link-forgot-pw").addEventListener("click", e => {
+          e.preventDefault();
+          document.getElementById("login-form").style.display = "none";
+          document.getElementById("reset-form").style.display = "";
+          const emailVal = document.getElementById("login-email").value.trim();
+          if (emailVal) document.getElementById("reset-email").value = emailVal;
+        });
+        document.getElementById("link-back-to-login").addEventListener("click", e => {
+          e.preventDefault();
+          document.getElementById("reset-form").style.display = "none";
+          document.getElementById("reset-sent").style.display = "none";
+          document.getElementById("login-form").style.display = "";
+        });
+
         document.getElementById("login-form").addEventListener("submit", async () => {
           const email    = document.getElementById("login-email").value.trim();
           const password = document.getElementById("login-password").value;
@@ -1003,6 +1086,30 @@
           } else {
             storeSession(data.session);
             dlg.close();
+          }
+        });
+
+        document.getElementById("reset-form").addEventListener("submit", async () => {
+          const email  = document.getElementById("reset-email").value.trim();
+          const errEl  = document.getElementById("reset-error");
+          const sentEl = document.getElementById("reset-sent");
+          const btn    = document.getElementById("reset-submit");
+          errEl.style.display = "none";
+          sentEl.style.display = "none";
+          btn.disabled = true;
+          btn.textContent = "Sending…";
+          const { error } = await sb.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin,
+          });
+          if (error) {
+            errEl.textContent = error.message;
+            errEl.style.display = "";
+            btn.disabled = false;
+            btn.textContent = "Send reset link";
+          } else {
+            sentEl.style.display = "";
+            btn.disabled = true;
+            btn.textContent = "Sent";
           }
         });
       }

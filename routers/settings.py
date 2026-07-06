@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
+from auth import get_current_user
 from database import get_db
 from middleware.tenant import invalidate_tenant_cache
 from models import Tenant
@@ -80,8 +81,12 @@ class InviteOperatorRequest(BaseModel):
 
 
 @router.post("/tenant-settings/invite", status_code=200)
-def invite_operator(request: Request, data: InviteOperatorRequest, db: Session = Depends(get_db)):
+def invite_operator(request: Request, data: InviteOperatorRequest, db: Session = Depends(get_db),
+                    user: dict = Depends(get_current_user)):
     import os
+    if (user or {}).get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+
     tenant_ctx = getattr(request.state, "tenant", None)
     if not tenant_ctx or tenant_ctx.id == 0:
         raise HTTPException(400, "Invitations require a cloud tenant — not available in local dev mode")
