@@ -7,6 +7,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import nullslast
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from database import get_db
 from models import Car, DispatchPlan, Location, SwitchingArea
@@ -86,8 +87,13 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
     return consist_inbound, outbound, local_spots, available_spots, warnings
 
 
+def _tenant_slug(request: Request) -> str:
+    tenant = getattr(request.state, "tenant", None)
+    return getattr(tenant, "slug", None) or "local"
+
+
 @router.post("/dispatcher/build-plan")
-def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db)):
+def build_dispatch_plan(request: Request, data: DispatchBuildRequest, db: Session = Depends(get_db)):
     area = db.get(SwitchingArea, data.switching_area_id)
     if not area:
         raise HTTPException(404, "Switching area not found")
@@ -120,6 +126,17 @@ def build_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db
 
     result = dispatch_plan_to_dict(plan, db)
     result["warnings"] = warnings
+
+    from routers import ops_events
+    car_count = (len(json.loads(plan.setout_ids_json or "[]"))
+                 + len(json.loads(plan.pickup_ids_json or "[]"))
+                 + len(json.loads(plan.spots_ids_json or "[]")))
+    ops_events.broadcast(
+        _tenant_slug(request), "plan_created",
+        {"plan_id": plan.id, "train_number": plan.train_number or "",
+         "train_name": plan.train_name or "", "car_count": car_count},
+        exclude_sid=request.headers.get("X-Subscriber-Id", ""),
+    )
     return result
 
 
@@ -172,18 +189,30 @@ def update_dispatch_power(plan_id: int, data: DispatchPowerUpdate, db: Session =
 
 
 @router.patch("/dispatcher/plan/{plan_id}/identity")
-def update_dispatch_identity(plan_id: int, data: DispatchPlanIdentityUpdate, db: Session = Depends(get_db)):
+def update_dispatch_identity(request: Request, plan_id: int, data: DispatchPlanIdentityUpdate,
+                              db: Session = Depends(get_db)):
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")
     for field, value in data.model_dump(exclude_none=False).items():
         setattr(plan, field, value)
     db.commit()
-    return dispatch_plan_to_dict(plan, db)
+    result = dispatch_plan_to_dict(plan, db)
+    # Only broadcast when engineer or conductor was set (not just train number/name changes)
+    if data.engineer or data.conductor:
+        from routers import ops_events
+        ops_events.broadcast(
+            _tenant_slug(request), "plan_crew_changed",
+            {"plan_id": plan.id, "train_number": plan.train_number or "",
+             "engineer": plan.engineer or "", "conductor": plan.conductor or ""},
+            exclude_sid=request.headers.get("X-Subscriber-Id", ""),
+        )
+    return result
 
 
 @router.patch("/dispatcher/plan/{plan_id}/status")
-def update_dispatch_status(plan_id: int, data: DispatchPlanStatusUpdate, db: Session = Depends(get_db)):
+def update_dispatch_status(request: Request, plan_id: int, data: DispatchPlanStatusUpdate,
+                            db: Session = Depends(get_db)):
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")
@@ -191,7 +220,16 @@ def update_dispatch_status(plan_id: int, data: DispatchPlanStatusUpdate, db: Ses
         raise HTTPException(400, "status must be draft, active, or complete")
     plan.status = data.status
     db.commit()
-    return dispatch_plan_to_dict(plan, db)
+    result = dispatch_plan_to_dict(plan, db)
+    if data.status in ("active", "complete"):
+        from routers import ops_events
+        ops_events.broadcast(
+            _tenant_slug(request), "plan_status_changed",
+            {"plan_id": plan.id, "train_number": plan.train_number or "",
+             "train_name": plan.train_name or "", "status": data.status},
+            exclude_sid=request.headers.get("X-Subscriber-Id", ""),
+        )
+    return result
 
 
 @router.post("/dispatcher/plan/{plan_id}/rebuild")

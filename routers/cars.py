@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request
 
 import storage
+from auth import get_current_user
 from database import get_db
 from models import Car, Location, MovementLog, Waybill
 from converters import car_to_dict, waybill_to_dict
@@ -272,7 +273,8 @@ def advance_waybill(car_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/cars/{car_id}/location")
-def update_car_location(car_id: int, body: dict, db: Session = Depends(get_db)):
+def update_car_location(car_id: int, body: dict, db: Session = Depends(get_db),
+                        user: dict = Depends(get_current_user)):
     car = db.get(Car, car_id)
     if not car:
         raise HTTPException(404, "Car not found")
@@ -285,6 +287,7 @@ def update_car_location(car_id: int, body: dict, db: Session = Depends(get_db)):
         from_location_id=old_loc_id,
         to_location_id=new_loc_id,
         note=body.get("note", ""),
+        operator_email=(user or {}).get("email", "local"),
     )
     db.add(log)
     car.current_location_id = new_loc_id

@@ -10,7 +10,10 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
+import sse_shared
+from auth import get_current_user
 from database import get_db
 from models import Car, Location, MovementLog, SessionClock, Waybill
 from converters import car_to_dict, clock_to_dict, start_session_clock as _start_session_clock, clear_session_clock
@@ -31,6 +34,7 @@ _sse_loop: asyncio.AbstractEventLoop | None = None
 def _register_loop(loop: asyncio.AbstractEventLoop):
     global _sse_loop
     _sse_loop = loop
+    sse_shared.register_loop(loop)
 
 
 def _broadcast_clock(payload: dict | None):
@@ -213,20 +217,31 @@ def ensure_session_clock(db: Session = Depends(get_db)):
 # ── Session plan / end ────────────────────────────────────────────────────────
 
 @router.post("/session/plan")
-def session_plan(db: Session = Depends(get_db)):
+def session_plan(request: Request, db: Session = Depends(get_db),
+                 user: dict = Depends(get_current_user)):
+    from routers import ops_events
     plan = _build_session_plan(db)
     _start_session_clock(db, force=False)
+    tenant = getattr(request.state, "tenant", None)
+    slug = getattr(tenant, "slug", None) or "local"
+    sid = request.headers.get("X-Subscriber-Id", "")
+    car_count = len(plan["arrivals"]) + len(plan["departures"]) + len(plan["spots"])
+    ops_events.broadcast(slug, "session_started", {"car_count": car_count}, exclude_sid=sid)
     return plan
 
 
 @router.post("/session/end")
-def session_end(req: SessionEndRequest, db: Session = Depends(get_db)):
+def session_end(request: Request, req: SessionEndRequest, db: Session = Depends(get_db),
+                user: dict = Depends(get_current_user)):
+    from routers import ops_events
     from routers.automation import auto_assign_one_car
+    operator_email = (user or {}).get("email", "local")
     staging_ids = {l.id for l in db.query(Location).filter(
         Location.location_type.in_(["staging", "yard"])
     ).all()}
 
     updated = []
+    moves_completed = 0
     for item in req.cars:
         car = db.get(Car, item.car_id)
         if not car:
@@ -236,7 +251,9 @@ def session_end(req: SessionEndRequest, db: Session = Depends(get_db)):
         if item.status == "done" and wb and wb.destination_id:
             car.current_location_id = wb.destination_id
             db.add(MovementLog(car_id=car.id, from_location_id=old_loc,
-                               to_location_id=wb.destination_id, note="Session move"))
+                               to_location_id=wb.destination_id, note="Session move",
+                               operator_email=operator_email))
+            moves_completed += 1
             new_slot, cycle_complete = _advance_slot(car)
             car.active_waybill_slot = new_slot
             car.cp_session_count = 0
@@ -254,11 +271,16 @@ def session_end(req: SessionEndRequest, db: Session = Depends(get_db)):
         elif item.status == "cp" and item.location_id:
             car.current_location_id = item.location_id
             db.add(MovementLog(car_id=car.id, from_location_id=old_loc,
-                               to_location_id=item.location_id, note="Session CP"))
+                               to_location_id=item.location_id, note="Session CP",
+                               operator_email=operator_email))
             # waybill NOT advanced for CP cars
             car.cp_session_count = (car.cp_session_count or 0) + 1
         db.commit()
         db.refresh(car)
         updated.append(car_to_dict(car))
     clear_session_clock(db)
+    tenant = getattr(request.state, "tenant", None)
+    slug = getattr(tenant, "slug", None) or "local"
+    sid = request.headers.get("X-Subscriber-Id", "")
+    ops_events.broadcast(slug, "session_ended", {"moves_completed": moves_completed}, exclude_sid=sid)
     return {"updated": updated}

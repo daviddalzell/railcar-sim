@@ -49,6 +49,7 @@ from routers import (
     export_import,
     settings,
     webhooks,
+    ops_events,
 )
 
 _auth = [Depends(get_current_user)]
@@ -70,6 +71,8 @@ templates = Jinja2Templates(directory="templates")
 @app.on_event("startup")
 async def on_startup():
     import asyncio
+    import sse_shared
+    sse_shared.register_loop(asyncio.get_running_loop())
     session._register_loop(asyncio.get_running_loop())
     init_db()
     try:
@@ -144,3 +147,4 @@ app.include_router(settings.router,      dependencies=_auth)
 # Webhook and SSE endpoints registered without auth
 app.include_router(webhooks.router)
 app.include_router(session.sse_router)
+app.include_router(ops_events.router)

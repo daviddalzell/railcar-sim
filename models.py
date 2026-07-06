@@ -121,6 +121,7 @@ class MovementLog(Base):
     from_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
     to_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
     note: Mapped[str] = mapped_column(String, default="")
+    operator_email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     car: Mapped["Car"] = relationship("Car", back_populates="movement_logs")
 

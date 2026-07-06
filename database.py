@@ -122,9 +122,10 @@ def init_db():
         except Exception:
             pass
         for col, table, defn in [
-            ("car_capacity",     "locations",  "INTEGER"),
-            ("spot_numbers",     "industries", "TEXT DEFAULT ''"),
-            ("cp_session_count", "cars",       "INTEGER DEFAULT 0"),
+            ("car_capacity",     "locations",     "INTEGER"),
+            ("spot_numbers",     "industries",    "TEXT DEFAULT ''"),
+            ("cp_session_count", "cars",          "INTEGER DEFAULT 0"),
+            ("operator_email",   "movement_logs", "TEXT"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {defn}"))

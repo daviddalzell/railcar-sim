@@ -19,6 +19,10 @@ let dispatchPlans = [];
 let opsMode = "free";
 let settings = null;
 
+// ── Subscriber identity ───────────────────────────────────────────────────────
+// Unique ID for this browser tab, used to suppress self-notifications.
+const _subscriberId = crypto.randomUUID();
+
 // ── Fast clock ────────────────────────────────────────────────────────────────
 let clockInterval = null;
 let clockState = null;
@@ -50,6 +54,50 @@ function _openClockEventSource() {
     _clockEventSource = null;
     setTimeout(_openClockEventSource, 5000);
   };
+}
+
+// ── Ops notifications SSE ─────────────────────────────────────────────────────
+let _opsEventSource = null;
+
+function _openOpsEventSource() {
+  if (_opsEventSource) return;
+  _opsEventSource = new EventSource(`/api/ops/events?sid=${_subscriberId}`);
+  _opsEventSource.onmessage = e => {
+    try {
+      const evt = JSON.parse(e.data);
+      _handleOpsEvent(evt);
+    } catch {}
+  };
+  _opsEventSource.onerror = () => {
+    _opsEventSource.close();
+    _opsEventSource = null;
+    setTimeout(_openOpsEventSource, 5000);
+  };
+}
+
+function _handleOpsEvent(evt) {
+  const { type } = evt;
+  if (type === "session_started") {
+    showToast(`Session started — ${evt.car_count} car${evt.car_count !== 1 ? "s" : ""} queued`, "success");
+  } else if (type === "session_ended") {
+    showToast(`Session ended — ${evt.moves_completed} move${evt.moves_completed !== 1 ? "s" : ""} completed`, "success");
+  } else if (type === "plan_created") {
+    const label = evt.train_number || evt.train_name || `Plan #${evt.plan_id}`;
+    showToast(`Consist built: ${label} — ${evt.car_count} car${evt.car_count !== 1 ? "s" : ""}`, "info");
+  } else if (type === "plan_crew_changed") {
+    const label = evt.train_number || `Plan #${evt.plan_id}`;
+    const parts = [];
+    if (evt.engineer) parts.push(`Engineer: ${evt.engineer}`);
+    if (evt.conductor) parts.push(`Conductor: ${evt.conductor}`);
+    showToast(`${label} — ${parts.join(" / ")}`, "info");
+  } else if (type === "plan_status_changed") {
+    const label = evt.train_number || evt.train_name || `Plan #${evt.plan_id}`;
+    if (evt.status === "active") {
+      showToast(`${label} is now active`, "info");
+    } else if (evt.status === "complete") {
+      showToast(`${label} complete`, "success");
+    }
+  }
 }
 
 async function fetchAndStartClock() {
@@ -112,6 +160,7 @@ async function api(method, path, body) {
   const opts = { method, headers: {} };
   const token = _authToken();
   if (token) opts.headers["Authorization"] = `Bearer ${token}`;
+  opts.headers["X-Subscriber-Id"] = _subscriberId;
   if (body && !(body instanceof FormData)) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
@@ -3459,6 +3508,7 @@ $("#invite-send-btn")?.addEventListener("click", async () => {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 (async function init() {
+  _openOpsEventSource();
   await Promise.all([
     loadRoster(),
     (async () => {
