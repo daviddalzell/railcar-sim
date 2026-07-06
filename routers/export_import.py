@@ -175,11 +175,15 @@ async def import_data(request: Request, file: UploadFile = File(...), db: Sessio
     tenant = getattr(request.state, "tenant", None)
     folder = getattr(tenant, "schema_name", None) or "uploads"
     photo_remap: dict[str, str] = {}  # original filename -> new photo_path
+    photo_errors: list[str] = []
     for name in zf.namelist():
         if name.startswith("photos/") and name != "photos/":
             fname = Path(name).name
-            new_path = _storage.upload(fname, zf.read(name), "image/jpeg", folder=folder)
-            photo_remap[fname] = new_path
+            try:
+                new_path = _storage.upload(fname, zf.read(name), "image/jpeg", folder=folder)
+                photo_remap[fname] = new_path
+            except Exception as exc:
+                photo_errors.append(f"{fname}: {exc}")
 
     # Remap photo_path values in car rows to the newly uploaded locations
     for car_row in tables.get("cars", []):
@@ -188,6 +192,8 @@ async def import_data(request: Request, file: UploadFile = File(...), db: Sessio
             old_fname = Path(old.split("?")[0]).name
             if old_fname in photo_remap:
                 car_row["photo_path"] = photo_remap[old_fname]
+            elif old_fname not in photo_remap and any(old_fname in e for e in photo_errors):
+                car_row["photo_path"] = ""  # upload failed — clear rather than keep broken path
 
     # Clear in reverse FK order
     db.query(DispatchPlan).delete(synchronize_session=False)
@@ -210,7 +216,10 @@ async def import_data(request: Request, file: UploadFile = File(...), db: Sessio
     import_table(db, MovementLog,         tables.get("movement_logs", []))
     import_table(db, DispatchPlan,        tables.get("dispatch_plan", []))
     db.commit()
-    return {"ok": True}
+    result: dict = {"ok": True, "photos_imported": len(photo_remap)}
+    if photo_errors:
+        result["photo_errors"] = photo_errors
+    return result
 
 
 @router.post("/import/cars")
