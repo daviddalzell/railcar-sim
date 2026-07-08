@@ -83,6 +83,26 @@ def _seed_car_types(schema_name: str) -> None:
         db.close()
 
 
+def _seed_commodity_map(schema_name: str) -> None:
+    """Seed default commodity → car type mappings into a tenant schema if empty."""
+    from database import SessionLocal
+    from models import CommodityCarTypeMap
+    from sqlalchemy import text
+    from routers.commodity_map import _DEFAULT_COMMODITY_MAP
+
+    db = SessionLocal()
+    try:
+        db.execute(text(f'SET search_path TO "{schema_name}", public'))
+        if db.query(CommodityCarTypeMap).count() > 0:
+            return
+        for commodity, car_type in _DEFAULT_COMMODITY_MAP:
+            db.add(CommodityCarTypeMap(commodity=commodity, car_type=car_type))
+        db.commit()
+        print(f"[provision] Seeded {len(_DEFAULT_COMMODITY_MAP)} commodity mappings into {schema_name}")
+    finally:
+        db.close()
+
+
 def provision_tenant(
     slug: str,
     name: str,
@@ -116,6 +136,7 @@ def provision_tenant(
         # 1+2. Create schema and all tenant tables
         _create_tenant_schema(engine, Base, schema_name)
         _seed_car_types(schema_name)
+        _seed_commodity_map(schema_name)
 
         # 3. Insert tenant row
         tenant = Tenant(
