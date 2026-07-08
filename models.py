@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: MIT
 
 import os
-from datetime import datetime
+from datetime import datetime, date as date_type
 from typing import List, Optional
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -28,6 +28,16 @@ class Tenant(Base):
     vision_provider: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     patreon_member_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PageView(Base):
+    """Daily page-view counter per tenant. Lives in the shared public schema."""
+    __tablename__ = "page_views"
+    __table_args__ = {} if _is_sqlite else {"schema": "public"}
+
+    tenant_slug: Mapped[str] = mapped_column(String, primary_key=True)
+    date: Mapped[date_type] = mapped_column(Date, primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class SwitchingArea(Base):

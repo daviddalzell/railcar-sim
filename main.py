@@ -75,6 +75,18 @@ async def on_startup():
     sse_shared.register_loop(asyncio.get_running_loop())
     session._register_loop(asyncio.get_running_loop())
     init_db()
+    from database import engine, _is_sqlite
+    from sqlalchemy import text
+    if not _is_sqlite:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.page_views (
+                    tenant_slug VARCHAR NOT NULL,
+                    date DATE NOT NULL,
+                    count INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (tenant_slug, date)
+                )
+            """))
     try:
         provider = get_provider()
     except ValueError:
@@ -130,6 +142,86 @@ def admin_reset_demo(request: Request):
     return {"ok": True, "source": "hardcoded"}
 
 
+@app.get("/admin/user-stats")
+def admin_user_stats(request: Request):
+    from fastapi import HTTPException
+    secret = os.environ.get("SYNC_SECRET")
+    if not secret or request.headers.get("X-Sync-Secret") != secret:
+        raise HTTPException(403, "Forbidden")
+
+    from database import engine, _is_sqlite, SessionLocal
+    from sqlalchemy import text
+    from datetime import date, timedelta, datetime as dt
+    from models import Tenant
+
+    db = SessionLocal()
+    try:
+        tenants = db.query(Tenant).order_by(Tenant.created_at).all()
+    finally:
+        db.close()
+
+    today = date.today()
+    thirty_days_ago = today - timedelta(days=30)
+    _DEMO_EMAILS = {"local", "dispatcher@mbw.demo"}
+
+    rows = []
+    total_views_30d = 0
+    total_operators_30d = 0
+
+    for t in tenants:
+        views_30d = views_today = 0
+        operators_30d = 0
+
+        if not _is_sqlite:
+            with engine.connect() as conn:
+                r = conn.execute(text("""
+                    SELECT
+                        COALESCE(SUM(count) FILTER (WHERE date >= :start), 0) AS views_30d,
+                        COALESCE(SUM(count) FILTER (WHERE date = :today), 0) AS views_today
+                    FROM public.page_views
+                    WHERE tenant_slug = :slug
+                """), {"slug": t.slug, "start": thirty_days_ago, "today": today}).mappings().one()
+                views_30d = int(r["views_30d"])
+                views_today = int(r["views_today"])
+
+                if t.schema_name:
+                    try:
+                        r2 = conn.execute(text(f"""
+                            SELECT COUNT(DISTINCT operator_email) AS ops
+                            FROM "{t.schema_name}".movement_logs
+                            WHERE timestamp >= :start
+                              AND operator_email IS NOT NULL
+                              AND operator_email != ALL(:skip)
+                        """), {"start": dt.combine(thirty_days_ago, dt.min.time()), "skip": list(_DEMO_EMAILS)}).scalar()
+                        operators_30d = int(r2 or 0)
+                    except Exception:
+                        pass
+
+        total_views_30d += views_30d
+        total_operators_30d += operators_30d
+        rows.append({
+            "slug": t.slug,
+            "name": t.name,
+            "status": t.subscription_status,
+            "created_at": t.created_at.date().isoformat() if t.created_at else None,
+            "views_last_30d": views_30d,
+            "views_today": views_today,
+            "operators_last_30d": operators_30d,
+        })
+
+    active = sum(1 for t in tenants if t.subscription_status == "active")
+    return {
+        "generated_at": dt.utcnow().isoformat() + "Z",
+        "tenants": rows,
+        "summary": {
+            "total_tenants": len(tenants),
+            "active_tenants": active,
+            "total_views_last_30d": total_views_30d,
+            "total_operators_last_30d": total_operators_30d,
+        },
+    }
+
+
 @app.post("/admin/provision-demo-template")
 def admin_provision_demo_template(request: Request):
     from fastapi import HTTPException
@@ -159,10 +251,25 @@ def signup(request: Request):
 
 @app.get("/")
 def index(request: Request):
+    from database import engine, _is_sqlite
+    from sqlalchemy import text
+    from datetime import date
     provider = os.environ.get("VISION_PROVIDER", "anthropic")
     vision_label = _PROVIDER_LABELS.get(provider, f"{provider} Vision")
     tenant = getattr(request.state, "tenant", None)
-    is_demo = getattr(tenant, "slug", "") == "demo"
+    slug = getattr(tenant, "slug", None) or "unknown"
+    is_demo = slug == "demo"
+    if not _is_sqlite:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    INSERT INTO public.page_views (tenant_slug, date, count)
+                    VALUES (:slug, :date, 1)
+                    ON CONFLICT (tenant_slug, date)
+                    DO UPDATE SET count = page_views.count + 1
+                """), {"slug": slug, "date": date.today()})
+        except Exception:
+            pass
     return templates.TemplateResponse(
         "index.html", {
             "request": request,
