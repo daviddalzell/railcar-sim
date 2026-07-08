@@ -2,7 +2,7 @@ name: Reset Demo
 
 on:
   schedule:
-    - cron: '0 4 * * *'  # 4am UTC daily
+    - cron: '0 9 * * *'  # 9am UTC daily
   workflow_dispatch:
 
 jobs:
