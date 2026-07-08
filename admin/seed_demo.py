@@ -46,6 +46,47 @@ _COMMODITY_MAP = [
 ]
 
 
+def _write_movement_logs(db, history):
+    """Write movement log entries with timestamps relative to now (2 hrs ago, 8-min intervals)."""
+    from models import MovementLog
+    base_time = datetime.utcnow() - timedelta(hours=2)
+    for i, (car, from_loc, to_loc) in enumerate(history):
+        db.add(MovementLog(
+            car_id=car.id,
+            timestamp=base_time + timedelta(minutes=i * 8),
+            from_location_id=from_loc.id,
+            to_location_id=to_loc.id,
+            operator_email="dispatcher@mbw.demo",
+            note="",
+        ))
+
+
+def regenerate_movement_logs(db):
+    """Replace movement_logs with fresh timestamped entries based on current DB state.
+
+    Called after cloning the demo-template schema so timestamps are always
+    relative to the moment of reset rather than when the template was last edited.
+    """
+    from models import Car, Location, MovementLog
+    db.query(MovementLog).delete(synchronize_session=False)
+    db.flush()
+
+    cars = db.query(Car).filter(Car.car_type != "caboose").limit(10).all()
+    locations = db.query(Location).all()
+    if len(cars) < 2 or len(locations) < 2:
+        db.commit()
+        return
+
+    history = []
+    for i, car in enumerate(cars):
+        from_loc = locations[i % len(locations)]
+        to_loc = locations[(i + 1) % len(locations)]
+        history.append((car, from_loc, to_loc))
+
+    _write_movement_logs(db, history)
+    db.commit()
+
+
 def seed_demo():
     from dotenv import load_dotenv
     load_dotenv()
@@ -209,7 +250,6 @@ def seed_demo():
         db.flush()
 
         # ── Movement log (simulated prior session) ───────────────────────────
-        base_time = datetime.utcnow() - timedelta(hours=2)
         history = [
             (car_objs[0][0],  loc_staging, loc_yard),
             (car_objs[1][0],  loc_staging, loc_yard),
@@ -222,15 +262,7 @@ def seed_demo():
             (car_objs[12][0], loc_yard,    loc_yard),
             (car_objs[5][0],  loc_staging, loc_fuel),
         ]
-        for i, (car, from_loc, to_loc) in enumerate(history):
-            db.add(MovementLog(
-                car_id=car.id,
-                timestamp=base_time + timedelta(minutes=i * 8),
-                from_location_id=from_loc.id,
-                to_location_id=to_loc.id,
-                operator_email="dispatcher@mbw.demo",
-                note="",
-            ))
+        _write_movement_logs(db, history)
 
         # ── Dispatch plan (pre-built consist to show Dispatcher tab) ─────────
         import json, time as _time

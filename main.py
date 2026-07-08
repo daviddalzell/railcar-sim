@@ -115,9 +115,41 @@ def admin_reset_demo(request: Request):
     secret = os.environ.get("SYNC_SECRET")
     if not secret or request.headers.get("X-Sync-Secret") != secret:
         raise HTTPException(403, "Forbidden")
-    from admin.seed_demo import seed_demo
+    from admin.clone_demo import clone_to_demo
+    from admin.seed_demo import regenerate_movement_logs, seed_demo
+    cloned = clone_to_demo()
+    if cloned:
+        from database import SessionLocal
+        db = SessionLocal()
+        try:
+            regenerate_movement_logs(db)
+        finally:
+            db.close()
+        return {"ok": True, "source": "template"}
     seed_demo()
-    return {"ok": True}
+    return {"ok": True, "source": "hardcoded"}
+
+
+@app.post("/admin/provision-demo-template")
+def admin_provision_demo_template(request: Request):
+    from fastapi import HTTPException
+    secret = os.environ.get("SYNC_SECRET")
+    if not secret or request.headers.get("X-Sync-Secret") != secret:
+        raise HTTPException(403, "Forbidden")
+    admin_email = os.environ.get("DEMO_TEMPLATE_EMAIL")
+    if not admin_email:
+        raise HTTPException(400, "DEMO_TEMPLATE_EMAIL env var not set")
+    from admin.provisioning import provision_tenant
+    try:
+        result = provision_tenant(
+            slug="demo-template",
+            name="Demo Template",
+            admin_email=admin_email,
+            patreon_member_id=None,
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    return result
 
 
 @app.get("/signup")
