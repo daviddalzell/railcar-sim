@@ -39,7 +39,7 @@ async def get_current_user(
 
     tenant = getattr(request.state, "tenant", None)
     if getattr(tenant, "slug", None) == "demo":
-        return {"id": "demo", "email": "demo@waypoint-ops.com", "role": "operator", "tenant_slug": "demo"}
+        return {"id": "demo", "email": "demo@waypoint-ops.com", "role": "admin", "tenant_slug": "demo"}
 
     if credentials is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
