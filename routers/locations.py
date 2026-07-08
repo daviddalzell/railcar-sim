@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
+from auth import require_admin
 from database import get_db
 from models import Car, Location, MovementLog, SwitchingArea, Waybill
 from converters import location_to_dict, switching_area_to_dict
@@ -23,7 +24,7 @@ def list_locations(db: Session = Depends(get_db)):
 
 
 @router.post("/locations", status_code=201)
-def create_location(data: LocationCreate, db: Session = Depends(get_db)):
+def create_location(data: LocationCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     loc = Location(**data.model_dump())
     db.add(loc)
     db.commit()
@@ -32,7 +33,7 @@ def create_location(data: LocationCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/locations/{loc_id}")
-def update_location(loc_id: int, data: LocationCreate, db: Session = Depends(get_db)):
+def update_location(loc_id: int, data: LocationCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     loc = db.get(Location, loc_id)
     if not loc:
         raise HTTPException(404, "Location not found")
@@ -45,7 +46,7 @@ def update_location(loc_id: int, data: LocationCreate, db: Session = Depends(get
 
 
 @router.delete("/locations/{loc_id}")
-def delete_location(request: Request, loc_id: int, merge_into_id: Optional[int] = None, db: Session = Depends(get_db)):
+def delete_location(request: Request, loc_id: int, merge_into_id: Optional[int] = None, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     from auth import is_demo
     if is_demo(request):
         raise HTTPException(403, "Deleting locations is disabled in the demo")
@@ -96,7 +97,7 @@ def list_switching_areas(db: Session = Depends(get_db)):
 
 
 @router.post("/switching-areas", status_code=201)
-def create_switching_area(data: SwitchingAreaCreate, db: Session = Depends(get_db)):
+def create_switching_area(data: SwitchingAreaCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     area = SwitchingArea(name=data.name, car_capacity=data.car_capacity)
     db.add(area)
     db.commit()
@@ -105,7 +106,7 @@ def create_switching_area(data: SwitchingAreaCreate, db: Session = Depends(get_d
 
 
 @router.put("/switching-areas/{area_id}")
-def update_switching_area(area_id: int, data: SwitchingAreaCreate, db: Session = Depends(get_db)):
+def update_switching_area(area_id: int, data: SwitchingAreaCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     area = db.get(SwitchingArea, area_id)
     if not area:
         raise HTTPException(404, "Switching area not found")
@@ -116,7 +117,7 @@ def update_switching_area(area_id: int, data: SwitchingAreaCreate, db: Session =
 
 
 @router.delete("/switching-areas/{area_id}", status_code=204)
-def delete_switching_area(request: Request, area_id: int, db: Session = Depends(get_db)):
+def delete_switching_area(request: Request, area_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     from auth import is_demo
     if is_demo(request):
         raise HTTPException(403, "Deleting switching areas is disabled in the demo")

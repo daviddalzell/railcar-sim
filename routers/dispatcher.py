@@ -9,6 +9,7 @@ from sqlalchemy import nullslast
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
+from auth import require_admin
 from database import get_db
 from models import Car, DispatchPlan, Location, SwitchingArea
 from converters import car_to_dict, dispatch_plan_to_dict
@@ -93,7 +94,7 @@ def _tenant_slug(request: Request) -> str:
 
 
 @router.post("/dispatcher/build-plan")
-def build_dispatch_plan(request: Request, data: DispatchBuildRequest, db: Session = Depends(get_db)):
+def build_dispatch_plan(request: Request, data: DispatchBuildRequest, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     area = db.get(SwitchingArea, data.switching_area_id)
     if not area:
         raise HTTPException(404, "Switching area not found")
@@ -155,7 +156,7 @@ def get_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/dispatcher/plan/{plan_id}", status_code=204)
-def delete_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
+def delete_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")
@@ -164,12 +165,12 @@ def delete_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/dispatcher/plans", status_code=204)
-def clear_all_dispatch_plans(db: Session = Depends(get_db)):
+def clear_all_dispatch_plans(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     _clear_dispatch_plan(db)
 
 
 @router.patch("/dispatcher/plan/{plan_id}/power")
-def update_dispatch_power(plan_id: int, data: DispatchPowerUpdate, db: Session = Depends(get_db)):
+def update_dispatch_power(plan_id: int, data: DispatchPowerUpdate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")
@@ -190,7 +191,7 @@ def update_dispatch_power(plan_id: int, data: DispatchPowerUpdate, db: Session =
 
 @router.patch("/dispatcher/plan/{plan_id}/identity")
 def update_dispatch_identity(request: Request, plan_id: int, data: DispatchPlanIdentityUpdate,
-                              db: Session = Depends(get_db)):
+                              db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")
@@ -233,7 +234,7 @@ def update_dispatch_status(request: Request, plan_id: int, data: DispatchPlanSta
 
 
 @router.post("/dispatcher/plan/{plan_id}/rebuild")
-def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db)):
+def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")

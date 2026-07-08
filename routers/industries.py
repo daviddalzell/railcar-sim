@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
+from auth import require_admin
 from database import get_db
 from models import CommodityCarTypeMap, Industry, Waybill
 from converters import industry_to_dict
@@ -20,7 +21,7 @@ def list_industries(db: Session = Depends(get_db)):
 
 
 @router.post("/industries", status_code=201)
-def create_industry(data: IndustryCreate, db: Session = Depends(get_db)):
+def create_industry(data: IndustryCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     ind = Industry(**data.model_dump())
     db.add(ind)
     db.commit()
@@ -29,7 +30,7 @@ def create_industry(data: IndustryCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/industries/{ind_id}")
-def update_industry(ind_id: int, data: IndustryCreate, db: Session = Depends(get_db)):
+def update_industry(ind_id: int, data: IndustryCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     ind = db.get(Industry, ind_id)
     if not ind:
         raise HTTPException(404, "Industry not found")
@@ -40,7 +41,7 @@ def update_industry(ind_id: int, data: IndustryCreate, db: Session = Depends(get
 
 
 @router.delete("/industries/{ind_id}", status_code=204)
-def delete_industry(request: Request, ind_id: int, db: Session = Depends(get_db)):
+def delete_industry(request: Request, ind_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     from auth import is_demo
     if is_demo(request):
         raise HTTPException(403, "Deleting industries is disabled in the demo")
