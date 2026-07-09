@@ -3484,15 +3484,19 @@ $("#settings-save-btn")?.addEventListener("click", async () => {
   if (anthropic) body.anthropic_api_key = anthropic;
   if (openai)    body.openai_api_key    = openai;
 
-  const result = await api("PATCH", "/api/tenant-settings", body);
-  if (result?.ok) {
-    if (msg) msg.textContent = "Saved.";
-    ["#settings-gemini-key", "#settings-anthropic-key", "#settings-openai-key"].forEach(id => {
-      const el = $(id);
-      if (el) el.value = "";
-    });
-    await loadSettings();
-    setTimeout(() => { if (msg) msg.textContent = ""; }, 3000);
+  try {
+    const result = await api("PATCH", "/api/tenant-settings", body);
+    if (result?.ok) {
+      if (msg) msg.textContent = "Saved.";
+      ["#settings-gemini-key", "#settings-anthropic-key", "#settings-openai-key"].forEach(id => {
+        const el = $(id);
+        if (el) el.value = "";
+      });
+      await loadSettings();
+      setTimeout(() => { if (msg) msg.textContent = ""; }, 3000);
+    }
+  } catch (err) {
+    if (msg) msg.textContent = err.message || "Failed to save settings.";
   }
 });
 
@@ -3532,11 +3536,15 @@ $("#invite-send-btn")?.addEventListener("click", async () => {
   const role  = $("#invite-role")?.value || "operator";
   const msg   = $("#invite-msg");
   if (!email) { if (msg) msg.textContent = "Enter an email address."; return; }
-  const result = await api("POST", "/api/tenant-settings/invite", { email, role });
-  if (result?.ok) {
-    if (msg) msg.textContent = `Invite sent to ${email}.`;
-    if ($("#invite-email")) $("#invite-email").value = "";
-    setTimeout(() => { if (msg) msg.textContent = ""; }, 4000);
+  try {
+    const result = await api("POST", "/api/tenant-settings/invite", { email, role });
+    if (result?.ok) {
+      if (msg) msg.textContent = `Invite sent to ${email}.`;
+      if ($("#invite-email")) $("#invite-email").value = "";
+      setTimeout(() => { if (msg) msg.textContent = ""; }, 4000);
+    }
+  } catch (err) {
+    if (msg) msg.textContent = err.message || "Failed to send invite.";
   }
 });
 
