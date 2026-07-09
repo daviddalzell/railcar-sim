@@ -127,7 +127,5 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         msg = str(e)
         if "timed out" in msg.lower() or "timeout" in msg.lower():
             raise HTTPException(503, "Could not reach Supabase — the project may be paused. Resume it in the Supabase dashboard.")
-        if "sending" in msg.lower() or "smtp" in msg.lower() or "email" in msg.lower():
-            raise HTTPException(503, "Supabase could not send the email — configure custom SMTP in Project Settings → Auth → SMTP Settings.")
-        raise HTTPException(500, f"Failed to send invite: {e}")
+        raise HTTPException(500, f"Supabase error: {e}")
 
