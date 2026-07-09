@@ -117,9 +117,16 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         from supabase import create_client, ClientOptions
         client = create_client(supabase_url, supabase_key,
                                options=ClientOptions(httpx_client=httpx.Client(timeout=15)))
+        app_url = os.environ.get("APP_URL", "https://waypoint-ops.com")
+        # Strip scheme to rebuild with tenant subdomain
+        base = app_url.split("://", 1)[-1].lstrip("www.")
+        redirect_to = f"https://{tenant_ctx.slug}.{base}/"
         resp = client.auth.admin.invite_user_by_email(
             data.email,
-            options={"data": {"tenant_slug": tenant_ctx.slug, "role": data.role}},
+            options={
+                "data": {"tenant_slug": tenant_ctx.slug, "role": data.role},
+                "redirect_to": redirect_to,
+            },
         )
         user_id = getattr(resp.user, "id", None)
         return {"ok": True, "user_id": user_id}
@@ -127,5 +134,5 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         msg = str(e)
         if "timed out" in msg.lower() or "timeout" in msg.lower():
             raise HTTPException(503, "Could not reach Supabase — the project may be paused. Resume it in the Supabase dashboard.")
-        raise HTTPException(500, f"Supabase error: {e}")
+        raise HTTPException(500, f"Failed to send invite: {e}")
 
