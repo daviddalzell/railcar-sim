@@ -113,8 +113,10 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         raise HTTPException(503, "Supabase not configured on this server")
 
     try:
-        from supabase import create_client
-        client = create_client(supabase_url, supabase_key)
+        import httpx
+        from supabase import create_client, ClientOptions
+        client = create_client(supabase_url, supabase_key,
+                               options=ClientOptions(httpx_client=httpx.Client(timeout=15)))
         resp = client.auth.admin.invite_user_by_email(
             data.email,
             options={"data": {"tenant_slug": tenant_ctx.slug, "role": data.role}},
@@ -122,5 +124,10 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         user_id = getattr(resp.user, "id", None)
         return {"ok": True, "user_id": user_id}
     except Exception as e:
+        msg = str(e)
+        if "timed out" in msg.lower() or "timeout" in msg.lower():
+            raise HTTPException(503, "Could not reach Supabase — the project may be paused. Resume it in the Supabase dashboard.")
+        if "sending" in msg.lower() or "smtp" in msg.lower() or "email" in msg.lower():
+            raise HTTPException(503, "Supabase could not send the email — configure custom SMTP in Project Settings → Auth → SMTP Settings.")
         raise HTTPException(500, f"Failed to send invite: {e}")
 
