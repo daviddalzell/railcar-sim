@@ -120,16 +120,21 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
     if data.role not in ("operator", "admin"):
         raise HTTPException(400, "Role must be 'operator' or 'admin'")
 
-    # Check if already an active member
+    # Check if already an active member (non-fatal if table doesn't exist yet)
     from database import _is_sqlite
     if not _is_sqlite:
-        existing = db.query(TenantMember).filter(
-            TenantMember.tenant_slug == tenant_ctx.slug,
-            TenantMember.email == data.email,
-            TenantMember.is_active == True,
-        ).first()
-        if existing:
-            raise HTTPException(409, f"{data.email} is already a member of this layout")
+        try:
+            existing = db.query(TenantMember).filter(
+                TenantMember.tenant_slug == tenant_ctx.slug,
+                TenantMember.email == data.email,
+                TenantMember.is_active == True,
+            ).first()
+            if existing:
+                raise HTTPException(409, f"{data.email} is already a member of this layout")
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # table may not exist on first deploy; proceed with invite
 
     try:
         client = _supabase_admin()
@@ -152,18 +157,21 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
             raise HTTPException(503, "Could not reach Supabase — the project may be paused. Resume it in the Supabase dashboard.")
         raise HTTPException(500, f"Failed to send invite: {e}")
 
-    # Sync to tenant_members
+    # Sync to tenant_members (non-fatal if table doesn't exist yet)
     if invited_user_id and not _is_sqlite:
-        from database import engine
-        from sqlalchemy import text
-        with engine.begin() as conn:
-            conn.execute(text("""
-                INSERT INTO public.tenant_members (tenant_slug, supabase_user_id, email, role, invited_at)
-                VALUES (:slug, :uid, :email, :role, NOW())
-                ON CONFLICT (tenant_slug, supabase_user_id)
-                DO UPDATE SET role = EXCLUDED.role, is_active = true, invited_at = NOW()
-            """), {"slug": tenant_ctx.slug, "uid": str(invited_user_id),
-                   "email": data.email, "role": data.role})
+        try:
+            from database import engine
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    INSERT INTO public.tenant_members (tenant_slug, supabase_user_id, email, role, invited_at)
+                    VALUES (:slug, :uid, :email, :role, NOW())
+                    ON CONFLICT (tenant_slug, supabase_user_id)
+                    DO UPDATE SET role = EXCLUDED.role, is_active = true, invited_at = NOW()
+                """), {"slug": tenant_ctx.slug, "uid": str(invited_user_id),
+                       "email": data.email, "role": data.role})
+        except Exception:
+            pass
 
     return {"ok": True, "user_id": invited_user_id}
 
