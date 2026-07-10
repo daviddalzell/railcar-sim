@@ -140,15 +140,74 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         client = _supabase_admin()
         app_url = os.environ.get("APP_URL", "https://waypoint-ops.com")
         base = app_url.split("://", 1)[-1].lstrip("www.")
-        redirect_to = f"https://{tenant_ctx.slug}.{base}"
-        resp = client.auth.admin.invite_user_by_email(
-            data.email,
-            options={
-                "data": {"tenant_slug": tenant_ctx.slug, "role": data.role, "next_url": redirect_to},
-                "redirect_to": redirect_to,
-            },
+        tenant_url = f"https://{tenant_ctx.slug}.{base}"
+
+        # generate_link creates the user + token without sending email,
+        # bypassing the redirect_to allowlist entirely.
+        link_type = "invite"
+        try:
+            link_resp = client.auth.admin.generate_link({
+                "type": "invite",
+                "email": data.email,
+                "options": {"data": {"tenant_slug": tenant_ctx.slug, "role": data.role}},
+            })
+        except Exception as _gen_err:
+            # Existing confirmed user — fall back to magic link
+            if "registered" in str(_gen_err).lower() or "exists" in str(_gen_err).lower():
+                link_type = "magiclink"
+                link_resp = client.auth.admin.generate_link({
+                    "type": "magiclink",
+                    "email": data.email,
+                    "options": {"data": {"tenant_slug": tenant_ctx.slug, "role": data.role}},
+                })
+                client.auth.admin.update_user_by_id(
+                    str(link_resp.user.id),
+                    {"user_metadata": {"tenant_slug": tenant_ctx.slug, "role": data.role}},
+                )
+            else:
+                raise
+
+        hashed_token = link_resp.properties.hashed_token
+        invited_user_id = getattr(link_resp.user, "id", None)
+
+        from urllib.parse import quote as _quote
+        confirm_url = (
+            f"{app_url}/auth/confirm"
+            f"?token_hash={hashed_token}"
+            f"&type={link_type}"
+            f"&next={_quote(tenant_url, safe='')}"
         )
-        invited_user_id = getattr(resp.user, "id", None)
+
+        resend_key = os.environ.get("RESEND_API_KEY")
+        resend_from = os.environ.get("RESEND_FROM_EMAIL", f"noreply@{base}")
+        if not resend_key:
+            raise HTTPException(503, "RESEND_API_KEY not configured — set it as a Fly secret")
+
+        if link_type == "invite":
+            subject = f"You're invited to join {tenant_ctx.slug} on Waypoint"
+            body = (
+                f"<p>You've been invited to <strong>{tenant_ctx.slug}</strong> on Waypoint.</p>"
+                f'<p><a href="{confirm_url}">Accept invitation &amp; set your password</a></p>'
+                f"<p style='color:#999;font-size:12px'>Or copy this link: {confirm_url}</p>"
+            )
+        else:
+            subject = f"You've been added to {tenant_ctx.slug} on Waypoint"
+            body = (
+                f"<p>You've been added to <strong>{tenant_ctx.slug}</strong> on Waypoint.</p>"
+                f'<p><a href="{confirm_url}">Sign in to {tenant_ctx.slug}</a></p>'
+                f"<p style='color:#999;font-size:12px'>Or copy this link: {confirm_url}</p>"
+            )
+
+        import httpx as _httpx
+        r = _httpx.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {resend_key}"},
+            json={"from": resend_from, "to": [data.email], "subject": subject, "html": body},
+            timeout=15,
+        )
+        if r.status_code >= 400:
+            raise HTTPException(500, f"Email delivery failed ({r.status_code}): {r.text}")
+
     except HTTPException:
         raise
     except Exception as e:

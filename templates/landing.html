@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waypoint — Model Railroad Operations</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0e1117;
+      color: #e8eaf0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 2rem 2rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-mark {
+      width: 36px;
+      height: 36px;
+      background: #d97706;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-mark svg { display: block; }
+
+    .logo-name {
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #f0f2f5;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem 2rem;
+      text-align: center;
+    }
+
+    .eyebrow {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #d97706;
+      margin-bottom: 1.25rem;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: #f0f2f5;
+      max-width: 20ch;
+      text-wrap: balance;
+      margin-bottom: 1.25rem;
+    }
+
+    h1 em {
+      font-style: normal;
+      color: #d97706;
+    }
+
+    .subtitle {
+      font-size: 1.05rem;
+      color: #8b95a5;
+      max-width: 48ch;
+      line-height: 1.6;
+      margin-bottom: 2.5rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+      margin-bottom: 4rem;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 0.65rem 1.5rem;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+
+    .btn-primary {
+      background: #d97706;
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: #1e2330;
+      color: #c8cdd8;
+      border: 1px solid #2d3447;
+    }
+
+    .tenant-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #161b26;
+      border: 1px solid #2d3447;
+      border-radius: 8px;
+      padding: 0.85rem 1.25rem;
+      font-size: 0.9rem;
+      color: #8b95a5;
+    }
+
+    .tenant-hint code {
+      color: #d97706;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.85rem;
+    }
+
+    .features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      justify-content: center;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    .feature {
+      flex: 1;
+      min-width: 200px;
+      max-width: 220px;
+      text-align: left;
+      background: #161b26;
+      border: 1px solid #2d3447;
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+
+    .feature-icon {
+      font-size: 1.4rem;
+      margin-bottom: 0.6rem;
+      display: block;
+    }
+
+    .feature h3 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #d4d9e4;
+      margin-bottom: 0.35rem;
+    }
+
+    .feature p {
+      font-size: 0.8rem;
+      color: #5a6475;
+      line-height: 1.5;
+    }
+
+    footer {
+      padding: 1.5rem 2rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #3d4556;
+    }
+
+    footer a { color: #5a6475; text-decoration: none; }
+    footer a:hover { color: #8b95a5; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-mark">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="13" width="16" height="3" rx="1.5" fill="white"/>
+        <rect x="5" y="8" width="10" height="5" rx="1" fill="white" opacity="0.85"/>
+        <circle cx="6" cy="16" r="1.5" fill="#d97706"/>
+        <circle cx="14" cy="16" r="1.5" fill="#d97706"/>
+      </svg>
+    </div>
+    <span class="logo-name">Waypoint</span>
+  </header>
+
+  <main>
+    <p class="eyebrow">Model Railroad Operations</p>
+    <h1>Operations sessions,<br><em>simplified</em></h1>
+    <p class="subtitle">
+      Waypoint brings car forwarding, switch lists, and session management
+      to your layout — accessible from any device on your layout room network.
+    </p>
+
+    <div class="actions">
+      <a href="https://demo.waypoint-ops.com" class="btn btn-primary">Try the demo</a>
+      <a href="https://www.patreon.com/WaypointOps" class="btn btn-secondary">Get access on Patreon</a>
+    </div>
+
+    <div class="tenant-hint">
+      Have a layout?&nbsp; Sign in at&nbsp;
+      <code>yourlayout.waypoint-ops.com</code>
+    </div>
+  </main>
+
+  <section style="padding: 0 2rem 4rem;">
+    <div class="features">
+      <div class="feature">
+        <span class="feature-icon">🚂</span>
+        <h3>Car forwarding</h3>
+        <p>Waybills, industries, and car routing — all in one place.</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">📋</span>
+        <h3>Switch lists</h3>
+        <p>Printable lists and QR codes for car-by-car instructions.</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">👥</span>
+        <h3>Multi-operator</h3>
+        <p>Invite your crew and manage roles from the settings panel.</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">📱</span>
+        <h3>Any device</h3>
+        <p>Works on phones, tablets, and laptops — no app to install.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    &copy; 2026 Waypoint &mdash;
+    <a href="https://www.patreon.com/WaypointOps">Patreon</a>
+  </footer>
+
+</body>
+</html>

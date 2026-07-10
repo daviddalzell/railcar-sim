@@ -1121,20 +1121,27 @@
         }
       });
 
-      // PKCE invite confirm: /auth/confirm?token_hash=...&type=invite&next=https://slug.domain/
-      // Verify the token, then redirect to the tenant subdomain with session tokens in the hash.
+      // PKCE invite confirm: /auth/confirm?token_hash=...&type=invite&next=https://slug.domain
       const _confirmSearch = new URLSearchParams(window.location.search);
       const _confirmTokenHash = _confirmSearch.get('token_hash');
       const _confirmType = _confirmSearch.get('type') || 'invite';
       const _confirmNext = _confirmSearch.get('next');
       if (_confirmTokenHash && _confirmNext) {
+        const _overlay = Object.assign(document.createElement('div'), {
+          style: 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-family:sans-serif;font-size:1.1rem;background:#fff;z-index:9999',
+          textContent: 'Verifying invite…',
+        });
+        document.documentElement.appendChild(_overlay);
+
         let _nextValid = false;
         try {
           const _nu = new URL(_confirmNext);
           const _base = window.location.hostname;
-          // Accept tenant subdomains (slug.domain) but not root or unrelated domains
-          _nextValid = _nu.protocol === 'https:' && _nu.hostname !== _base && _nu.hostname.endsWith('.' + _base);
+          _nextValid = _nu.protocol === 'https:'
+            && _nu.hostname !== _base
+            && _nu.hostname.endsWith('.' + _base);
         } catch {}
+
         if (_nextValid) {
           const { data: _vData, error: _vErr } = await sb.auth.verifyOtp({
             token_hash: _confirmTokenHash,
@@ -1143,11 +1150,19 @@
           if (!_vErr && _vData.session) {
             const { access_token: _at, refresh_token: _rt, expires_in: _ei } = _vData.session;
             const _dest = new URL(_confirmNext);
-            _dest.hash = `access_token=${_at}&refresh_token=${_rt}&expires_in=${_ei || 3600}&token_type=bearer&type=${_confirmType}`;
+            _dest.hash = `access_token=${_at}&refresh_token=${_rt}&expires_in=${_ei||3600}&token_type=bearer&type=${_confirmType}`;
             window.location.href = _dest.toString();
             return;
           }
+          _overlay.style.color = 'red';
+          _overlay.textContent = _vErr
+            ? `Invite error: ${_vErr.message}. Request a new invite.`
+            : 'Invite link expired or already used. Request a new invite.';
+        } else {
+          _overlay.style.color = 'red';
+          _overlay.textContent = 'Invalid invite link. Contact your admin for a new one.';
         }
+        return;
       }
 
       const { data: { session } } = await sb.auth.getSession();

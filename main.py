@@ -286,6 +286,8 @@ def index(request: Request):
     provider = os.environ.get("VISION_PROVIDER", "anthropic")
     vision_label = _PROVIDER_LABELS.get(provider, f"{provider} Vision")
     tenant = getattr(request.state, "tenant", None)
+    if tenant is None:
+        return templates.TemplateResponse("landing.html", {"request": request})
     slug = getattr(tenant, "slug", None) or "unknown"
     is_demo = slug == "demo"
     if not _is_sqlite:

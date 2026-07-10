@@ -12,7 +12,7 @@ from database import SessionLocal, _is_sqlite
 
 # Paths that bypass tenant resolution entirely
 _BYPASS_PATHS = {"/health", "/static", "/favicon.ico", "/signup", "/auth/confirm"}
-_BYPASS_SLUGS = {"www", "api"}
+_BYPASS_SLUGS = {"www", "api", "waypoint-ops"}
 
 
 @dataclass
