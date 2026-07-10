@@ -194,7 +194,10 @@ def list_members(request: Request, db: Session = Depends(get_db),
         return []
 
     # One-time backfill from Supabase if table is empty for this tenant
-    count = db.query(TenantMember).filter(TenantMember.tenant_slug == tenant_ctx.slug).count()
+    try:
+        count = db.query(TenantMember).filter(TenantMember.tenant_slug == tenant_ctx.slug).count()
+    except Exception:
+        return []  # table doesn't exist yet; will be created on next app restart
     if count == 0:
         try:
             client = _supabase_admin()
