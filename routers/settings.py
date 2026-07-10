@@ -140,7 +140,7 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         client = _supabase_admin()
         app_url = os.environ.get("APP_URL", "https://waypoint-ops.com")
         base = app_url.split("://", 1)[-1].lstrip("www.")
-        redirect_to = f"https://{tenant_ctx.slug}.{base}/"
+        redirect_to = f"https://{tenant_ctx.slug}.{base}"
         resp = client.auth.admin.invite_user_by_email(
             data.email,
             options={

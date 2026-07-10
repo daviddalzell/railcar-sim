@@ -1131,7 +1131,9 @@
         let _nextValid = false;
         try {
           const _nu = new URL(_confirmNext);
-          _nextValid = _nu.protocol === 'https:' && _nu.hostname.endsWith('.' + window.location.hostname);
+          const _base = window.location.hostname;
+          // Accept tenant subdomains (slug.domain) but not root or unrelated domains
+          _nextValid = _nu.protocol === 'https:' && _nu.hostname !== _base && _nu.hostname.endsWith('.' + _base);
         } catch {}
         if (_nextValid) {
           const { data: _vData, error: _vErr } = await sb.auth.verifyOtp({
