@@ -144,7 +144,7 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         resp = client.auth.admin.invite_user_by_email(
             data.email,
             options={
-                "data": {"tenant_slug": tenant_ctx.slug, "role": data.role},
+                "data": {"tenant_slug": tenant_ctx.slug, "role": data.role, "next_url": redirect_to},
                 "redirect_to": redirect_to,
             },
         )
