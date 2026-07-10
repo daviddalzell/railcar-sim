@@ -11,7 +11,7 @@ from starlette.responses import Response
 from database import SessionLocal, _is_sqlite
 
 # Paths that bypass tenant resolution entirely
-_BYPASS_PATHS = {"/health", "/static", "/favicon.ico", "/signup"}
+_BYPASS_PATHS = {"/health", "/static", "/favicon.ico", "/signup", "/auth/confirm"}
 _BYPASS_SLUGS = {"www", "api"}
 
 

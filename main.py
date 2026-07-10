@@ -258,6 +258,21 @@ def admin_provision_demo_template(request: Request):
     return result
 
 
+@app.get("/auth/confirm")
+def auth_confirm(request: Request):
+    """PKCE invite confirm page — verifies token_hash then redirects to tenant subdomain via JS."""
+    return templates.TemplateResponse(
+        "index.html", {
+            "request": request,
+            "vision_label": "",
+            "supabase_url": os.environ.get("SUPABASE_URL", ""),
+            "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", ""),
+            "auth_disabled": False,
+            "is_demo": False,
+        }
+    )
+
+
 @app.get("/signup")
 def signup(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})

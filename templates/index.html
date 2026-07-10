@@ -1121,6 +1121,33 @@
         }
       });
 
+      // PKCE invite confirm: /auth/confirm?token_hash=...&type=invite&next=https://slug.domain/
+      // Verify the token, then redirect to the tenant subdomain with session tokens in the hash.
+      const _confirmSearch = new URLSearchParams(window.location.search);
+      const _confirmTokenHash = _confirmSearch.get('token_hash');
+      const _confirmType = _confirmSearch.get('type') || 'invite';
+      const _confirmNext = _confirmSearch.get('next');
+      if (_confirmTokenHash && _confirmNext) {
+        let _nextValid = false;
+        try {
+          const _nu = new URL(_confirmNext);
+          _nextValid = _nu.protocol === 'https:' && _nu.hostname.endsWith('.' + window.location.hostname);
+        } catch {}
+        if (_nextValid) {
+          const { data: _vData, error: _vErr } = await sb.auth.verifyOtp({
+            token_hash: _confirmTokenHash,
+            type: _confirmType,
+          });
+          if (!_vErr && _vData.session) {
+            const { access_token: _at, refresh_token: _rt, expires_in: _ei } = _vData.session;
+            const _dest = new URL(_confirmNext);
+            _dest.hash = `access_token=${_at}&refresh_token=${_rt}&expires_in=${_ei || 3600}&token_type=bearer&type=${_confirmType}`;
+            window.location.href = _dest.toString();
+            return;
+          }
+        }
+      }
+
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
         storeSession(session);
