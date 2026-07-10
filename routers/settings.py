@@ -173,7 +173,7 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         except Exception:
             pass
 
-    return {"ok": True, "user_id": invited_user_id}
+    return {"ok": True, "user_id": invited_user_id, "redirect_to": redirect_to}
 
 
 @router.get("/tenant-settings/members")
