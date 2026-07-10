@@ -40,6 +40,22 @@ class PageView(Base):
     count: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class TenantMember(Base):
+    """Per-tenant user membership. Lives in the shared public schema."""
+    __tablename__ = "tenant_members"
+    __table_args__ = {} if _is_sqlite else {"schema": "public"}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_slug: Mapped[str] = mapped_column(String, nullable=False)
+    supabase_user_id: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, nullable=False)
+    display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    role: Mapped[str] = mapped_column(String, nullable=False, default="operator")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    invited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    joined_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
 class SwitchingArea(Base):
     __tablename__ = "switching_areas"
 

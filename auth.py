@@ -54,6 +54,26 @@ async def get_current_user(
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+    # Check if this user has been explicitly revoked from this tenant
+    tenant_slug = getattr(getattr(request.state, "tenant", None), "slug", None)
+    if tenant_slug:
+        try:
+            from database import engine, _is_sqlite
+            from sqlalchemy import text as _text
+            if not _is_sqlite:
+                with engine.connect() as conn:
+                    revoked = conn.execute(_text("""
+                        SELECT 1 FROM public.tenant_members
+                        WHERE supabase_user_id = :uid AND tenant_slug = :slug AND is_active = false
+                        LIMIT 1
+                    """), {"uid": str(user.id), "slug": tenant_slug}).fetchone()
+                    if revoked:
+                        raise HTTPException(status_code=403, detail="Access revoked")
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # DB check failure is non-fatal; let the request through
+
     meta = user.user_metadata or {}
     return {
         "id": user.id,

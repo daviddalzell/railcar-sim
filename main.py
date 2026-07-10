@@ -87,6 +87,20 @@ async def on_startup():
                     PRIMARY KEY (tenant_slug, date)
                 )
             """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.tenant_members (
+                    id SERIAL PRIMARY KEY,
+                    tenant_slug VARCHAR NOT NULL,
+                    supabase_user_id VARCHAR NOT NULL,
+                    email VARCHAR NOT NULL,
+                    display_name VARCHAR,
+                    role VARCHAR NOT NULL DEFAULT 'operator',
+                    is_active BOOLEAN NOT NULL DEFAULT true,
+                    invited_at TIMESTAMP DEFAULT NOW(),
+                    joined_at TIMESTAMP,
+                    UNIQUE (tenant_slug, supabase_user_id)
+                )
+            """))
     try:
         provider = get_provider()
     except ValueError:

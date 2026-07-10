@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: 2026 David Dalzell
 # SPDX-License-Identifier: MIT
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -9,7 +11,7 @@ from starlette.requests import Request
 from auth import get_current_user
 from database import get_db
 from middleware.tenant import invalidate_tenant_cache
-from models import Tenant
+from models import Tenant, TenantMember
 
 router = APIRouter(prefix="/api", tags=["settings"])
 
@@ -24,9 +26,27 @@ class TenantSettingsUpdate(BaseModel):
     openai_api_key: str | None = None
 
 
+class InviteOperatorRequest(BaseModel):
+    email: str
+    role: str = "operator"
+
+
+class MemberRoleUpdate(BaseModel):
+    role: str
+
+
+def _supabase_admin():
+    import httpx
+    from supabase import create_client, ClientOptions
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    if not (url and key):
+        raise HTTPException(503, "Supabase not configured on this server")
+    return create_client(url, key, options=ClientOptions(httpx_client=httpx.Client(timeout=15)))
+
+
 @router.get("/tenant-settings")
 def get_settings(request: Request, db: Session = Depends(get_db)):
-    import os
     tenant_ctx = getattr(request.state, "tenant", None)
     if not tenant_ctx or tenant_ctx.id == 0:
         return {
@@ -72,7 +92,6 @@ def update_settings(request: Request, data: TenantSettingsUpdate, db: Session = 
         row.name = data.name.strip()
     if data.vision_provider is not None:
         row.vision_provider = data.vision_provider
-    # Empty string clears a key; None means no change
     if data.gemini_api_key is not None:
         row.gemini_api_key = data.gemini_api_key or None
     if data.anthropic_api_key is not None:
@@ -85,15 +104,9 @@ def update_settings(request: Request, data: TenantSettingsUpdate, db: Session = 
     return {"ok": True}
 
 
-class InviteOperatorRequest(BaseModel):
-    email: str
-    role: str = "operator"
-
-
 @router.post("/tenant-settings/invite", status_code=200)
 def invite_operator(request: Request, data: InviteOperatorRequest, db: Session = Depends(get_db),
                     user: dict = Depends(get_current_user)):
-    import os
     from auth import is_demo
     if is_demo(request):
         raise HTTPException(403, "Invitations are disabled in the demo")
@@ -107,18 +120,20 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
     if data.role not in ("operator", "admin"):
         raise HTTPException(400, "Role must be 'operator' or 'admin'")
 
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_KEY")
-    if not (supabase_url and supabase_key):
-        raise HTTPException(503, "Supabase not configured on this server")
+    # Check if already an active member
+    from database import _is_sqlite
+    if not _is_sqlite:
+        existing = db.query(TenantMember).filter(
+            TenantMember.tenant_slug == tenant_ctx.slug,
+            TenantMember.email == data.email,
+            TenantMember.is_active == True,
+        ).first()
+        if existing:
+            raise HTTPException(409, f"{data.email} is already a member of this layout")
 
     try:
-        import httpx
-        from supabase import create_client, ClientOptions
-        client = create_client(supabase_url, supabase_key,
-                               options=ClientOptions(httpx_client=httpx.Client(timeout=15)))
+        client = _supabase_admin()
         app_url = os.environ.get("APP_URL", "https://waypoint-ops.com")
-        # Strip scheme to rebuild with tenant subdomain
         base = app_url.split("://", 1)[-1].lstrip("www.")
         redirect_to = f"https://{tenant_ctx.slug}.{base}/"
         resp = client.auth.admin.invite_user_by_email(
@@ -128,11 +143,180 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
                 "redirect_to": redirect_to,
             },
         )
-        user_id = getattr(resp.user, "id", None)
-        return {"ok": True, "user_id": user_id}
+        invited_user_id = getattr(resp.user, "id", None)
+    except HTTPException:
+        raise
     except Exception as e:
         msg = str(e)
         if "timed out" in msg.lower() or "timeout" in msg.lower():
             raise HTTPException(503, "Could not reach Supabase — the project may be paused. Resume it in the Supabase dashboard.")
         raise HTTPException(500, f"Failed to send invite: {e}")
 
+    # Sync to tenant_members
+    if invited_user_id and not _is_sqlite:
+        from database import engine
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO public.tenant_members (tenant_slug, supabase_user_id, email, role, invited_at)
+                VALUES (:slug, :uid, :email, :role, NOW())
+                ON CONFLICT (tenant_slug, supabase_user_id)
+                DO UPDATE SET role = EXCLUDED.role, is_active = true, invited_at = NOW()
+            """), {"slug": tenant_ctx.slug, "uid": str(invited_user_id),
+                   "email": data.email, "role": data.role})
+
+    return {"ok": True, "user_id": invited_user_id}
+
+
+@router.get("/tenant-settings/members")
+def list_members(request: Request, db: Session = Depends(get_db),
+                 user: dict = Depends(get_current_user)):
+    from auth import is_demo
+    if is_demo(request):
+        return []
+    if (user or {}).get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+
+    tenant_ctx = getattr(request.state, "tenant", None)
+    if not tenant_ctx or tenant_ctx.id == 0:
+        return []
+
+    from database import _is_sqlite
+    if _is_sqlite:
+        return []
+
+    # One-time backfill from Supabase if table is empty for this tenant
+    count = db.query(TenantMember).filter(TenantMember.tenant_slug == tenant_ctx.slug).count()
+    if count == 0:
+        try:
+            client = _supabase_admin()
+            users = client.auth.admin.list_users(page=1, per_page=1000)
+            from database import engine
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                for u in users:
+                    meta = u.user_metadata or {}
+                    if meta.get("tenant_slug") == tenant_ctx.slug:
+                        conn.execute(text("""
+                            INSERT INTO public.tenant_members
+                                (tenant_slug, supabase_user_id, email, role, invited_at)
+                            VALUES (:slug, :uid, :email, :role, :invited_at)
+                            ON CONFLICT (tenant_slug, supabase_user_id) DO NOTHING
+                        """), {
+                            "slug": tenant_ctx.slug,
+                            "uid": str(u.id),
+                            "email": u.email or "",
+                            "role": meta.get("role", "operator"),
+                            "invited_at": u.created_at,
+                        })
+        except Exception:
+            pass  # Backfill failure is non-fatal
+
+    members = (
+        db.query(TenantMember)
+        .filter(TenantMember.tenant_slug == tenant_ctx.slug)
+        .order_by(TenantMember.invited_at)
+        .all()
+    )
+    return [
+        {
+            "id": m.id,
+            "email": m.email,
+            "display_name": m.display_name,
+            "role": m.role,
+            "is_active": m.is_active,
+            "invited_at": m.invited_at.isoformat() if m.invited_at else None,
+            "joined_at": m.joined_at.isoformat() if m.joined_at else None,
+        }
+        for m in members
+    ]
+
+
+@router.patch("/tenant-settings/members/me/joined", status_code=200)
+def mark_joined(request: Request, db: Session = Depends(get_db),
+                user: dict = Depends(get_current_user)):
+    from database import _is_sqlite
+    if _is_sqlite:
+        return {"ok": True}
+    tenant_ctx = getattr(request.state, "tenant", None)
+    if not tenant_ctx or tenant_ctx.id == 0:
+        return {"ok": True}
+    uid = (user or {}).get("id")
+    if not uid:
+        return {"ok": True}
+    from datetime import datetime
+    member = db.query(TenantMember).filter(
+        TenantMember.tenant_slug == tenant_ctx.slug,
+        TenantMember.supabase_user_id == str(uid),
+        TenantMember.joined_at == None,
+    ).first()
+    if member:
+        member.joined_at = datetime.utcnow()
+        db.commit()
+    return {"ok": True}
+
+
+@router.patch("/tenant-settings/members/{member_id}", status_code=200)
+def update_member_role(member_id: int, data: MemberRoleUpdate, request: Request,
+                       db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    from auth import is_demo
+    if is_demo(request):
+        raise HTTPException(403, "Disabled in demo")
+    if (user or {}).get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    if data.role not in ("operator", "admin"):
+        raise HTTPException(400, "Role must be 'operator' or 'admin'")
+
+    tenant_ctx = getattr(request.state, "tenant", None)
+    member = db.query(TenantMember).filter(
+        TenantMember.id == member_id,
+        TenantMember.tenant_slug == tenant_ctx.slug if tenant_ctx else False,
+    ).first()
+    if not member:
+        raise HTTPException(404, "Member not found")
+
+    member.role = data.role
+    db.commit()
+
+    # Sync to Supabase metadata so JWT reflects the new role on next refresh
+    try:
+        client = _supabase_admin()
+        client.auth.admin.update_user_by_id(
+            member.supabase_user_id,
+            {"user_metadata": {"role": data.role, "tenant_slug": tenant_ctx.slug}},
+        )
+    except Exception:
+        pass  # DB update succeeded; Supabase sync failure is non-fatal
+
+    return {"ok": True, "role": data.role}
+
+
+@router.delete("/tenant-settings/members/{member_id}", status_code=204)
+def remove_member(member_id: int, request: Request,
+                  db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    from auth import is_demo
+    if is_demo(request):
+        raise HTTPException(403, "Disabled in demo")
+    if (user or {}).get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+
+    tenant_ctx = getattr(request.state, "tenant", None)
+    member = db.query(TenantMember).filter(
+        TenantMember.id == member_id,
+        TenantMember.tenant_slug == tenant_ctx.slug if tenant_ctx else False,
+    ).first()
+    if not member:
+        raise HTTPException(404, "Member not found")
+
+    member.is_active = False
+    db.commit()
+
+    # Clear tenant_slug from Supabase metadata so the user's existing JWT stops working
+    try:
+        client = _supabase_admin()
+        client.auth.admin.update_user_by_id(
+            member.supabase_user_id,
+            {"user_metadata": {"tenant_slug": "", "role": ""}},
+        )
+    except Exception:
+        pass  # DB update succeeded; Supabase sync failure is non-fatal

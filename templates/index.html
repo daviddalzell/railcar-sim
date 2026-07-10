@@ -28,6 +28,9 @@
     <nav>
       <ul><li><strong class="brand">🔀 WAYPOINT</strong></li></ul>
       <span id="nav-current-tab" class="nav-current-tab"></span>
+      {% if supabase_url and not is_demo %}
+      <button id="account-btn" aria-label="Account" style="display:none;width:2rem;height:2rem;border-radius:50%;padding:0;font-size:0.85rem;font-weight:600;margin-right:0.25rem;flex-shrink:0;"></button>
+      {% endif %}
       <button id="nav-hamburger" class="nav-hamburger" aria-label="Open menu">☰</button>
       <ul id="nav-tab-list">
         <li><a href="#" data-tab="roster" class="tab-link active">Car Roster<span id="roster-badge" class="tab-badge hidden"></span></a></li>
@@ -840,6 +843,22 @@
             <span id="invite-msg" class="muted" style="align-self:center;"></span>
           </div>
         </fieldset>
+
+        <fieldset style="margin-top:2rem;" id="members-fieldset">
+          <legend>Members</legend>
+          <div id="members-loading" class="muted" style="font-size:0.85em;">Loading…</div>
+          <table id="members-table" style="display:none;width:100%;font-size:0.875em;">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Email</th>
+                <th style="text-align:left;width:7rem;">Role</th>
+                <th style="text-align:left;width:5rem;">Status</th>
+                <th style="width:2.5rem;"></th>
+              </tr>
+            </thead>
+            <tbody id="members-body"></tbody>
+          </table>
+        </fieldset>
       </div>
     </section>
 
@@ -954,6 +973,25 @@
   <div id="toast-container"></div>
 
   {% if supabase_url and not is_demo %}
+  <!-- Account dialog -->
+  <dialog id="account-dialog" style="max-width:320px">
+    <article>
+      <header style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="margin:0">My Account</h3>
+        <button class="outline secondary" id="close-account-dialog" style="width:auto;padding:0.25rem 0.75rem;">×</button>
+      </header>
+      <p style="margin:0.25rem 0 0.1rem;font-size:0.8em;color:var(--pico-muted-color)">Signed in as</p>
+      <p id="account-email" style="font-weight:600;margin:0 0 0.25rem;word-break:break-all;"></p>
+      <p style="margin:0.25rem 0 0.1rem;font-size:0.8em;color:var(--pico-muted-color)">Layout</p>
+      <p id="account-tenant" style="margin:0 0 1rem;"></p>
+      <p id="account-pw-sent" style="color:green;display:none;font-size:0.9em;margin-bottom:0.75rem;">Check your email for a reset link.</p>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;">
+        <button id="account-change-pw-btn" class="outline">Change password</button>
+        <button id="account-signout-btn" class="outline secondary">Sign out</button>
+      </div>
+    </article>
+  </dialog>
+
   <!-- Login modal — shown when no active session -->
   <dialog id="login-dialog" style="max-width:360px">
     <article>
@@ -1012,6 +1050,11 @@
       const url = document.querySelector('meta[name="supabase-url"]').content;
       const key = document.querySelector('meta[name="supabase-anon-key"]').content;
       const sb  = supabase.createClient(url, key);
+      window._sb = sb;  // expose for app.js account dialog
+
+      // Detect invite links before Supabase processes the hash
+      const _hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+      const _wasInviteLink = _hashParams.get('type') === 'invite';
 
       function storeSession(session) {
         if (session?.access_token) {
@@ -1019,6 +1062,14 @@
         } else {
           sessionStorage.removeItem("waypoint_token");
         }
+      }
+
+      function _showAccountBtn(email) {
+        const btn = document.getElementById("account-btn");
+        if (!btn) return;
+        btn.textContent = (email || "?")[0].toUpperCase();
+        btn.style.display = "";
+        window._currentUserEmail = email;
       }
 
       function showSetPasswordDialog() {
@@ -1045,20 +1096,35 @@
             btn.textContent = "Update password";
           } else {
             spDlg.close();
+            // Record that this invited user has set their password
+            try {
+              await fetch("/api/tenant-settings/members/me/joined", {
+                method: "PATCH",
+                headers: { "Authorization": `Bearer ${sessionStorage.getItem("waypoint_token")}` },
+              });
+            } catch { /* non-fatal */ }
           }
         }, { once: true });
       }
 
       sb.auth.onAuthStateChange((event, session) => {
         storeSession(session);
-        if (event === "PASSWORD_RECOVERY") {
+        if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && _wasInviteLink)) {
           showSetPasswordDialog();
+        }
+        if (event === "SIGNED_IN" && session?.user?.email) {
+          _showAccountBtn(session.user.email);
+        }
+        if (event === "SIGNED_OUT") {
+          const btn = document.getElementById("account-btn");
+          if (btn) btn.style.display = "none";
         }
       });
 
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
         storeSession(session);
+        _showAccountBtn(session.user?.email);
       } else {
         // No session — show login modal
         const dlg = document.getElementById("login-dialog");

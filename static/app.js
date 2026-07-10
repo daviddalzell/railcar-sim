@@ -3438,7 +3438,115 @@ $("#btn-clear-all-plans").addEventListener("click", async () => {
   }
 });
 
+// ── Account dialog ────────────────────────────────────────────────────────────
+document.getElementById("account-btn")?.addEventListener("click", () => {
+  const dlg = document.getElementById("account-dialog");
+  if (!dlg) return;
+  document.getElementById("account-email").textContent = window._currentUserEmail || "";
+  const tenantName = settings?.name || document.querySelector("title")?.textContent || "";
+  document.getElementById("account-tenant").textContent = tenantName;
+  document.getElementById("account-pw-sent").style.display = "none";
+  dlg.showModal();
+});
+
+document.getElementById("close-account-dialog")?.addEventListener("click", () => {
+  document.getElementById("account-dialog")?.close();
+});
+
+document.getElementById("account-change-pw-btn")?.addEventListener("click", async () => {
+  const email = window._currentUserEmail;
+  if (!email || !window._sb) return;
+  const btn = document.getElementById("account-change-pw-btn");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  const { error } = await window._sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  });
+  btn.disabled = false;
+  btn.textContent = "Change password";
+  document.getElementById("account-pw-sent").style.display = error ? "none" : "";
+  if (error) showToast("Could not send reset email: " + error.message, "error");
+});
+
+document.getElementById("account-signout-btn")?.addEventListener("click", async () => {
+  if (!window._sb) return;
+  await window._sb.auth.signOut();
+  sessionStorage.removeItem("waypoint_token");
+  window.location.reload();
+});
+
 // ── Settings tab ──────────────────────────────────────────────────────────────
+async function loadMembers() {
+  const loading = document.getElementById("members-loading");
+  const table   = document.getElementById("members-table");
+  const tbody   = document.getElementById("members-body");
+  if (!tbody) return;
+
+  let members;
+  try {
+    members = await api("GET", "/api/tenant-settings/members");
+  } catch {
+    if (loading) loading.textContent = "Could not load members.";
+    return;
+  }
+  if (!members || !members.length) {
+    if (loading) loading.textContent = "No members yet.";
+    if (table) table.style.display = "none";
+    return;
+  }
+  if (loading) loading.style.display = "none";
+  if (table) table.style.display = "";
+
+  tbody.innerHTML = members.map(m => {
+    const status = !m.is_active ? '<span style="color:var(--pico-muted-color)">Revoked</span>'
+      : m.joined_at ? '<span style="color:green">Active</span>'
+      : '<span style="color:var(--pico-muted-color)">Pending</span>';
+    const roleCtrl = m.is_active
+      ? `<select class="member-role-select" data-id="${m.id}" style="padding:0.15rem 0.35rem;font-size:0.8em;height:auto;width:auto;">
+           <option value="operator"${m.role==="operator"?" selected":""}>Operator</option>
+           <option value="admin"${m.role==="admin"?" selected":""}>Admin</option>
+         </select>`
+      : `<span style="font-size:0.85em;color:var(--pico-muted-color)">${m.role}</span>`;
+    const removeBtn = m.is_active
+      ? `<button class="member-remove-btn outline secondary" data-id="${m.id}" style="padding:0.1rem 0.4rem;font-size:0.75em;width:auto;">×</button>`
+      : "";
+    return `<tr data-member-id="${m.id}">
+      <td style="word-break:break-all;">${m.email}</td>
+      <td>${roleCtrl}</td>
+      <td>${status}</td>
+      <td>${removeBtn}</td>
+    </tr>`;
+  }).join("");
+}
+
+document.addEventListener("change", async e => {
+  const sel = e.target.closest(".member-role-select");
+  if (!sel) return;
+  const id = sel.dataset.id;
+  const role = sel.value;
+  try {
+    await api("PATCH", `/api/tenant-settings/members/${id}`, { role });
+    showToast("Role updated", "success");
+  } catch (err) {
+    showToast("Failed to update role: " + err.message, "error");
+    await loadMembers(); // revert UI
+  }
+});
+
+document.addEventListener("click", async e => {
+  const btn = e.target.closest(".member-remove-btn");
+  if (!btn) return;
+  if (!confirm("Remove this member? They will lose access immediately.")) return;
+  const id = btn.dataset.id;
+  try {
+    await api("DELETE", `/api/tenant-settings/members/${id}`);
+    showToast("Member removed", "success");
+    await loadMembers();
+  } catch (err) {
+    showToast("Failed to remove member: " + err.message, "error");
+  }
+});
+
 async function loadSettings() {
   const data = await api("GET", "/api/tenant-settings");
   if (!data) return;
@@ -3469,6 +3577,8 @@ async function loadSettings() {
 
   const saveBtn = $("#settings-save-btn");
   if (saveBtn && data.source === "env") saveBtn.disabled = true;
+
+  loadMembers();
 }
 
 $("#settings-save-btn")?.addEventListener("click", async () => {
@@ -3542,6 +3652,7 @@ $("#invite-send-btn")?.addEventListener("click", async () => {
       if (msg) msg.textContent = `Invite sent to ${email}.`;
       if ($("#invite-email")) $("#invite-email").value = "";
       setTimeout(() => { if (msg) msg.textContent = ""; }, 4000);
+      loadMembers();
     }
   } catch (err) {
     if (msg) msg.textContent = err.message || "Failed to send invite.";
