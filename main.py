@@ -101,6 +101,11 @@ async def on_startup():
                     UNIQUE (tenant_slug, supabase_user_id)
                 )
             """))
+            # Backfill missing column default (table may have been created before DEFAULT was added)
+            conn.execute(text("""
+                ALTER TABLE public.tenant_members
+                    ALTER COLUMN is_active SET DEFAULT true
+            """))
     try:
         provider = get_provider()
     except ValueError:

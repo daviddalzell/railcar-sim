@@ -237,8 +237,9 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
             from sqlalchemy import text
             with engine.begin() as conn:
                 conn.execute(text("""
-                    INSERT INTO public.tenant_members (tenant_slug, supabase_user_id, email, role, invited_at)
-                    VALUES (:slug, :uid, :email, :role, NOW())
+                    INSERT INTO public.tenant_members
+                        (tenant_slug, supabase_user_id, email, role, is_active, invited_at)
+                    VALUES (:slug, :uid, :email, :role, true, NOW())
                     ON CONFLICT (tenant_slug, supabase_user_id)
                     DO UPDATE SET role = EXCLUDED.role, is_active = true, invited_at = NOW()
                 """), {"slug": tenant_ctx.slug, "uid": str(invited_user_id),
@@ -284,8 +285,8 @@ def list_members(request: Request, db: Session = Depends(get_db),
                     if meta.get("tenant_slug") == tenant_ctx.slug:
                         conn.execute(text("""
                             INSERT INTO public.tenant_members
-                                (tenant_slug, supabase_user_id, email, role, invited_at)
-                            VALUES (:slug, :uid, :email, :role, :invited_at)
+                                (tenant_slug, supabase_user_id, email, role, is_active, invited_at)
+                            VALUES (:slug, :uid, :email, :role, true, :invited_at)
                             ON CONFLICT (tenant_slug, supabase_user_id) DO NOTHING
                         """), {
                             "slug": tenant_ctx.slug,
