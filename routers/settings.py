@@ -181,7 +181,10 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         smtp_user = os.environ.get("SMTP_USER")
         smtp_pass = os.environ.get("SMTP_PASS")
         if not smtp_user or not smtp_pass:
-            raise HTTPException(503, "SMTP_USER and SMTP_PASS not configured — set them as Fly secrets")
+            raise HTTPException(503, "SMTP_USER and SMTP_PASS not configured - set them as Fly secrets")
+        # Gmail app passwords are displayed with non-breaking spaces; strip all whitespace so the
+        # 16-char token is passed as a clean ASCII string (Gmail accepts both spaced and unspaced forms)
+        smtp_pass = "".join(c for c in smtp_pass if ord(c) > 32 and ord(c) < 127)
         smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
         smtp_port = int(os.environ.get("SMTP_PORT", "587"))
         smtp_from = os.environ.get("SMTP_FROM", smtp_user)
