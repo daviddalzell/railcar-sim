@@ -268,35 +268,24 @@ def list_members(request: Request, db: Session = Depends(get_db),
     if _is_sqlite:
         return []
 
-    # One-time backfill from Supabase if table is empty for this tenant
-    try:
-        count = db.query(TenantMember).filter(TenantMember.tenant_slug == tenant_ctx.slug).count()
-    except Exception:
-        return []  # table doesn't exist yet; will be created on next app restart
-    if count == 0:
+    # Ensure the viewing admin exists in tenant_members. Admins provisioned outside
+    # the invite flow (e.g. via Patreon) have no row yet; a cheap upsert-or-skip
+    # here avoids an empty list on first view without any remote API call.
+    admin_uid = (user or {}).get("id")
+    admin_email = (user or {}).get("email", "")
+    if admin_uid:
         try:
-            client = _supabase_admin()
-            users = client.auth.admin.list_users(page=1, per_page=1000)
             from database import engine
-            from sqlalchemy import text
-            with engine.begin() as conn:
-                for u in users:
-                    meta = u.user_metadata or {}
-                    if meta.get("tenant_slug") == tenant_ctx.slug:
-                        conn.execute(text("""
-                            INSERT INTO public.tenant_members
-                                (tenant_slug, supabase_user_id, email, role, is_active, invited_at)
-                            VALUES (:slug, :uid, :email, :role, true, :invited_at)
-                            ON CONFLICT (tenant_slug, supabase_user_id) DO NOTHING
-                        """), {
-                            "slug": tenant_ctx.slug,
-                            "uid": str(u.id),
-                            "email": u.email or "",
-                            "role": meta.get("role", "operator"),
-                            "invited_at": u.created_at,
-                        })
-        except Exception:
-            pass  # Backfill failure is non-fatal
+            from sqlalchemy import text as _text
+            with engine.begin() as _conn:
+                _conn.execute(_text("""
+                    INSERT INTO public.tenant_members
+                        (tenant_slug, supabase_user_id, email, role, is_active, joined_at, invited_at)
+                    VALUES (:slug, :uid, :email, 'admin', true, NOW(), NOW())
+                    ON CONFLICT (tenant_slug, supabase_user_id) DO NOTHING
+                """), {"slug": tenant_ctx.slug, "uid": str(admin_uid), "email": admin_email})
+        except Exception as _e:
+            logger.warning("Failed to auto-register admin %s: %s", admin_email, _e)
 
     members = (
         db.query(TenantMember)

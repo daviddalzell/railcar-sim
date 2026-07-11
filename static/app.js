@@ -3485,7 +3485,13 @@ async function loadMembers() {
   let members;
   try {
     members = await api("GET", "/api/tenant-settings/members");
-  } catch {
+  } catch (err) {
+    // Operators don't have access — hide the section silently
+    if (err.status === 403) {
+      const fieldset = document.getElementById("members-fieldset");
+      if (fieldset) fieldset.style.display = "none";
+      return;
+    }
     if (loading) loading.textContent = "Could not load members.";
     return;
   }
@@ -3555,7 +3561,7 @@ let _membersRefreshTimer = null;
 function _startMembersRefresh() {
   _stopMembersRefresh();
   loadMembers();
-  _membersRefreshTimer = setInterval(loadMembers, 15_000);
+  _membersRefreshTimer = setInterval(loadMembers, 60_000);
 }
 function _stopMembersRefresh() {
   if (_membersRefreshTimer) { clearInterval(_membersRefreshTimer); _membersRefreshTimer = null; }
