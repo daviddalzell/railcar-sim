@@ -139,7 +139,7 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
     try:
         client = _supabase_admin()
         app_url = os.environ.get("APP_URL", "https://waypoint-ops.com")
-        base = app_url.split("://", 1)[-1].lstrip("www.")
+        base = app_url.split("://", 1)[-1].removeprefix("www.")
         tenant_url = f"https://{tenant_ctx.slug}.{base}"
 
         # generate_link creates the user + token without sending email,
