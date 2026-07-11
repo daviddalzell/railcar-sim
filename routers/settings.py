@@ -202,17 +202,16 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
             )
 
         import smtplib as _smtp
-        from email.mime.multipart import MIMEMultipart as _MMP
-        from email.mime.text import MIMEText as _MMT
-        msg = _MMP("alternative")
+        from email.message import EmailMessage as _EM
+        msg = _EM()
         msg["Subject"] = subject
         msg["From"] = smtp_from
         msg["To"] = data.email
-        msg.attach(_MMT(body, "html"))
+        msg.set_content(body, subtype="html", charset="utf-8")
         with _smtp.SMTP(smtp_host, smtp_port, timeout=15) as srv:
             srv.starttls()
             srv.login(smtp_user, smtp_pass)
-            srv.sendmail(smtp_from, [data.email], msg.as_string())
+            srv.send_message(msg)
 
     except HTTPException:
         raise
