@@ -1074,17 +1074,19 @@
 
       function showSetPasswordDialog() {
         const spDlg = document.getElementById("set-password-dialog");
+        if (spDlg.open) return; // already shown — don't add a second listener
         spDlg.showModal();
         document.getElementById("set-password-form").addEventListener("submit", async () => {
           const pw1  = document.getElementById("new-password").value;
           const pw2  = document.getElementById("confirm-password").value;
           const errEl = document.getElementById("set-password-error");
           const btn  = document.getElementById("set-password-submit");
+          if (btn.disabled) return; // prevent double-submit while request is in flight
           errEl.style.display = "none";
           if (pw1 !== pw2) {
             errEl.textContent = "Passwords do not match.";
             errEl.style.display = "";
-            return;
+            return; // leave listener active so user can correct and retry
           }
           btn.disabled = true;
           btn.textContent = "Updating…";
@@ -1104,7 +1106,7 @@
               });
             } catch { /* non-fatal */ }
           }
-        }, { once: true });
+        });
       }
 
       sb.auth.onAuthStateChange((event, session) => {
