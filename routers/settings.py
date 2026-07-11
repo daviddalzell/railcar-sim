@@ -178,10 +178,13 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
             f"&next={_quote(tenant_url, safe='')}"
         )
 
-        resend_key = os.environ.get("RESEND_API_KEY")
-        resend_from = os.environ.get("RESEND_FROM_EMAIL", f"noreply@{base}")
-        if not resend_key:
-            raise HTTPException(503, "RESEND_API_KEY not configured — set it as a Fly secret")
+        smtp_user = os.environ.get("SMTP_USER")
+        smtp_pass = os.environ.get("SMTP_PASS")
+        if not smtp_user or not smtp_pass:
+            raise HTTPException(503, "SMTP_USER and SMTP_PASS not configured — set them as Fly secrets")
+        smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        smtp_from = os.environ.get("SMTP_FROM", smtp_user)
 
         if link_type == "invite":
             subject = f"You're invited to join {tenant_ctx.slug} on Waypoint"
@@ -198,15 +201,18 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
                 f"<p style='color:#999;font-size:12px'>Or copy this link: {confirm_url}</p>"
             )
 
-        import httpx as _httpx
-        r = _httpx.post(
-            "https://api.resend.com/emails",
-            headers={"Authorization": f"Bearer {resend_key}"},
-            json={"from": resend_from, "to": [data.email], "subject": subject, "html": body},
-            timeout=15,
-        )
-        if r.status_code >= 400:
-            raise HTTPException(500, f"Email delivery failed ({r.status_code}): {r.text}")
+        import smtplib as _smtp
+        from email.mime.multipart import MIMEMultipart as _MMP
+        from email.mime.text import MIMEText as _MMT
+        msg = _MMP("alternative")
+        msg["Subject"] = subject
+        msg["From"] = smtp_from
+        msg["To"] = data.email
+        msg.attach(_MMT(body, "html"))
+        with _smtp.SMTP(smtp_host, smtp_port, timeout=15) as srv:
+            srv.starttls()
+            srv.login(smtp_user, smtp_pass)
+            srv.sendmail(smtp_from, [data.email], msg.as_string())
 
     except HTTPException:
         raise
