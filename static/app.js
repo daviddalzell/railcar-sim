@@ -397,7 +397,7 @@ $$(".tab-link").forEach(link => {
     if (tab === "operations") loadOperations();
     if (tab === "waybills") loadWaybillPool();
     if (tab === "layout") loadLayout();
-    if (tab === "settings") loadSettings();
+    if (tab === "settings") { loadSettings(); _startMembersRefresh(); } else { _stopMembersRefresh(); }
   });
 });
 
@@ -3547,6 +3547,20 @@ document.addEventListener("click", async e => {
   }
 });
 
+// Refresh button for members
+document.getElementById("members-refresh-btn")?.addEventListener("click", () => loadMembers());
+
+// Auto-refresh members list every 15 s while the settings tab is visible
+let _membersRefreshTimer = null;
+function _startMembersRefresh() {
+  _stopMembersRefresh();
+  loadMembers();
+  _membersRefreshTimer = setInterval(loadMembers, 15_000);
+}
+function _stopMembersRefresh() {
+  if (_membersRefreshTimer) { clearInterval(_membersRefreshTimer); _membersRefreshTimer = null; }
+}
+
 async function loadSettings() {
   const data = await api("GET", "/api/tenant-settings");
   if (!data) return;
@@ -3577,8 +3591,6 @@ async function loadSettings() {
 
   const saveBtn = $("#settings-save-btn");
   if (saveBtn && data.source === "env") saveBtn.disabled = true;
-
-  loadMembers();
 }
 
 $("#settings-save-btn")?.addEventListener("click", async () => {

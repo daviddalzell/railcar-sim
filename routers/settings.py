@@ -1,9 +1,12 @@
 # SPDX-FileCopyrightText: 2026 David Dalzell
 # SPDX-License-Identifier: MIT
 
+import logging
 import os
 
 from fastapi import APIRouter, Depends, HTTPException
+
+logger = logging.getLogger("waypoint")
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette.requests import Request
@@ -240,8 +243,9 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
                     DO UPDATE SET role = EXCLUDED.role, is_active = true, invited_at = NOW()
                 """), {"slug": tenant_ctx.slug, "uid": str(invited_user_id),
                        "email": data.email, "role": data.role})
-        except Exception:
-            pass
+        except Exception as _db_err:
+            logger.warning("tenant_members upsert failed for %s/%s: %s",
+                           tenant_ctx.slug, data.email, _db_err)
 
     return {"ok": True, "user_id": invited_user_id}
 
