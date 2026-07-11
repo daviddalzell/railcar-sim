@@ -106,6 +106,11 @@ async def on_startup():
                 ALTER TABLE public.tenant_members
                     ALTER COLUMN is_active SET DEFAULT true
             """))
+            # Ensure unique constraint exists (CREATE TABLE IF NOT EXISTS skips this on existing tables)
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS tenant_members_slug_uid_idx
+                    ON public.tenant_members (tenant_slug, supabase_user_id)
+            """))
     try:
         provider = get_provider()
     except ValueError:
