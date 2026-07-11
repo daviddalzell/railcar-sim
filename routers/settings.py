@@ -203,14 +203,17 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
 
         import smtplib as _smtp
         from email.message import EmailMessage as _EM
-        msg = _EM()
-        msg["Subject"] = subject
-        msg["From"] = smtp_from
-        msg["To"] = data.email
+        from email import policy as _policy
+        # Strip any stray non-ASCII bytes that can sneak in via env vars
+        _clean = lambda s: s.encode("ascii", "ignore").decode("ascii").strip()
+        msg = _EM(policy=_policy.SMTP)
+        msg["Subject"] = subject        # subject is always ASCII (slug + literals)
+        msg["From"] = _clean(smtp_from)
+        msg["To"] = _clean(data.email)
         msg.set_content(body, subtype="html", charset="utf-8")
         with _smtp.SMTP(smtp_host, smtp_port, timeout=15) as srv:
             srv.starttls()
-            srv.login(smtp_user, smtp_pass)
+            srv.login(_clean(smtp_user), smtp_pass)
             srv.send_message(msg)
 
     except HTTPException:
