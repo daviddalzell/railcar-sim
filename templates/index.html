@@ -29,9 +29,6 @@
       <ul><li><strong class="brand">🔀 WAYPOINT</strong></li></ul>
       <span id="nav-current-tab" class="nav-current-tab"></span>
       <button id="nav-hamburger" class="nav-hamburger" aria-label="Open menu">☰</button>
-      {% if supabase_url and not is_demo %}
-      <button id="account-btn" aria-label="Account" style="display:none;"></button>
-      {% endif %}
       <ul id="nav-tab-list">
         <li><a href="#" data-tab="roster" class="tab-link active">Car Roster<span id="roster-badge" class="tab-badge hidden"></span></a></li>
         <li><a href="#" data-tab="operations" class="tab-link">Operations</a></li>
@@ -40,6 +37,9 @@
         <li><a href="#" data-tab="help" class="tab-link">Help</a></li>
         <li><a href="#" data-tab="settings" class="tab-link">Settings</a></li>
       </ul>
+      {% if supabase_url and not is_demo %}
+      <button id="account-btn" aria-label="Account" style="display:none;"></button>
+      {% endif %}
     </nav>
   </header>
 
