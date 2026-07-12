@@ -161,6 +161,21 @@ header.container-fluid {
 .nav-hamburger { display: none; }
 .nav-current-tab { display: none; }
 
+#account-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: 0.25rem;
+  flex-shrink: 0;
+}
+
 header nav .brand {
   color: var(--rail-light);
   font-size: 1.05rem;

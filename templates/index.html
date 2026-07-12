@@ -28,10 +28,10 @@
     <nav>
       <ul><li><strong class="brand">🔀 WAYPOINT</strong></li></ul>
       <span id="nav-current-tab" class="nav-current-tab"></span>
-      {% if supabase_url and not is_demo %}
-      <button id="account-btn" aria-label="Account" style="display:none;width:2rem;height:2rem;border-radius:50%;padding:0;font-size:0.85rem;font-weight:600;margin-right:0.25rem;flex-shrink:0;"></button>
-      {% endif %}
       <button id="nav-hamburger" class="nav-hamburger" aria-label="Open menu">☰</button>
+      {% if supabase_url and not is_demo %}
+      <button id="account-btn" aria-label="Account" style="display:none;"></button>
+      {% endif %}
       <ul id="nav-tab-list">
         <li><a href="#" data-tab="roster" class="tab-link active">Car Roster<span id="roster-badge" class="tab-badge hidden"></span></a></li>
         <li><a href="#" data-tab="operations" class="tab-link">Operations</a></li>
