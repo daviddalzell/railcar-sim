@@ -210,8 +210,8 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
         import smtplib as _smtp
         from email.message import EmailMessage as _EM
         from email import policy as _policy
-        # Strip any stray non-ASCII bytes that can sneak in via env vars
-        _clean = lambda s: s.encode("ascii", "ignore").decode("ascii").strip()
+        def _clean(s):
+            return s.encode("ascii", "ignore").decode("ascii").strip()
         msg = _EM(policy=_policy.SMTP)
         msg["Subject"] = subject        # subject is always ASCII (slug + literals)
         msg["From"] = _clean(smtp_from)
