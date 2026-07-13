@@ -1109,13 +1109,19 @@
         });
       }
 
+      let _loginDialogShown = false;
+
       sb.auth.onAuthStateChange((event, session) => {
         storeSession(session);
         if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && _wasInviteLink)) {
           showSetPasswordDialog();
+          return;
         }
         if (event === "SIGNED_IN" && session?.user?.email) {
           _showAccountBtn(session.user.email);
+          if (_loginDialogShown) {
+            window.location.reload();
+          }
         }
         if (event === "SIGNED_OUT") {
           const btn = document.getElementById("account-btn");
@@ -1174,6 +1180,7 @@
       } else {
         // No session — show login modal
         const dlg = document.getElementById("login-dialog");
+        _loginDialogShown = true;
         dlg.showModal();
 
         // Toggle between sign-in and reset-request forms
