@@ -108,6 +108,7 @@ def provision_tenant(
     name: str,
     admin_email: str,
     patreon_member_id: str | None = None,
+    expires_at: datetime | None = None,
 ) -> dict:
     """
     Provision a new tenant:
@@ -145,6 +146,7 @@ def provision_tenant(
             schema_name=schema_name,
             subscription_status="active",
             patreon_member_id=patreon_member_id,
+            subscription_expires_at=expires_at,
         )
         db.add(tenant)
         db.commit()
@@ -243,6 +245,95 @@ def suspend_tenant(slug: str, grace_days: int = 30) -> bool:
         return True
     finally:
         db.close()
+
+
+def extend_tenant_lease(slug: str, days: int) -> bool:
+    from database import SessionLocal
+    from models import Tenant
+    from middleware.tenant import invalidate_tenant_cache
+
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.slug == slug).first()
+        if not tenant:
+            return False
+        base = tenant.subscription_expires_at or datetime.now(timezone.utc)
+        if base.tzinfo is None:
+            base = base.replace(tzinfo=timezone.utc)
+        tenant.subscription_expires_at = base + timedelta(days=days)
+        if tenant.subscription_status != "active":
+            tenant.subscription_status = "active"
+        db.commit()
+        invalidate_tenant_cache(slug)
+        print(f"[provision] Tenant {slug!r} lease extended by {days}d → {tenant.subscription_expires_at.date()}")
+        return True
+    finally:
+        db.close()
+
+
+def delete_tenant(slug: str) -> bool:
+    from database import SessionLocal
+    from models import Tenant
+    from middleware.tenant import invalidate_tenant_cache
+
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.slug == slug).first()
+        if not tenant:
+            return False
+        tenant.subscription_status = "deleted"
+        db.commit()
+        invalidate_tenant_cache(slug)
+        print(f"[provision] Tenant {slug!r} marked deleted")
+        return True
+    finally:
+        db.close()
+
+
+def send_welcome_email(admin_email: str, slug: str, tenant_name: str, expires_at: datetime | None) -> None:
+    """Send a welcome email to a newly provisioned tenant admin via SMTP."""
+    import smtplib
+    from email.message import EmailMessage
+    from email import policy
+
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_from = os.environ.get("SMTP_FROM", smtp_user)
+    app_url = os.environ.get("APP_URL", "https://waypoint-ops.com")
+    base = app_url.split("://", 1)[-1].removeprefix("www.")
+
+    if not smtp_user:
+        print(f"[provision] SMTP_USER not set — skipping welcome email to {admin_email}")
+        return
+
+    smtp_pass = "".join(c for c in smtp_pass if ord(c) > 32 and ord(c) < 127)
+    tenant_url = f"https://{slug}.{base}"
+    expiry_str = expires_at.strftime("%B %d, %Y") if expires_at else "no fixed expiry"
+
+    subject = f"Your Waypoint layout is ready — {tenant_name}"
+    body = (
+        f"<p>Your Waypoint layout <strong>{tenant_name}</strong> is live!</p>"
+        f'<p><a href="{tenant_url}">Visit your layout: {tenant_url}</a></p>'
+        f"<p>You'll be prompted to set a password on your first visit.</p>"
+        f"<p>Your access expires on <strong>{expiry_str}</strong>. "
+        f"Reply to this email to renew.</p>"
+    )
+
+    try:
+        msg = EmailMessage(policy=policy.SMTP)
+        msg["Subject"] = subject
+        msg["From"] = smtp_from
+        msg["To"] = admin_email
+        msg.set_content(body, subtype="html", charset="utf-8")
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as srv:
+            srv.starttls()
+            srv.login(smtp_user, smtp_pass)
+            srv.send_message(msg)
+        print(f"[provision] Welcome email sent to {admin_email}")
+    except Exception as e:
+        print(f"[provision] Warning: failed to send welcome email to {admin_email}: {e}")
 
 
 def reactivate_tenant(slug: str) -> bool:

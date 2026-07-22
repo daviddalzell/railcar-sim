@@ -217,6 +217,24 @@
     </div>
   </main>
 
+  <section style="padding: 0 2rem 3rem; max-width: 480px; margin: 0 auto; width: 100%;">
+    <div style="background:#161b26;border:1px solid #2d3447;border-radius:10px;padding:1.5rem;">
+      <h2 style="font-size:1rem;font-weight:600;color:#d4d9e4;margin-bottom:0.4rem;">Redeem an access code</h2>
+      <p style="font-size:0.85rem;color:#5a6475;margin-bottom:1rem;line-height:1.5;">
+        Received an access code from David? Enter it below to activate your layout.
+      </p>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <input id="redeem-input" type="text" maxlength="14" spellcheck="false" autocomplete="off"
+          placeholder="RAIL-XXXX-XXXX"
+          style="flex:1;min-width:160px;padding:0.6rem 0.8rem;background:#0e1117;border:1px solid #2d3447;
+                 border-radius:6px;color:#e8eaf0;font-size:0.9rem;font-family:'SF Mono','Fira Code',monospace;
+                 letter-spacing:0.05em;text-transform:uppercase;">
+        <button id="redeem-btn" class="btn btn-primary" style="padding:0.6rem 1.1rem;font-size:0.9rem;border:none;cursor:pointer;">Activate</button>
+      </div>
+      <div id="redeem-msg" style="margin-top:0.65rem;font-size:0.85rem;"></div>
+    </div>
+  </section>
+
   <section style="padding: 0 2rem 4rem;">
     <div class="features">
       <div class="feature">
@@ -247,5 +265,57 @@
     <a href="https://www.patreon.com/WaypointOps">Patreon</a>
   </footer>
 
+<script>
+(function () {
+  const input = document.getElementById("redeem-input");
+  const btn   = document.getElementById("redeem-btn");
+  const msg   = document.getElementById("redeem-msg");
+  if (!input) return;
+
+  input.addEventListener("input", function () {
+    var v = input.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (v.startsWith("RAIL")) v = v.slice(4);
+    var parts = [];
+    if (v.length >= 0) parts.push("RAIL");
+    if (v.length > 0) parts.push(v.slice(0, 4));
+    if (v.length > 4) parts.push(v.slice(4, 8));
+    input.value = parts.join("-");
+  });
+
+  btn.addEventListener("click", async function () {
+    var code = input.value.trim();
+    if (!code || code.length < 5) return;
+    btn.disabled = true;
+    btn.textContent = "Activating…";
+    msg.textContent = "";
+    msg.style.color = "";
+    try {
+      var r = await fetch("/redeem", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({code: code}),
+      });
+      var data = await r.json().catch(function () { return {}; });
+      if (r.ok) {
+        msg.style.color = "#16a34a";
+        msg.innerHTML = "✓ Layout activated! Check your email for next steps. <a href=\"" + data.tenant_url + "\" style=\"color:#16a34a\">" + data.tenant_url + "</a>";
+        btn.textContent = "Done!";
+      } else {
+        msg.style.color = "#dc2626";
+        msg.textContent = data.detail || "Invalid code or already used. Check and try again.";
+        btn.disabled = false;
+        btn.textContent = "Activate";
+      }
+    } catch (e) {
+      msg.style.color = "#dc2626";
+      msg.textContent = "Network error. Please try again.";
+      btn.disabled = false;
+      btn.textContent = "Activate";
+    }
+  });
+
+  input.addEventListener("keydown", function (e) { if (e.key === "Enter") btn.click(); });
+})();
+</script>
 </body>
 </html>

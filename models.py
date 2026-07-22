@@ -56,6 +56,23 @@ class TenantMember(Base):
     joined_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
+class AccessKey(Base):
+    """Single-use access codes for non-Patreon tenant provisioning."""
+    __tablename__ = "access_keys"
+    __table_args__ = {} if _is_sqlite else {"schema": "public"}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    tenant_slug: Mapped[str] = mapped_column(String, nullable=False)
+    tenant_name: Mapped[str] = mapped_column(String, nullable=False)
+    admin_email: Mapped[str] = mapped_column(String, nullable=False)
+    duration_days: Mapped[int] = mapped_column(Integer, nullable=False, default=365)
+    notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
+    redeemed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    redeemed_by_email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+
 class SwitchingArea(Base):
     __tablename__ = "switching_areas"
 

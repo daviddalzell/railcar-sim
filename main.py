@@ -50,6 +50,7 @@ from routers import (
     settings,
     webhooks,
     ops_events,
+    admin_keys,
 )
 
 _auth = [Depends(get_current_user)]
@@ -110,6 +111,20 @@ async def on_startup():
             conn.execute(text("""
                 CREATE UNIQUE INDEX IF NOT EXISTS tenant_members_slug_uid_idx
                     ON public.tenant_members (tenant_slug, supabase_user_id)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS public.access_keys (
+                    id SERIAL PRIMARY KEY,
+                    code VARCHAR NOT NULL UNIQUE,
+                    tenant_slug VARCHAR NOT NULL,
+                    tenant_name VARCHAR NOT NULL,
+                    admin_email VARCHAR NOT NULL,
+                    duration_days INTEGER NOT NULL DEFAULT 365,
+                    notes VARCHAR,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    redeemed_at TIMESTAMP,
+                    redeemed_by_email VARCHAR
+                )
             """))
     try:
         provider = get_provider()
@@ -268,6 +283,39 @@ def admin_provision_demo_template(request: Request):
     return result
 
 
+@app.get("/admin/dashboard")
+def admin_dashboard(request: Request):
+    """Admin dashboard — cookie-gated, serves admin.html."""
+    return templates.TemplateResponse("admin.html", {"request": request})
+
+
+@app.post("/admin/login")
+async def admin_login(request: Request):
+    """Validate ADMIN_PASSWORD and set a signed session cookie."""
+    import hashlib, hmac, time
+    from fastapi import HTTPException
+    from fastapi.responses import JSONResponse
+    admin_pw = os.environ.get("ADMIN_PASSWORD")
+    if not admin_pw:
+        raise HTTPException(503, "ADMIN_PASSWORD not configured")
+    body = await request.json()
+    if body.get("password") != admin_pw:
+        raise HTTPException(403, "Incorrect password")
+    secret = admin_pw.encode()
+    ts = str(int(time.time()))
+    sig = hmac.new(secret, ts.encode(), hashlib.sha256).hexdigest()
+    token = f"{ts}.{sig}"
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie("admin_session", token, httponly=True, samesite="lax", max_age=86400)
+    return resp
+
+
+@app.get("/redeem")
+def redeem_page(request: Request):
+    """Public access-key redemption page."""
+    return templates.TemplateResponse("landing.html", {"request": request, "show_redeem": True})
+
+
 @app.get("/auth/confirm")
 def auth_confirm(request: Request):
     """PKCE invite confirm page — verifies token_hash then redirects to tenant subdomain via JS."""
@@ -342,3 +390,5 @@ app.include_router(settings.router,      dependencies=_auth)
 app.include_router(webhooks.router)
 app.include_router(session.sse_router)
 app.include_router(ops_events.router)
+# Admin key management and public redemption — no tenant auth required
+app.include_router(admin_keys.router)

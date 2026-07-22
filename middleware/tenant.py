@@ -11,7 +11,7 @@ from starlette.responses import Response
 from database import SessionLocal, _is_sqlite
 
 # Paths that bypass tenant resolution entirely
-_BYPASS_PATHS = {"/health", "/static", "/favicon.ico", "/signup", "/auth/confirm"}
+_BYPASS_PATHS = {"/health", "/static", "/favicon.ico", "/signup", "/auth/confirm", "/redeem", "/admin"}
 _BYPASS_SLUGS = {"www", "api", "waypoint-ops"}
 
 
@@ -112,6 +112,9 @@ class TenantMiddleware(BaseHTTPMiddleware):
                 tenant = _lookup(default_slug)
             if not tenant:
                 return Response(f"Unknown tenant: {slug!r}", status_code=404)
+
+        if tenant.subscription_status == "deleted":
+            return Response(f"Unknown tenant: {slug!r}", status_code=404)
 
         if tenant.subscription_status == "suspended":
             expires = tenant.subscription_expires_at
