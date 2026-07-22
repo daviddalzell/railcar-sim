@@ -5,9 +5,17 @@ name: Test & Deploy
 
 on:
   push:
-    branches: [feature/cloud-migration, main]
+    branches: [feature/cloud-migration, main]   # runs CI (test + lint) only; deploy is gated separately
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '0 10 * * *'   # 5am Chicago (UTC-5/UTC-6) — nightly deploy window
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual deploy'
+        required: false
+        default: 'urgent fix'
 
 jobs:
   test:
@@ -50,8 +58,7 @@ jobs:
     name: Deploy to Fly.io
     needs: [test, lint]
     runs-on: ubuntu-latest
-    # Only deploy on pushes to these branches, not on PRs
-    if: github.event_name == 'push'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     environment: production   # requires manual approval in GitHub settings
     steps:
       - uses: actions/checkout@v4
