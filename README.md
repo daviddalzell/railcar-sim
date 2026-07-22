@@ -83,6 +83,9 @@ Set these with `flyctl secrets set KEY=value --app waypoint-app`:
 | `VISION_PROVIDER` | One of: `gemini`, `anthropic`, `openai`, `ollama` |
 | `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com) → API keys |
 | `DEFAULT_TENANT_SLUG` | Slug of the fallback tenant when no subdomain is present (e.g. `demo`) |
+| `ADMIN_PASSWORD` | Password for the admin dashboard at `/admin/dashboard` |
+| `SMTP_USER` | Gmail address for outbound email (invites, welcome emails, renewal reminders) |
+| `SMTP_PASS` | Gmail app password (16 chars, spaces stripped automatically) |
 
 ### Deploy
 
@@ -120,6 +123,36 @@ python -m admin.provision_tenant \
 ```
 
 This creates the `t_myclub` schema, all tables, and sends a Supabase Auth invite to the admin email.
+
+### Access key provisioning (direct / non-Patreon)
+
+Use this to provision tenants for users who pay via Venmo or any other out-of-band method, without requiring a Patreon subscription.
+
+**Required Fly secret:**
+
+```bash
+flyctl secrets set ADMIN_PASSWORD=yourpassword --app waypoint-app
+```
+
+**Workflow:**
+
+1. Visit `https://waypoint-ops.com/admin/dashboard` and sign in with `ADMIN_PASSWORD`.
+2. Go to the **Keys** tab → fill in slug, layout name, admin email, duration (days), and an optional private note (e.g. `"Venmo @alice $25 2026-07-11"`).
+3. Click **Generate key** → copy the `RAIL-XXXX-XXXX` code → send it to the user by email.
+4. The user visits `https://waypoint-ops.com`, enters the code, and clicks **Activate** — the tenant is provisioned and a welcome email is sent automatically.
+
+**Managing leases from the dashboard:**
+
+- **Tenants tab** — extend a lease (add days), suspend, reactivate, or delete any tenant.
+- **Reminders tab** — send renewal reminder emails to all tenants expiring within 30 days. Run this manually, or automate with a cron job:
+
+```bash
+# Example: run daily at 9 AM (requires X-Sync-Secret)
+0 9 * * * curl -s -X POST https://waypoint-ops.com/admin/send-renewal-reminders \
+  -H "Cookie: admin_session=<token>"
+```
+
+Renewals are always manual — the user contacts David, pays via Venmo, and David clicks **Extend** in the dashboard.
 
 ### Patreon webhook (automatic provisioning)
 
@@ -231,11 +264,12 @@ railcar-sim/
 │   ├── settings.py      # Tenant-level AI settings + operator invites
 │   ├── operations.py
 │   ├── export_import.py
-│   └── webhooks.py      # Patreon webhook handler (unauthenticated)
+│   ├── webhooks.py      # Patreon webhook handler (unauthenticated)
+│   └── admin_keys.py    # Access key CRUD + /redeem + renewal reminders
 ├── middleware/
 │   └── tenant.py        # Host-header → tenant resolution middleware
 ├── admin/
-│   ├── provisioning.py          # provision/suspend/reactivate tenant
+│   ├── provisioning.py          # provision/suspend/reactivate/extend/delete tenant; welcome email
 │   ├── provision_tenant.py      # CLI: python -m admin.provision_tenant
 │   └── migrate_all_tenants.py   # CLI: python -m admin.migrate_all_tenants
 ├── alembic/             # Database migrations
