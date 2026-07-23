@@ -263,7 +263,7 @@
   }
   function showApp() {
     $("login-screen").style.display = "none";
-    $("app").style.display = "";
+    $("app").style.display = "block";
   }
 
   // Initial auth check
@@ -278,7 +278,7 @@
     $("login-error").style.display = "none";
     const ok = await tryLogin(pw);
     if (ok) { showApp(); loadTenants(); loadKeys(); }
-    else { $("login-error").textContent = "Incorrect password."; $("login-error").style.display = ""; }
+    else { $("login-error").textContent = "Incorrect password."; $("login-error").style.display = "block"; }
   });
   $("pw-input").addEventListener("keydown", e => { if (e.key === "Enter") $("pw-btn").click(); });
 
