@@ -59,18 +59,43 @@ jobs:
     needs: [test, lint]
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    environment: production   # requires manual approval in GitHub settings
     steps:
       - uses: actions/checkout@v4
 
+      - name: Skip if no new commits (schedule only)
+        id: check
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LAST=$(gh run list \
+            --repo ${{ github.repository }} \
+            --workflow "Test & Deploy" \
+            --branch main \
+            --status success \
+            --limit 10 \
+            --json headSha,jobs \
+            --jq '[.[] | select(.jobs != null)] | .[0].headSha' 2>/dev/null || echo "none")
+          echo "Last deployed SHA: $LAST"
+          echo "Current SHA:       ${{ github.sha }}"
+          if [ "$LAST" = "${{ github.sha }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "No new commits since last deploy — skipping."
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.check.outputs.skip != 'true'
 
       - name: Deploy
+        if: steps.check.outputs.skip != 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only
 
       - name: Smoke test — health check
+        if: steps.check.outputs.skip != 'true'
         run: |
           for i in $(seq 1 12); do
             echo "Attempt $i/12..."
