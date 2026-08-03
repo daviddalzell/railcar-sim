@@ -3679,6 +3679,11 @@ $("#invite-send-btn")?.addEventListener("click", async () => {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 (async function init() {
+  // Wait for Supabase getSession() to finish before making authenticated API calls.
+  // Without this, init() can fire while a token refresh is still in flight (app.js loads
+  // from cache faster than getSession() resolves), sending all requests without a Bearer
+  // token and returning empty data. In local/demo mode _authReady is undefined — skip.
+  if (window._authReady) await window._authReady;
   _openOpsEventSource();
   await Promise.all([
     loadRoster(),
