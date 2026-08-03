@@ -1047,6 +1047,10 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     (async () => {
+      // Deferred promise resolved once auth state is determined.
+      // app.js init() awaits this so API calls never fire before the token is stored.
+      window._authReady = new Promise(r => { window._resolveAuth = r; });
+
       const url = document.querySelector('meta[name="supabase-url"]').content;
       const key = document.querySelector('meta[name="supabase-anon-key"]').content;
       const sb  = supabase.createClient(url, key);
@@ -1177,7 +1181,9 @@
       if (session) {
         storeSession(session);
         _showAccountBtn(session.user?.email);
+        window._resolveAuth?.();  // token is in sessionStorage — app.js can proceed
       } else {
+        window._resolveAuth?.();  // no session; app.js proceeds (API calls get 401, login dialog handles it)
         // No session — show login modal
         const dlg = document.getElementById("login-dialog");
         _loginDialogShown = true;
