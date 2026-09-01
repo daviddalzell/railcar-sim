@@ -15,7 +15,7 @@ from starlette.requests import Request
 import sse_shared
 from auth import get_current_user
 from database import get_db
-from models import Car, Location, MovementLog, SessionClock, Waybill
+from models import Car, Location, MovementLog, SessionClock, SwitchingArea, Waybill
 from converters import car_to_dict, clock_to_dict, start_session_clock as _start_session_clock, clear_session_clock
 from schemas import LayoutSettingsUpdate, SessionEndRequest
 from converters import get_or_create_settings, settings_to_dict
@@ -98,12 +98,47 @@ def _build_session_plan(db: Session) -> dict:
             else:
                 departures.append(car)
 
+    # Cap arrivals by actual switching area capacity
+    area_spots: dict[int, int] = {}
+    for area in db.query(SwitchingArea).all():
+        loc_ids = [l.id for l in area.locations]
+        if not loc_ids:
+            continue
+        current = db.query(Car).filter(Car.current_location_id.in_(loc_ids)).count()
+        area_cars_local = db.query(Car).filter(Car.current_location_id.in_(loc_ids)).all()
+        outbound_count = sum(
+            1 for c in area_cars_local
+            if (w := _get_active_waybill(c)) and w.destination_id in dispatch_ids
+        )
+        area_spots[area.id] = max(0, area.car_capacity - current + outbound_count)
+
     random.shuffle(arrivals)
-    arrivals = arrivals[:5]
+    capacity_filtered = []
+    used: dict[int, int] = {}
+    for car in arrivals:
+        wb = _get_active_waybill(car)
+        dest_loc = db.get(Location, wb.destination_id) if wb and wb.destination_id else None
+        area_id = getattr(dest_loc, "switching_area_id", None) if dest_loc else None
+        if area_id is None:
+            capacity_filtered.append(car)
+            continue
+        limit = area_spots.get(area_id, 0)
+        if used.get(area_id, 0) < limit:
+            capacity_filtered.append(car)
+            used[area_id] = used.get(area_id, 0) + 1
+    arrivals = capacity_filtered[:5]
+
     random.shuffle(departures)
     departures = departures[:min(5, max(len(arrivals), len(departures)))]
     random.shuffle(spots)
     spots = spots[:5]
+
+    total_work = len(arrivals) + len(departures) + len(spots)
+    if total_work > 6:
+        warnings.append(
+            f"Large switch list ({total_work} car moves). Consider regenerating for a shorter session, "
+            "or plan for two yard trips."
+        )
 
     if len(departures) < len(arrivals):
         warnings.append(
