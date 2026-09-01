@@ -65,7 +65,7 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
         and wb.destination_id in area_location_ids
         and car.current_location_id != wb.destination_id
     ]
-    local_spots = local_spots[:3]
+    local_spots = local_spots[:round(area.car_capacity * 0.375)]
 
     available_spots = max(0, area.car_capacity - current_count + len(outbound))
 
@@ -89,10 +89,11 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
     if not consist_inbound and not outbound and not local_spots:
         warnings.append("No eligible cars found for this origin and switching area.")
     total_work = len(consist_inbound) + len(outbound) + len(local_spots)
-    if total_work > 6:
+    work_threshold = round(area.car_capacity * 0.75)
+    if total_work > work_threshold:
         warnings.append(
-            f"Large switch list ({total_work} car moves). Consider regenerating for a shorter session, "
-            "or plan for two yard trips."
+            f"Large switch list ({total_work} car moves, limit {work_threshold} for this area). "
+            "Consider regenerating for a shorter session, or plan for two yard trips."
         )
 
     return consist_inbound, outbound, local_spots, available_spots, warnings

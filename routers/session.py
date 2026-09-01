@@ -98,8 +98,9 @@ def _build_session_plan(db: Session) -> dict:
             else:
                 departures.append(car)
 
-    # Cap arrivals by actual switching area capacity
+    # Cap arrivals by actual switching area capacity; store raw capacities for work threshold
     area_spots: dict[int, int] = {}
+    area_capacity: dict[int, int] = {}
     for area in db.query(SwitchingArea).all():
         loc_ids = [l.id for l in area.locations]
         if not loc_ids:
@@ -111,6 +112,7 @@ def _build_session_plan(db: Session) -> dict:
             if (w := _get_active_waybill(c)) and w.destination_id in dispatch_ids
         )
         area_spots[area.id] = max(0, area.car_capacity - current + outbound_count)
+        area_capacity[area.id] = area.car_capacity
 
     random.shuffle(arrivals)
     capacity_filtered = []
@@ -133,12 +135,27 @@ def _build_session_plan(db: Session) -> dict:
     random.shuffle(spots)
     spots = spots[:5]
 
-    total_work = len(arrivals) + len(departures) + len(spots)
-    if total_work > 6:
-        warnings.append(
-            f"Large switch list ({total_work} car moves). Consider regenerating for a shorter session, "
-            "or plan for two yard trips."
-        )
+    # Per-area work count: arrivals go to destination area; departures and spots come from current area
+    area_work: dict[int, int] = {}
+    for car in arrivals:
+        wb = _get_active_waybill(car)
+        dest_loc = db.get(Location, wb.destination_id) if wb and wb.destination_id else None
+        aid = getattr(dest_loc, "switching_area_id", None) if dest_loc else None
+        if aid:
+            area_work[aid] = area_work.get(aid, 0) + 1
+    for car in departures + spots:
+        curr_loc = db.get(Location, car.current_location_id) if car.current_location_id else None
+        aid = getattr(curr_loc, "switching_area_id", None) if curr_loc else None
+        if aid:
+            area_work[aid] = area_work.get(aid, 0) + 1
+    for aid, work_count in area_work.items():
+        cap = area_capacity.get(aid, 0)
+        threshold = round(cap * 0.75) if cap else 6
+        if work_count > threshold:
+            warnings.append(
+                f"Large switch list ({work_count} moves in this area, limit {threshold}). "
+                "Consider regenerating for a shorter session, or plan for two yard trips."
+            )
 
     if len(departures) < len(arrivals):
         warnings.append(
