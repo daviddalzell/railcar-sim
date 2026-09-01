@@ -1402,66 +1402,15 @@ async function loadOperations() {
   }
 
   $("#ops-title").textContent = "Quick Op Session";
-  // Idle state: "Plan Session" as fallback below the dispatcher
+  // Idle state: "Generate Switch List" shows pre-review before committing
   $("#ops-header-buttons").innerHTML =
-    `<button id="btn-plan-session">Start Quick Op Session</button>`;
+    `<button id="btn-plan-session">Generate Switch List</button>`;
   document.getElementById("btn-plan-session").addEventListener("click", async () => {
     const btn = document.getElementById("btn-plan-session");
     await withLoading(btn, "Planning…", async () => {
       try {
         const plan = await api("POST", "/api/session/plan");
-        session = {
-          warnings: plan.warnings || [],
-          cars: [
-            ...plan.arrivals.map(c => ({
-              id: c.id,
-              marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
-              carType: c.car_type,
-              fromLocation: c.session_from_location_name,
-              toLocation: c.session_to_location_name,
-              photoPath: c.photo_path || null,
-              photoUrl: c.photo_url || null,
-              industryName: c.active_waybill?.industry_name || null,
-              toIndustryId: c.active_waybill?.industry_id ?? null,
-              cpSessions: c.cp_session_count || 0,
-              priority: Math.floor(Math.random() * 1000),
-              group: "arrivals",
-              status: "pending",
-            })),
-            ...plan.departures.map(c => ({
-              id: c.id,
-              marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
-              carType: c.car_type,
-              fromLocation: c.session_from_location_name,
-              toLocation: c.session_to_location_name,
-              photoPath: c.photo_path || null,
-              photoUrl: c.photo_url || null,
-              industryName: c.active_waybill?.industry_name || null,
-              toIndustryId: null,
-              cpSessions: 0,
-              priority: 0,
-              group: "departures",
-              status: "pending",
-            })),
-            ...(plan.spots || []).map(c => ({
-              id: c.id,
-              marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
-              carType: c.car_type,
-              fromLocation: c.session_from_location_name,
-              toLocation: c.session_to_location_name,
-              photoPath: c.photo_path || null,
-              photoUrl: c.photo_url || null,
-              industryName: c.active_waybill?.industry_name || null,
-              toIndustryId: c.active_waybill?.industry_id ?? null,
-              cpSessions: c.cp_session_count || 0,
-              priority: Math.floor(Math.random() * 1000),
-              group: "spots",
-              status: "pending",
-            })),
-          ],
-        };
-        saveSession();
-        renderActiveSession();
+        renderPlanPreview(plan);
       } catch (err) {
         showToast("Error planning session: " + err.message, "error");
       }
@@ -1499,6 +1448,112 @@ async function loadOperations() {
       </div>
     `;
   }).join("");
+}
+
+function _startSessionFromPlan(plan) {
+  session = {
+    warnings: plan.warnings || [],
+    cars: [
+      ...plan.arrivals.map(c => ({
+        id: c.id,
+        marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
+        carType: c.car_type,
+        fromLocation: c.session_from_location_name,
+        toLocation: c.session_to_location_name,
+        photoPath: c.photo_path || null,
+        photoUrl: c.photo_url || null,
+        industryName: c.active_waybill?.industry_name || null,
+        toIndustryId: c.active_waybill?.industry_id ?? null,
+        cpSessions: c.cp_session_count || 0,
+        priority: Math.floor(Math.random() * 1000),
+        group: "arrivals",
+        status: "pending",
+      })),
+      ...plan.departures.map(c => ({
+        id: c.id,
+        marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
+        carType: c.car_type,
+        fromLocation: c.session_from_location_name,
+        toLocation: c.session_to_location_name,
+        photoPath: c.photo_path || null,
+        photoUrl: c.photo_url || null,
+        industryName: c.active_waybill?.industry_name || null,
+        toIndustryId: null,
+        cpSessions: 0,
+        priority: 0,
+        group: "departures",
+        status: "pending",
+      })),
+      ...(plan.spots || []).map(c => ({
+        id: c.id,
+        marks: `${c.reporting_marks || "—"} ${c.car_number || ""}`.trim(),
+        carType: c.car_type,
+        fromLocation: c.session_from_location_name,
+        toLocation: c.session_to_location_name,
+        photoPath: c.photo_path || null,
+        photoUrl: c.photo_url || null,
+        industryName: c.active_waybill?.industry_name || null,
+        toIndustryId: c.active_waybill?.industry_id ?? null,
+        cpSessions: c.cp_session_count || 0,
+        priority: Math.floor(Math.random() * 1000),
+        group: "spots",
+        status: "pending",
+      })),
+    ],
+  };
+  saveSession();
+  renderActiveSession();
+}
+
+function renderPlanPreview(plan) {
+  const list = $("#ops-list");
+  const groups = [
+    { label: "Set out from staging", cars: plan.arrivals || [],   empty: "No setouts planned." },
+    { label: "Cars to spot",         cars: plan.spots || [],       empty: "No local spots planned." },
+    { label: "Pick up for staging",  cars: plan.departures || [],  empty: "No pickups planned." },
+  ];
+  const warningHtml = (plan.warnings || []).map(w =>
+    `<li style="color:var(--pico-del-color,#c0392b)">${w}</li>`
+  ).join("");
+  const total = (plan.arrivals?.length || 0) + (plan.departures?.length || 0) + (plan.spots?.length || 0);
+
+  list.innerHTML = `
+    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap">
+      <button id="btn-confirm-preview" class="contrast">&#9654; Start session (${total} moves)</button>
+      <button id="btn-regenerate-preview" class="outline">&#8635; Regenerate</button>
+    </div>
+    ${warningHtml ? `<ul style="margin-bottom:1rem">${warningHtml}</ul>` : ""}
+    ${groups.map(g => `
+      <details open>
+        <summary style="font-weight:600;margin-bottom:0.5rem">${g.label} (${g.cars.length})</summary>
+        ${g.cars.length === 0
+          ? `<p style="color:var(--pico-muted-color)">${g.empty}</p>`
+          : g.cars.map(c => `
+            <div style="display:flex;gap:0.5rem;align-items:center;
+                        padding:0.4rem 0;border-bottom:1px solid var(--pico-table-border-color)">
+              ${c.photo_url || c.photo_path
+                ? `<img src="${photoSrc(c.photo_path, c.photo_url)}"
+                       style="width:48px;height:32px;object-fit:cover;border-radius:4px" alt="">`
+                : `<div style="width:48px;height:32px;background:var(--pico-secondary-background);
+                              border-radius:4px;flex-shrink:0"></div>`}
+              <div>
+                <strong>${c.reporting_marks || "—"} ${c.car_number || ""}</strong>
+                <span style="color:var(--pico-muted-color);font-size:0.85em"> &middot; ${c.car_type || "?"}</span><br>
+                <span style="font-size:0.85em">
+                  ${c.session_from_location_name || "?"} &rarr; ${c.session_to_location_name || "?"}
+                </span>
+              </div>
+            </div>`).join("")}
+      </details>`).join("")}
+  `;
+
+  document.getElementById("btn-confirm-preview").addEventListener("click", () => _startSessionFromPlan(plan));
+  document.getElementById("btn-regenerate-preview").addEventListener("click", async () => {
+    const btn = document.getElementById("btn-regenerate-preview");
+    await withLoading(btn, "Regenerating…", async () => {
+      renderPlanPreview(await api("POST", "/api/session/plan"));
+    });
+  });
 }
 
 // ── Operating Session ─────────────────────────────────────────────────────────
