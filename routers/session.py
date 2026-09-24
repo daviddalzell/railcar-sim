@@ -315,6 +315,7 @@ def session_end(request: Request, req: SessionEndRequest, db: Session = Depends(
                     w.car_id = None
                     w.slot_index = None
                 db.flush()
+                db.expire(car, ["waybills"])  # stale in-memory refs remain after flush; force reload
                 unassigned = db.query(Waybill).filter(Waybill.car_id.is_(None)).all()
                 random.shuffle(unassigned)
                 auto_assign_one_car(car, unassigned, staging_ids, db,
