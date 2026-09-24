@@ -81,6 +81,7 @@ function _handleOpsEvent(evt) {
     showToast(`Session started — ${evt.car_count} car${evt.car_count !== 1 ? "s" : ""} queued`, "success");
   } else if (type === "session_ended") {
     showToast(`Session ended — ${evt.moves_completed} move${evt.moves_completed !== 1 ? "s" : ""} completed`, "success");
+    loadLayout();  // keep all devices in sync after car locations change
   } else if (type === "plan_created") {
     const label = evt.train_number || evt.train_name || `Plan #${evt.plan_id}`;
     showToast(`Consist built: ${label} — ${evt.car_count} car${evt.car_count !== 1 ? "s" : ""}`, "info");
