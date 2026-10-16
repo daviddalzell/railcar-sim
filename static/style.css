@@ -1532,31 +1532,100 @@ button.small {
 .conflict-group-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.35rem;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.conflict-industry-header {
+  flex: 1;
+}
+
+.conflict-industry-name {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 0.1rem;
+}
+
+.conflict-industry-meta {
+  font-size: 0.78rem;
+  color: var(--muted-color, #888);
+  margin-bottom: 0.15rem;
+}
+
+.conflict-spot-status {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--badge-orange);
 }
 
 .conflict-car-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0.4rem;
+  padding: 0.35rem 0.5rem;
   border-radius: 4px;
   font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+  border: 2px solid transparent;
+  transition: background 0.12s, border-color 0.12s, opacity 0.12s;
 }
 
-.conflict-will-spot {
-  background: color-mix(in srgb, var(--color-valid, #27ae60) 10%, transparent);
+.conflict-car-row.is-priority {
+  border-color: var(--pico-primary-background, #1a56a4);
+  background: color-mix(in srgb, var(--pico-primary-background, #1a56a4) 8%, transparent);
 }
 
-.conflict-will-cp {
-  background: color-mix(in srgb, var(--badge-orange) 10%, transparent);
-  opacity: 0.8;
+.conflict-car-row.is-held {
+  opacity: 0.55;
+}
+
+.conflict-car-identity {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 .conflict-car-marks {
-  flex: 1;
   font-weight: 500;
+}
+
+.conflict-priority-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--pico-primary-background, #1a56a4);
+  letter-spacing: 0.01em;
+}
+
+.conflict-car-actions {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.conflict-spot-btn,
+.conflict-hold-btn {
+  min-width: 4.5rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.conflict-spot-btn.is-active {
+  background: var(--color-valid, #27ae60);
+  border-color: var(--color-valid, #27ae60);
+  color: #fff;
+}
+
+.conflict-hold-btn.is-active {
+  background: var(--badge-orange);
+  border-color: var(--badge-orange);
+  color: #fff;
+}
+
+.conflict-spot-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .aging-badge {
@@ -1566,17 +1635,6 @@ button.small {
   border-radius: 3px;
   padding: 0.1rem 0.4rem;
   white-space: nowrap;
-}
-
-.priority-badge {
-  font-size: 0.75rem;
-  color: var(--muted-color, #888);
-  white-space: nowrap;
-}
-
-.conflict-disposition {
-  min-width: 3.5rem;
-  text-align: right;
 }
 
 .info-offer {
