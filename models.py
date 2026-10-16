@@ -148,6 +148,7 @@ class Waybill(Base):
     commodity: Mapped[str] = mapped_column(String, default="")
     is_empty: Mapped[bool] = mapped_column(Boolean, default=False)
     required_car_type: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
+    is_priority: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     car: Mapped[Optional["Car"]] = relationship("Car", back_populates="waybills", foreign_keys=[car_id])
     origin: Mapped[Optional["Location"]] = relationship("Location", foreign_keys=[origin_id], back_populates="origin_waybills")
