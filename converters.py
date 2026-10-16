@@ -32,6 +32,7 @@ def waybill_to_dict(w: Waybill) -> dict:
         "commodity": w.commodity,
         "is_empty": w.is_empty,
         "required_car_type": w.required_car_type,
+        "is_priority": w.is_priority or False,
     }
 
 

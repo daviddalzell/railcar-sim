@@ -1293,6 +1293,7 @@ function openWaybillEditDialog(waybillId = null) {
   if (w?.destination_id) $("#we-destination").value = w.destination_id;
   if (w?.industry_id) $("#we-industry").value = w.industry_id;
   $("#we-car-type").value = w?.required_car_type || "";
+  $("#we-is-priority").checked = w?.is_priority || false;
 
   $("#waybill-edit-dialog").showModal();
 }
@@ -1359,6 +1360,7 @@ $("#btn-save-waybill-edit").addEventListener("click", async () => {
     commodity: $("#we-commodity").value.trim(),
     is_empty: $("#we-empty").checked,
     required_car_type: $("#we-car-type").value || null,
+    is_priority: $("#we-is-priority").checked,
   };
   try {
     if (editingWaybillId) {
@@ -1466,6 +1468,7 @@ function _startSessionFromPlan(plan) {
         industryName: c.active_waybill?.industry_name || null,
         toIndustryId: c.active_waybill?.industry_id ?? null,
         cpSessions: c.cp_session_count || 0,
+        isPriority: c.active_waybill?.is_priority || false,
         priority: Math.floor(Math.random() * 1000),
         group: "arrivals",
         status: "pending",
@@ -1496,6 +1499,7 @@ function _startSessionFromPlan(plan) {
         industryName: c.active_waybill?.industry_name || null,
         toIndustryId: c.active_waybill?.industry_id ?? null,
         cpSessions: c.cp_session_count || 0,
+        isPriority: c.active_waybill?.is_priority || false,
         priority: Math.floor(Math.random() * 1000),
         group: "spots",
         status: "pending",
@@ -1539,7 +1543,8 @@ function renderPlanPreview(plan) {
                               border-radius:4px;flex-shrink:0"></div>`}
               <div>
                 <strong>${c.reporting_marks || "—"} ${c.car_number || ""}</strong>
-                <span style="color:var(--pico-muted-color);font-size:0.85em"> &middot; ${c.car_type || "?"}</span><br>
+                <span style="color:var(--pico-muted-color);font-size:0.85em"> &middot; ${c.car_type || "?"}</span>
+                ${c.active_waybill?.is_priority ? `<span style="background:var(--pico-primary-background,#1a56a4);color:#fff;font-size:0.7em;padding:1px 5px;border-radius:3px;margin-left:4px">Priority</span>` : ""}<br>
                 <span style="font-size:0.85em">
                   ${c.session_from_location_name || "?"} &rarr; ${c.session_to_location_name || "?"}
                 </span>
@@ -1597,6 +1602,12 @@ function detectSpottingConflicts() {
   session.conflicts = conflicts;
 }
 
+function carTypeMatchesIndustry(car, ind) {
+  if (!ind.inbound_car_types) return false;
+  const accepted = ind.inbound_car_types.split(",").map(s => s.trim().toLowerCase());
+  return accepted.includes((car.carType || "").toLowerCase());
+}
+
 function renderSpottingConflicts() {
   const el = document.getElementById("spotting-conflicts");
   if (!el) return;
@@ -1608,9 +1619,14 @@ function renderSpottingConflicts() {
       <p class="conflict-panel-title">⚠ Spotting Conflicts</p>
       ${conflicts.map(({ ind, capacity, spotNums, current, cars: incoming }) => {
         const available = capacity - current;
-        const sorted = [...incoming].sort((a, b) =>
-          b.cpSessions - a.cpSessions || a.priority - b.priority
-        );
+        const sorted = [...incoming].sort((a, b) => {
+          if (b.isPriority !== a.isPriority) return (b.isPriority ? 1 : 0) - (a.isPriority ? 1 : 0);
+          if (b.cpSessions !== a.cpSessions) return b.cpSessions - a.cpSessions;
+          const typeA = carTypeMatchesIndustry(a, ind) ? 1 : 0;
+          const typeB = carTypeMatchesIndustry(b, ind) ? 1 : 0;
+          if (typeB !== typeA) return typeB - typeA;
+          return a.priority - b.priority;
+        });
         return `
         <div class="conflict-group" data-ind-id="${ind.id}">
           <div class="conflict-group-header">
@@ -1620,8 +1636,8 @@ function renderSpottingConflicts() {
           ${sorted.map((car, i) => `
             <div class="conflict-car-row${i < available ? " conflict-will-spot" : " conflict-will-cp"}">
               <span class="conflict-car-marks">${car.marks} <span class="muted">${car.carType}</span></span>
+              ${car.isPriority ? `<span class="aging-badge" style="background:var(--pico-primary-background,#1a56a4);color:#fff">Priority</span>` : ""}
               ${car.cpSessions > 0 ? `<span class="aging-badge">Held ${car.cpSessions} session${car.cpSessions !== 1 ? "s" : ""}</span>` : ""}
-              <span class="priority-badge">#${car.priority}</span>
               <span class="conflict-disposition muted small">${i < available ? "✓ spot" : "→ CP"}</span>
             </div>
           `).join("")}
@@ -1635,10 +1651,17 @@ function renderSpottingConflicts() {
       const conflict = (session.conflicts || []).find(c => c.ind.id === indId);
       if (!conflict) return;
       const available = conflict.capacity - conflict.current;
-      const sorted = [...conflict.cars].sort((a, b) =>
-        b.cpSessions - a.cpSessions || a.priority - b.priority
-      );
-      sorted.slice(available).forEach(car => {
+      const sorted = [...conflict.cars].sort((a, b) => {
+        if (b.isPriority !== a.isPriority) return (b.isPriority ? 1 : 0) - (a.isPriority ? 1 : 0);
+        if (b.cpSessions !== a.cpSessions) return b.cpSessions - a.cpSessions;
+        const typeA = carTypeMatchesIndustry(a, conflict.ind) ? 1 : 0;
+        const typeB = carTypeMatchesIndustry(b, conflict.ind) ? 1 : 0;
+        if (typeB !== typeA) return typeB - typeA;
+        return a.priority - b.priority;
+      });
+      const priorityCars = sorted.filter(c => c.isPriority);
+      const normalCars = sorted.filter(c => !c.isPriority);
+      [...priorityCars, ...normalCars].slice(available).forEach(car => {
         const sc = session.cars.find(c => c.id === car.id);
         if (sc) sc.status = "cp";
       });
@@ -3379,6 +3402,7 @@ function wireConsistCard(planId) {
         industryName: c.active_waybill?.industry_name || null,
         toIndustryId: (group !== "departures") ? (c.active_waybill?.industry_id ?? null) : null,
         cpSessions: (group !== "departures") ? (c.cp_session_count || 0) : 0,
+        isPriority: (group !== "departures") ? (c.active_waybill?.is_priority || false) : false,
         priority: (group !== "departures") ? Math.floor(Math.random() * 1000) : 0,
         group,
         status: "pending",

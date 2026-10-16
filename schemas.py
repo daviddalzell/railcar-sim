@@ -79,6 +79,7 @@ class WaybillCreate(BaseModel):
     commodity: str = ""
     is_empty: bool = False
     required_car_type: Optional[str] = None
+    is_priority: bool = False
 
 
 class CarTypeCreate(BaseModel):
