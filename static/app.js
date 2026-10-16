@@ -1472,6 +1472,7 @@ function _startSessionFromPlan(plan) {
         priority: Math.floor(Math.random() * 1000),
         group: "arrivals",
         status: "pending",
+        conflictDecision: null,
       })),
       ...plan.departures.map(c => ({
         id: c.id,
@@ -1503,6 +1504,7 @@ function _startSessionFromPlan(plan) {
         priority: Math.floor(Math.random() * 1000),
         group: "spots",
         status: "pending",
+        conflictDecision: null,
       })),
     ],
   };
@@ -1578,6 +1580,9 @@ function loadSessionFromStorage() {
 
 function detectSpottingConflicts() {
   if (!session) return;
+  // Clear stale conflictDecision on all cars first; re-seed below for active conflicts
+  session.cars.forEach(c => { c.conflictDecision = null; });
+
   const relevant = session.cars.filter(c =>
     (c.group === "arrivals" || c.group === "spots") && c.toIndustryId && c.status !== "cp"
   );
@@ -1596,7 +1601,24 @@ function detectSpottingConflicts() {
       c.active_waybill?.industry_id === ind.id
     ).length;
     if (currentCount + incoming.length > industryCapacity) {
-      conflicts.push({ ind, capacity: industryCapacity, spotNums, current: currentCount, cars: incoming });
+      const conflict = { ind, capacity: industryCapacity, spotNums, current: currentCount, cars: incoming };
+      conflicts.push(conflict);
+      // Seed per-car recommendations based on four-tier sort (only if not already decided)
+      const available = industryCapacity - currentCount;
+      const sorted = [...incoming].sort((a, b) => {
+        if (b.isPriority !== a.isPriority) return (b.isPriority ? 1 : 0) - (a.isPriority ? 1 : 0);
+        if (b.cpSessions !== a.cpSessions) return b.cpSessions - a.cpSessions;
+        const typeA = carTypeMatchesIndustry(a, ind) ? 1 : 0;
+        const typeB = carTypeMatchesIndustry(b, ind) ? 1 : 0;
+        if (typeB !== typeA) return typeB - typeA;
+        return a.priority - b.priority;
+      });
+      sorted.forEach((car, i) => {
+        const sc = session.cars.find(c => c.id === car.id);
+        if (sc && sc.conflictDecision == null) {
+          sc.conflictDecision = i < available ? "spot" : "hold";
+        }
+      });
     }
   }
   session.conflicts = conflicts;
@@ -1608,6 +1630,17 @@ function carTypeMatchesIndustry(car, ind) {
   return accepted.includes((car.carType || "").toLowerCase());
 }
 
+function _commitConflictDecisions(conflict) {
+  conflict.cars.forEach(car => {
+    const sc = session.cars.find(c => c.id === car.id);
+    if (sc && sc.conflictDecision === "hold") sc.status = "cp";
+  });
+  saveSession();
+  detectSpottingConflicts();
+  renderSpottingConflicts();
+  renderActiveSession();
+}
+
 function renderSpottingConflicts() {
   const el = document.getElementById("spotting-conflicts");
   if (!el) return;
@@ -1616,59 +1649,126 @@ function renderSpottingConflicts() {
 
   el.innerHTML = `
     <div class="conflict-panel">
-      <p class="conflict-panel-title">⚠ Spotting Conflicts</p>
+      <p class="conflict-panel-title">⚠ Resolve Spotting Conflicts</p>
       ${conflicts.map(({ ind, capacity, spotNums, current, cars: incoming }) => {
         const available = capacity - current;
-        const sorted = [...incoming].sort((a, b) => {
-          if (b.isPriority !== a.isPriority) return (b.isPriority ? 1 : 0) - (a.isPriority ? 1 : 0);
-          if (b.cpSessions !== a.cpSessions) return b.cpSessions - a.cpSessions;
-          const typeA = carTypeMatchesIndustry(a, ind) ? 1 : 0;
-          const typeB = carTypeMatchesIndustry(b, ind) ? 1 : 0;
-          if (typeB !== typeA) return typeB - typeA;
-          return a.priority - b.priority;
-        });
+        const spotCount = incoming.filter(c => {
+          const sc = session.cars.find(x => x.id === c.id);
+          return sc?.conflictDecision === "spot";
+        }).length;
+        const spotsLeft = available - spotCount;
+        const metaLine = [
+          ind.commodities ? `Accepts: ${ind.commodities}` : "",
+          ind.inbound_car_types ? `Car types: ${ind.inbound_car_types}` : "",
+        ].filter(Boolean).join(" · ");
         return `
         <div class="conflict-group" data-ind-id="${ind.id}">
           <div class="conflict-group-header">
-            <span><strong>${ind.name}</strong>${spotNums.length ? ` · spots ${spotNums.join(", ")}` : ""} — ${capacity} spot${capacity !== 1 ? "s" : ""}, ${incoming.length} inbound</span>
-            <button class="outline small conflict-auto-resolve" data-ind-id="${ind.id}">Auto-resolve</button>
-          </div>
-          ${sorted.map((car, i) => `
-            <div class="conflict-car-row${i < available ? " conflict-will-spot" : " conflict-will-cp"}">
-              <span class="conflict-car-marks">${car.marks} <span class="muted">${car.carType}</span></span>
-              ${car.isPriority ? `<span class="aging-badge" style="background:var(--pico-primary-background,#1a56a4);color:#fff">Priority</span>` : ""}
-              ${car.cpSessions > 0 ? `<span class="aging-badge">Held ${car.cpSessions} session${car.cpSessions !== 1 ? "s" : ""}</span>` : ""}
-              <span class="conflict-disposition muted small">${i < available ? "✓ spot" : "→ CP"}</span>
+            <div class="conflict-industry-header">
+              <div class="conflict-industry-name">${ind.name}</div>
+              ${metaLine ? `<div class="conflict-industry-meta">${metaLine}</div>` : ""}
+              <div class="conflict-spot-status">${available} spot${available !== 1 ? "s" : ""} open &middot; ${incoming.length} car${incoming.length !== 1 ? "s" : ""} arriving</div>
             </div>
-          `).join("")}
+            <button class="outline small conflict-accept-suggestion" data-ind-id="${ind.id}">Accept suggestion</button>
+          </div>
+          ${incoming.map(car => {
+            const sc = session.cars.find(x => x.id === car.id);
+            const decision = sc?.conflictDecision || null;
+            const isHeld = decision === "hold";
+            const isSpot = decision === "spot";
+            const spotDisabled = spotsLeft <= 0 && !isSpot;
+            return `
+            <div class="conflict-car-row${car.isPriority ? " is-priority" : ""}${isHeld ? " is-held" : ""}">
+              <div class="conflict-car-identity">
+                <span class="conflict-car-marks">${car.marks} <span class="muted">${car.carType}</span></span>
+                ${car.isPriority ? `<span class="conflict-priority-label">Perishable &mdash; time-sensitive</span>` : ""}
+                ${car.cpSessions > 0 ? `<span class="aging-badge">Held ${car.cpSessions} session${car.cpSessions !== 1 ? "s" : ""}</span>` : ""}
+              </div>
+              <div class="conflict-car-actions">
+                <button class="outline small conflict-spot-btn${isSpot ? " is-active" : ""}"
+                        data-car-id="${car.id}" data-ind-id="${ind.id}"
+                        ${spotDisabled ? "disabled" : ""}>&#10003; Spot</button>
+                <button class="outline small conflict-hold-btn${isHeld ? " is-active" : ""}"
+                        data-car-id="${car.id}" data-ind-id="${ind.id}">Hold</button>
+              </div>
+            </div>`;
+          }).join("")}
         </div>`;
       }).join("")}
     </div>`;
 
-  el.querySelectorAll(".conflict-auto-resolve").forEach(btn => {
+  // Spot button handler
+  el.querySelectorAll(".conflict-spot-btn").forEach(btn => {
     btn.addEventListener("click", () => {
+      const carId = parseInt(btn.dataset.carId);
       const indId = parseInt(btn.dataset.indId);
       const conflict = (session.conflicts || []).find(c => c.ind.id === indId);
-      if (!conflict) return;
+      const sc = session.cars.find(c => c.id === carId);
+      if (!conflict || !sc) return;
       const available = conflict.capacity - conflict.current;
-      const sorted = [...conflict.cars].sort((a, b) => {
-        if (b.isPriority !== a.isPriority) return (b.isPriority ? 1 : 0) - (a.isPriority ? 1 : 0);
-        if (b.cpSessions !== a.cpSessions) return b.cpSessions - a.cpSessions;
-        const typeA = carTypeMatchesIndustry(a, conflict.ind) ? 1 : 0;
-        const typeB = carTypeMatchesIndustry(b, conflict.ind) ? 1 : 0;
-        if (typeB !== typeA) return typeB - typeA;
-        return a.priority - b.priority;
-      });
-      const priorityCars = sorted.filter(c => c.isPriority);
-      const normalCars = sorted.filter(c => !c.isPriority);
-      [...priorityCars, ...normalCars].slice(available).forEach(car => {
-        const sc = session.cars.find(c => c.id === car.id);
-        if (sc) sc.status = "cp";
-      });
+
+      if (sc.conflictDecision === "spot") {
+        // Toggle off — un-spot this car
+        sc.conflictDecision = "hold";
+        saveSession();
+        renderSpottingConflicts();
+        return;
+      }
+      const spotCount = conflict.cars.filter(c => {
+        const x = session.cars.find(s => s.id === c.id);
+        return x?.conflictDecision === "spot";
+      }).length;
+      if (spotCount >= available) return; // defensive guard
+      sc.conflictDecision = "spot";
+      if (spotCount + 1 >= available) {
+        // All spots claimed — auto-commit undecided cars as hold
+        conflict.cars.forEach(car => {
+          const x = session.cars.find(s => s.id === car.id);
+          if (x && x.conflictDecision !== "spot") x.conflictDecision = "hold";
+        });
+        _commitConflictDecisions(conflict);
+      } else {
+        saveSession();
+        renderSpottingConflicts();
+      }
+    });
+  });
+
+  // Hold button handler
+  el.querySelectorAll(".conflict-hold-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const carId = parseInt(btn.dataset.carId);
+      const indId = parseInt(btn.dataset.indId);
+      const conflict = (session.conflicts || []).find(c => c.ind.id === indId);
+      const sc = session.cars.find(c => c.id === carId);
+      if (!conflict || !sc) return;
+
+      if (sc.conflictDecision === "hold" && sc.status === "cp") {
+        // Un-hold — restore to pending
+        sc.status = "pending";
+        sc.conflictDecision = null;
+        saveSession();
+        detectSpottingConflicts();
+        renderSpottingConflicts();
+        renderActiveSession();
+        return;
+      }
+      sc.conflictDecision = "hold";
+      sc.status = "cp";
       saveSession();
       detectSpottingConflicts();
       renderSpottingConflicts();
       renderActiveSession();
+    });
+  });
+
+  // Accept suggestion handler — commit all pre-filled decisions
+  el.querySelectorAll(".conflict-accept-suggestion").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const indId = parseInt(btn.dataset.indId);
+      const conflict = (session.conflicts || []).find(c => c.ind.id === indId);
+      if (!conflict) return;
+      _commitConflictDecisions(conflict);
     });
   });
 }
@@ -1687,6 +1787,9 @@ function markCar(carId, status) {
   if (!car) return;
   // toggle: clicking the same status again resets to pending
   car.status = car.status === status ? "pending" : status;
+  // Keep conflictDecision in sync so the conflict panel reflects manual overrides
+  if (car.status === "cp")      car.conflictDecision = "hold";
+  if (car.status === "pending") car.conflictDecision = null;
   saveSession();
   detectSpottingConflicts();
   renderSpottingConflicts();
@@ -3406,6 +3509,7 @@ function wireConsistCard(planId) {
         priority: (group !== "departures") ? Math.floor(Math.random() * 1000) : 0,
         group,
         status: "pending",
+        conflictDecision: null,
       });
 
       const firstLoco = (plan.power || [])[0];
