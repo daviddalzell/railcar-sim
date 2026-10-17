@@ -1717,3 +1717,27 @@ button.small {
   margin-left: .5rem;
   white-space: nowrap;
 }
+
+/* ── Session status bar (persistent, bottom of viewport) ─────────────────── */
+#session-status-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--card-background-color);
+  border-top: 2px solid var(--pico-primary-background, #1a56a4);
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.12);
+}
+#session-status-bar.hidden { display: none; }
+.session-bar-progress {
+  color: var(--muted-color, #888);
+  font-weight: 400;
+  flex: 1;
+}
+/* Push page content up so the bar never covers the last element */
+body { padding-bottom: 3.5rem; }

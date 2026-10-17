@@ -1264,5 +1264,12 @@
   {% endif %}
 
   <script src="/static/app.js"></script>
+
+  <!-- Persistent session status bar — visible on any tab while a session is active -->
+  <div id="session-status-bar" class="hidden">
+    <span id="session-bar-label"></span>
+    <span id="session-bar-progress" class="session-bar-progress"></span>
+    <button id="session-bar-goto" class="outline small">&#9654; Go to session</button>
+  </div>
 </body>
 </html>
