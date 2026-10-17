@@ -1510,6 +1510,8 @@ function _startSessionFromPlan(plan) {
   };
   saveSession();
   renderActiveSession();
+  collapseDispatcher();
+  setTimeout(() => document.getElementById("ops-header")?.scrollIntoView({ behavior: "smooth" }), 50);
 }
 
 function renderPlanPreview(plan) {
@@ -1796,6 +1798,45 @@ function markCar(carId, status) {
   renderActiveSession();
 }
 
+function updateSessionBar() {
+  const bar = document.getElementById("session-status-bar");
+  if (!bar) return;
+  if (!session) { bar.classList.add("hidden"); return; }
+  bar.classList.remove("hidden");
+  const { total, done, cp, pending } = sessionProgress();
+  const label = session.trainNumber
+    ? `Train #${session.trainNumber}`
+    : (session.trainName || "Active Session");
+  document.getElementById("session-bar-label").textContent = label;
+  document.getElementById("session-bar-progress").textContent =
+    `${done + cp} / ${total} worked${pending === 0 ? " — ready to end" : ""}`;
+}
+
+document.getElementById("session-bar-goto")?.addEventListener("click", () => {
+  document.querySelector('[data-tab="operations"]').click();
+  setTimeout(() => {
+    document.getElementById("ops-header")?.scrollIntoView({ behavior: "smooth" });
+  }, 80);
+});
+
+function collapseDispatcher() {
+  const body = document.getElementById("dispatcher-body");
+  const btn  = document.getElementById("btn-toggle-dispatcher");
+  if (body && !body.classList.contains("hidden")) {
+    body.classList.add("hidden");
+    if (btn) btn.textContent = "▶";
+  }
+}
+
+function restoreDispatcher() {
+  const body = document.getElementById("dispatcher-body");
+  const btn  = document.getElementById("btn-toggle-dispatcher");
+  if (body) {
+    body.classList.remove("hidden");
+    if (btn) btn.textContent = "▼";
+  }
+}
+
 function renderActiveSession() {
   detectSpottingConflicts();
   renderSpottingConflicts();
@@ -1838,6 +1879,8 @@ function renderActiveSession() {
     const cancelledPlanId = session?.planId;
     session = null;
     saveSession();
+    updateSessionBar();
+    restoreDispatcher();
     if (cancelledPlanId) {
       try { await api("PATCH", `/api/dispatcher/plan/${cancelledPlanId}/status`, { status: "draft" }); } catch {}
     }
@@ -1900,6 +1943,7 @@ function renderActiveSession() {
   $$(".session-cp-btn").forEach(btn => {
     btn.addEventListener("click", () => markCar(parseInt(btn.dataset.id), "cp"));
   });
+  updateSessionBar();
 }
 
 async function handleEndSession() {
@@ -1944,6 +1988,8 @@ async function commitEndSession(cpCars) {
       }
       session = null;
       saveSession();
+      updateSessionBar();
+      restoreDispatcher();
       result.updated.forEach(updated => {
         const idx = cars.findIndex(c => c.id === updated.id);
         if (idx !== -1) cars[idx] = updated;
@@ -3537,6 +3583,8 @@ function wireConsistCard(planId) {
       saveSession();
       renderActiveSession();
       document.querySelector('[data-tab="operations"]').click();
+      collapseDispatcher();
+      setTimeout(() => document.getElementById("ops-header")?.scrollIntoView({ behavior: "smooth" }), 120);
     } catch (err) {
       showToast("Error starting session: " + err.message, "error");
     }
