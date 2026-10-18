@@ -1263,13 +1263,13 @@
   </script>
   {% endif %}
 
-  <script src="/static/app.js"></script>
-
-  <!-- Persistent session status bar — visible on any tab while a session is active -->
+  <!-- Persistent session status bar — must be before app.js so the element exists when the script runs -->
   <div id="session-status-bar" class="hidden">
     <span id="session-bar-label"></span>
     <span id="session-bar-progress" class="session-bar-progress"></span>
     <button id="session-bar-goto" class="outline small">&#9654; Go to session</button>
   </div>
+
+  <script src="/static/app.js"></script>
 </body>
 </html>
