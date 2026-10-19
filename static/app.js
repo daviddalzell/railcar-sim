@@ -144,6 +144,14 @@ async function toggleClockPause() {
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
+function track(eventName, params = {}) {
+  if (typeof gtag === "undefined") return;
+  gtag("event", eventName, {
+    is_demo: !!document.getElementById("demo-banner"),
+    ...params,
+  });
+}
+
 function _authToken() {
   return sessionStorage.getItem("waypoint_token") || "";
 }
@@ -1413,6 +1421,9 @@ async function loadOperations() {
     await withLoading(btn, "Planning…", async () => {
       try {
         const plan = await api("POST", "/api/session/plan");
+        track("switch_list_generated", {
+          car_count: (plan.arrivals?.length || 0) + (plan.departures?.length || 0) + (plan.spots?.length || 0),
+        });
         renderPlanPreview(plan);
       } catch (err) {
         showToast("Error planning session: " + err.message, "error");
@@ -1508,6 +1519,7 @@ function _startSessionFromPlan(plan) {
       })),
     ],
   };
+  track("session_started", { source: "quick_op", car_count: session.cars.length });
   saveSession();
   renderActiveSession();
   collapseDispatcher();
@@ -1876,6 +1888,7 @@ function renderActiveSession() {
     }
     btn.classList.remove("btn-confirming");
     stopClock();
+    track("session_cancelled");
     const cancelledPlanId = session?.planId;
     session = null;
     saveSession();
@@ -1983,6 +1996,7 @@ async function commitEndSession(cpCars) {
     await withLoading(btn || document.body, "Finishing…", async () => {
       const result = await api("POST", "/api/session/end", { cars: payload });
       stopClock();
+      track("session_completed", { moves_completed: result.updated.length });
       if (session?.planId) {
         try { await api("PATCH", `/api/dispatcher/plan/${session.planId}/status`, { status: "complete" }); } catch {}
       }
@@ -3580,6 +3594,7 @@ function wireConsistCard(planId) {
           ...(plan.pickups || []).map(c => toSessionCar(c, "departures")),
         ],
       };
+      track("session_started", { source: "dispatcher", car_count: session.cars.length });
       saveSession();
       renderActiveSession();
       document.querySelector('[data-tab="operations"]').click();
@@ -3640,6 +3655,7 @@ $("#btn-build-consist").addEventListener("click", async () => {
         switching_area_id: areaId,
         destination_location_id: destId,
       });
+      track("dispatcher_plan_built");
       dispatchPlans.push(newPlan);
       renderDispatchPlanList();
       await renderLayoutStatus();
@@ -3934,4 +3950,6 @@ $("#invite-send-btn")?.addEventListener("click", async () => {
       populateCarTypeSelects();
     })(),
   ]);
+  document.querySelector('a[href*="patreon.com"]')
+    ?.addEventListener("click", () => track("patreon_link_clicked"));
 })();
