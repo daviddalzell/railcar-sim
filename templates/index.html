@@ -712,13 +712,13 @@
       <div class="help-section">
         <button class="help-section-header">▶ AI Features</button>
         <div class="help-section-body hidden">
-          <p>WAYPOINT uses AI in several places to reduce manual data entry. All AI features require an API key configured in your <code>.env</code> file.</p>
+          <p>WAYPOINT uses AI in several places to reduce manual data entry. Gemini AI is included with your subscription — no configuration needed to get started.</p>
           <ul>
             <li><strong>Car identification</strong> — Upload a photo of a car and AI identifies type, reporting marks, road number, and color.</li>
             <li><strong>Stylized illustration</strong> — The <strong>✨ AI</strong> panel on the car add/edit form generates an artistic rendering using an image-generation model.</li>
             <li><strong>Industry suggest</strong> — The <strong>✨ AI Suggest</strong> button in the industry form fills in commodities, car types, and role based on the industry name.</li>
             <li><strong>Commodity suggest</strong> — The <strong>✨</strong> button in the commodity mapping form suggests the correct car type for any commodity.</li>
-            <li>Supported providers: Gemini (default), Claude (Anthropic), GPT-4o (OpenAI), or a local Ollama model. Set <code>VISION_PROVIDER</code> in <code>.env</code>.</li>
+            <li><strong>Bringing your own API key</strong> — If you have your own Gemini, Claude, or OpenAI API key, you can enter it in the <strong>Settings</strong> tab. Your key is used instead of the shared key and counts against your own quota.</li>
             <li>AI calls automatically retry on transient provider errors (rate limits, overloads) before failing.</li>
           </ul>
         </div>
