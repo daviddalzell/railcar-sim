@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<!-- SPDX-FileCopyrightText: 2026 David Dalzell -->
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Updates &amp; Roadmap — Waypoint</title>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-GVQFSP7HDG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-GVQFSP7HDG');
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0e1117;
+      color: #c8cdd8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.65;
+    }
+
+    a { color: #d97706; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Header ── */
+    header {
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1e2330;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 0.75rem; }
+
+    .logo-mark {
+      width: 32px; height: 32px;
+      background: #d97706;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .logo-name {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #f0f2f5;
+      letter-spacing: -0.01em;
+    }
+
+    .header-nav { display: flex; gap: 1.5rem; font-size: 0.85rem; }
+    .header-nav a { color: #5a6475; }
+    .header-nav a:hover { color: #8b95a5; text-decoration: none; }
+
+    /* ── Page layout ── */
+    main {
+      flex: 1;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 5rem;
+      width: 100%;
+    }
+
+    .page-header { margin-bottom: 3rem; }
+
+    .page-eyebrow {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #d97706;
+      margin-bottom: 0.6rem;
+    }
+
+    .page-title {
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-weight: 700;
+      color: #f0f2f5;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 0.75rem;
+      text-wrap: balance;
+    }
+
+    .page-subtitle {
+      font-size: 0.92rem;
+      color: #5a6475;
+      max-width: 52ch;
+      line-height: 1.6;
+    }
+
+    /* ── Section headings ── */
+    .section-heading {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #3d4556;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 1px solid #1e2330;
+    }
+
+    /* ── Timeline entries ── */
+    .timeline { display: flex; flex-direction: column; gap: 0; margin-bottom: 3rem; }
+
+    .entry {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 0 1.5rem;
+      position: relative;
+    }
+
+    .entry::before {
+      content: "";
+      position: absolute;
+      left: 90px;
+      top: 0.55rem;
+      bottom: 0;
+      width: 1px;
+      background: #1e2330;
+      transform: translateX(calc(1.5rem / 2 - 0.5px));
+    }
+
+    .entry:last-child::before { display: none; }
+
+    .entry-date {
+      padding-top: 0.4rem;
+      font-size: 0.75rem;
+      color: #3d4556;
+      text-align: right;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.4;
+    }
+
+    .entry-body {
+      padding-bottom: 2rem;
+      padding-left: 0;
+      position: relative;
+    }
+
+    .entry-body::before {
+      content: "";
+      position: absolute;
+      left: calc(-1.5rem / 2 - 5px);
+      top: 0.5rem;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 2px solid #1e2330;
+      background: #0e1117;
+    }
+
+    .entry.shipped .entry-body::before { background: #d97706; border-color: #d97706; }
+    .entry.proposed .entry-body::before { background: #0e1117; border-color: #3d4556; }
+
+    .entry-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #d4d9e4;
+      margin-bottom: 0.35rem;
+      line-height: 1.3;
+    }
+
+    .entry-desc {
+      font-size: 0.85rem;
+      color: #5a6475;
+      line-height: 1.6;
+      margin-bottom: 0.5rem;
+    }
+
+    .entry-desc p { margin-bottom: 0.35rem; }
+    .entry-desc p:last-child { margin-bottom: 0; }
+
+    .entry-desc ul {
+      padding-left: 1.1rem;
+      margin-top: 0.3rem;
+    }
+
+    .entry-desc li { margin-bottom: 0.2rem; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+
+    .badge-shipped  { background: #2a1f0a; color: #d97706; }
+    .badge-proposed { background: #161b26; color: #5a6475; border: 1px solid #2d3447; }
+    .badge-fix      { background: #0e1f12; color: #3d9a50; }
+
+    .rfc-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #d97706;
+      border: 1px solid #2d2010;
+      border-radius: 4px;
+      padding: 0.25rem 0.6rem;
+      background: #1a1408;
+    }
+
+    .rfc-link:hover { background: #221a0a; text-decoration: none; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 1.5rem 2rem;
+      text-align: center;
+      font-size: 0.78rem;
+      color: #2d3447;
+      border-top: 1px solid #1e2330;
+    }
+
+    footer a { color: #3d4556; }
+    footer a:hover { color: #5a6475; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <div class="logo-mark">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="13" width="16" height="3" rx="1.5" fill="white"/>
+          <rect x="5" y="8" width="10" height="5" rx="1" fill="white" opacity="0.85"/>
+          <circle cx="6" cy="16" r="1.5" fill="#d97706"/>
+          <circle cx="14" cy="16" r="1.5" fill="#d97706"/>
+        </svg>
+      </div>
+      <span class="logo-name">Waypoint</span>
+    </div>
+    <nav class="header-nav">
+      <a href="/">Home</a>
+      <a href="/signup">Get access</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="page-header">
+      <div class="page-eyebrow">Waypoint</div>
+      <h1 class="page-title">Updates &amp; Roadmap</h1>
+      <p class="page-subtitle">Recent changes shipped to all layouts, plus proposals open for feedback before we build them.</p>
+    </div>
+
+    <!-- ── Proposed changes ── -->
+    <div class="section-heading">Open for feedback</div>
+    <div class="timeline">
+
+      <div class="entry proposed">
+        <div class="entry-date">Proposed<br>Oct 2026</div>
+        <div class="entry-body">
+          <div class="badge badge-proposed">RFC</div>
+          <div class="entry-title">Clearer Layout Setup: Towns, Tracks &amp; Industries</div>
+          <div class="entry-desc">
+            <p>A user found the terms "Location" and "Switching Area" confusing — it wasn't clear which to create first or how they relate. We're proposing a rename and a nested UI that makes the hierarchy obvious: a <strong>Town</strong> contains <strong>Tracks</strong>, and tracks contain <strong>Industries</strong>.</p>
+            <p>No data would be lost — this is a rename and a UI reorganisation, not a structural change.</p>
+          </div>
+          <a class="rfc-link" href="/updates/rfc-layout-setup-rename">Read the full proposal &amp; leave feedback →</a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Shipped changes ── -->
+    <div class="section-heading">Recently shipped</div>
+    <div class="timeline">
+
+      <div class="entry shipped">
+        <div class="entry-date">Oct 2026</div>
+        <div class="entry-body">
+          <div class="badge badge-shipped">Shipped</div>
+          <div class="entry-title">Session status bar</div>
+          <div class="entry-desc">
+            <p>A persistent bar at the bottom of the screen shows your active session at all times — car count, progress, and a quick link to jump back to it. The dispatcher panel auto-collapses when a session starts so the session is always in view.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="entry shipped">
+        <div class="entry-date">Oct 2026</div>
+        <div class="entry-body">
+          <div class="badge badge-shipped">Shipped</div>
+          <div class="entry-title">Dispatcher conflict panel — Spot &amp; Hold</div>
+          <div class="entry-desc">
+            <p>When two cars compete for the same industry spot, the dispatcher panel now presents a decision UI rather than auto-resolving silently. The system recommends which car to spot based on priority, wait time, and car type — but you make the final call.</p>
+            <ul>
+              <li><strong>Spot</strong> — commit this car to the industry</li>
+              <li><strong>Hold</strong> — park it at the yard until next session</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="entry shipped">
+        <div class="entry-date">Oct 2026</div>
+        <div class="entry-body">
+          <div class="badge badge-shipped">Shipped</div>
+          <div class="entry-title">Priority freight</div>
+          <div class="entry-desc">
+            <p>Waybills can now be marked as priority freight (perishable or time-sensitive). Priority cars sort to the top of spotting conflict lists and are highlighted in the dispatcher panel with a priority badge.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="entry shipped">
+        <div class="entry-date">Sep 2026</div>
+        <div class="entry-body">
+          <div class="badge badge-fix">Fix</div>
+          <div class="entry-title">AI features help text corrected</div>
+          <div class="entry-desc">
+            <p>The Help tab now accurately describes which AI features are included with your subscription (car identification, industry suggest, commodity suggest) and which require a paid Gemini API key (stylized illustration).</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="entry shipped">
+        <div class="entry-date">Sep 2026</div>
+        <div class="entry-body">
+          <div class="badge badge-shipped">Shipped</div>
+          <div class="entry-title">Google Analytics — understanding demo engagement</div>
+          <div class="entry-desc">
+            <p>Added engagement tracking to better understand how demo visitors use the app. Events tracked include: switch list generation, session start, session completion, and dispatcher plan builds. All tracking is anonymous and aggregated.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    &copy; 2026 Waypoint &mdash;
+    <a href="/">Home</a> &middot;
+    <a href="https://www.patreon.com/WaypointOps">Patreon</a>
+  </footer>
+
+</body>
+</html>
