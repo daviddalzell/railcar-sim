@@ -336,6 +336,16 @@ def signup(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
 
 
+@app.get("/updates")
+def changelog(request: Request):
+    return templates.TemplateResponse("changelog.html", {"request": request})
+
+
+@app.get("/updates/rfc-layout-setup-rename")
+def rfc_layout_rename(request: Request):
+    return templates.TemplateResponse("rfc_layout_rename.html", {"request": request})
+
+
 @app.get("/")
 def index(request: Request):
     from database import engine, _is_sqlite

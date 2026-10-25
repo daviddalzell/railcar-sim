@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<!-- SPDX-FileCopyrightText: 2026 David Dalzell -->
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RFC: Layout Setup Rename — Waypoint</title>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-GVQFSP7HDG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-GVQFSP7HDG');
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0e1117;
+      color: #c8cdd8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.65;
+    }
+
+    a { color: #d97706; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Header ── */
+    header {
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1e2330;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 0.75rem; }
+
+    .logo-mark {
+      width: 32px; height: 32px;
+      background: #d97706;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .logo-name {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #f0f2f5;
+      letter-spacing: -0.01em;
+    }
+
+    .header-nav { display: flex; gap: 1.5rem; font-size: 0.85rem; }
+    .header-nav a { color: #5a6475; }
+    .header-nav a:hover { color: #8b95a5; text-decoration: none; }
+
+    /* ── Doc layout ── */
+    main {
+      flex: 1;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 5rem;
+      width: 100%;
+    }
+
+    /* ── Doc header ── */
+    .breadcrumb {
+      font-size: 0.78rem;
+      color: #3d4556;
+      margin-bottom: 1.5rem;
+    }
+
+    .breadcrumb a { color: #5a6475; }
+    .breadcrumb a:hover { color: #8b95a5; text-decoration: none; }
+
+    .doc-eyebrow {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #d97706;
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-size: clamp(1.4rem, 4vw, 1.9rem);
+      font-weight: 700;
+      color: #f0f2f5;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 0.75rem;
+      text-wrap: balance;
+    }
+
+    .doc-meta {
+      display: flex;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      font-size: 0.78rem;
+      color: #3d4556;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid #1e2330;
+    }
+
+    /* ── Body ── */
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #d4d9e4;
+      margin: 2rem 0 0.6rem;
+    }
+
+    p { font-size: 0.9rem; color: #8b95a5; margin-bottom: 0.65rem; }
+    p:last-child { margin-bottom: 0; }
+
+    strong { color: #c8cdd8; font-weight: 600; }
+
+    ul, ol {
+      padding-left: 1.25rem;
+      margin-bottom: 0.65rem;
+    }
+
+    li { font-size: 0.9rem; color: #8b95a5; margin-bottom: 0.3rem; }
+
+    hr { border: none; border-top: 1px solid #1e2330; margin: 2rem 0; }
+
+    /* ── Rename table ── */
+    .rename-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.5rem 1fr;
+      gap: 0.5rem 0.75rem;
+      align-items: center;
+      margin: 1.25rem 0;
+      background: #161b26;
+      border: 1px solid #1e2330;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+    }
+
+    .col-head {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #3d4556;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid #1e2330;
+    }
+
+    .col-arrow { border-bottom: 1px solid #1e2330; padding-bottom: 0.35rem; }
+
+    .tag {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .tag-before { background: #1e2a38; color: #7aafd4; }
+    .tag-after  { background: #0e2a1a; color: #5dbf8a; }
+    .tag-same   { background: #1e2330; color: #5a6475; }
+
+    .row-arrow  { color: #3d4556; font-size: 0.8rem; text-align: center; }
+    .row-note   { font-size: 0.75rem; color: #3d4556; font-style: italic; }
+
+    /* ── Hierarchy diagram ── */
+    .diagram-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin: 1.25rem 0;
+    }
+
+    @media (max-width: 500px) { .diagram-pair { grid-template-columns: 1fr; } }
+
+    .diagram-box {
+      background: #161b26;
+      border: 1px solid #1e2330;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .diagram-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding-bottom: 0.5rem;
+      margin-bottom: 0.75rem;
+      border-bottom: 1px solid #1e2330;
+    }
+
+    .diagram-label.before { color: #7aafd4; }
+    .diagram-label.after  { color: #5dbf8a; }
+
+    .tree {
+      font-size: 0.78rem;
+      line-height: 1.9;
+      font-family: "SF Mono", "Fira Code", monospace;
+      color: #8b95a5;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 0.05rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      font-family: -apple-system, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+      line-height: 1.7;
+    }
+
+    .pill-area  { background: #1e2a38; color: #7aafd4; }
+    .pill-track { background: #0e2a1a; color: #5dbf8a; }
+    .pill-spot  { background: #2a1f0a; color: #d97706; }
+
+    /* ── Impact boxes ── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    @media (max-width: 460px) { .two-col { grid-template-columns: 1fr; } }
+
+    .impact-box {
+      background: #161b26;
+      border: 1px solid #1e2330;
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+    }
+
+    .impact-box h3 {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.6rem;
+    }
+
+    .impact-box.changes h3 { color: #d97706; }
+    .impact-box.stays   h3 { color: #3d4556; }
+    .impact-box ul { font-size: 0.82rem; }
+
+    /* ── Questions callout ── */
+    .callout {
+      background: #161b26;
+      border: 1px solid #1e2330;
+      border-left: 3px solid #d97706;
+      border-radius: 0 8px 8px 0;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .callout-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #d97706;
+      margin-bottom: 0.6rem;
+    }
+
+    .callout ol { padding-left: 1.25rem; }
+    .callout li { font-size: 0.88rem; color: #8b95a5; margin-bottom: 0.5rem; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 1.5rem 2rem;
+      text-align: center;
+      font-size: 0.78rem;
+      color: #2d3447;
+      border-top: 1px solid #1e2330;
+    }
+
+    footer a { color: #3d4556; }
+    footer a:hover { color: #5a6475; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <div class="logo-mark">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="13" width="16" height="3" rx="1.5" fill="white"/>
+          <rect x="5" y="8" width="10" height="5" rx="1" fill="white" opacity="0.85"/>
+          <circle cx="6" cy="16" r="1.5" fill="#d97706"/>
+          <circle cx="14" cy="16" r="1.5" fill="#d97706"/>
+        </svg>
+      </div>
+      <span class="logo-name">Waypoint</span>
+    </div>
+    <nav class="header-nav">
+      <a href="/">Home</a>
+      <a href="/updates">Updates &amp; Roadmap</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="breadcrumb">
+      <a href="/updates">Updates &amp; Roadmap</a> &rsaquo; Proposal
+    </div>
+
+    <div class="doc-eyebrow">RFC &mdash; Layout Setup</div>
+    <h1>Clearer Layout Setup: Renaming Locations &amp; Switching Areas</h1>
+    <div class="doc-meta">
+      <span>Posted October 2026</span>
+      <span>Status: Open for feedback</span>
+    </div>
+
+    <h2>The problem</h2>
+    <p>A user recently pointed out that the terms <strong>Location</strong> and <strong>Switching Area</strong> don't make it obvious how they relate to each other, or which one to create first. The current setup screen presents both as flat lists side by side, which makes it easy to create a Location without realising it belongs inside a Switching Area.</p>
+    <p>The underlying structure is actually quite natural once you see it — a Switching Area is a named part of your layout (a town, a yard, a junction), and Locations are the individual tracks and sidings within it. The problem is the current names and layout don't make that hierarchy obvious.</p>
+
+    <hr />
+
+    <h2>The proposal</h2>
+    <p>Rename the concepts to use more familiar railroad vocabulary, and reorganise the Layout Setup screen so the hierarchy is visible at a glance.</p>
+
+    <div class="rename-grid">
+      <div class="col-head">Current name</div>
+      <div class="col-arrow"></div>
+      <div class="col-head">Proposed name</div>
+
+      <div><span class="tag tag-before">Switching Area</span></div>
+      <div class="row-arrow">→</div>
+      <div><span class="tag tag-after">Town / Station</span></div>
+
+      <div><span class="tag tag-before">Location</span></div>
+      <div class="row-arrow">→</div>
+      <div><span class="tag tag-after">Track</span></div>
+
+      <div><span class="tag tag-same">Industry</span></div>
+      <div class="row-arrow">→</div>
+      <div><div style="display:flex;align-items:center;gap:0.5rem"><span class="tag tag-same">Industry</span> <span class="row-note">unchanged</span></div></div>
+    </div>
+
+    <p>The hierarchy would read: <strong>Town → Tracks → Industries</strong>. A track is a specific siding or lead within the town. An industry is a spot on that track — a grain elevator, a fuel dealer, a team track spot.</p>
+
+    <h2>Before and after</h2>
+
+    <div class="diagram-pair">
+      <div class="diagram-box">
+        <div class="diagram-label before">Current — flat lists</div>
+        <div class="tree">
+          <div><span class="pill pill-area">Area</span> Millbrook</div>
+          <div><span class="pill pill-area">Area</span> East Junction</div>
+          <div style="margin-top:0.4rem"></div>
+          <div><span class="pill pill-track">Location</span> Yard Lead</div>
+          <div><span class="pill pill-track">Location</span> Grain Siding</div>
+          <div><span class="pill pill-track">Location</span> Fuel Siding</div>
+          <div><span class="pill pill-track">Location</span> West Staging</div>
+          <div style="margin-top:0.3rem;font-size:0.7rem;color:#3d4556">← which belong where?</div>
+        </div>
+      </div>
+
+      <div class="diagram-box">
+        <div class="diagram-label after">Proposed — nested</div>
+        <div class="tree">
+          <div>▼ <span class="pill pill-area">Town</span> Millbrook</div>
+          <div>&nbsp;&nbsp;├─ <span class="pill pill-track">Track</span> Yard Lead</div>
+          <div>&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;<span class="pill pill-spot">Industry</span> Fuel Dealer</div>
+          <div>&nbsp;&nbsp;└─ <span class="pill pill-track">Track</span> Grain Siding</div>
+          <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="pill pill-spot">Industry</span> Riverside Grain</div>
+          <div>▼ <span class="pill pill-area">Town</span> East Junction</div>
+          <div>&nbsp;&nbsp;└─ <span class="pill pill-track">Track</span> West Staging</div>
+        </div>
+      </div>
+    </div>
+
+    <hr />
+
+    <h2>What changes and what stays the same</h2>
+
+    <div class="two-col">
+      <div class="impact-box changes">
+        <h3>What changes</h3>
+        <ul>
+          <li>Labels in the Layout Setup screen</li>
+          <li>Tracks are created <em>inside</em> a Town, not as a separate list</li>
+          <li>Form labels and help text throughout the app</li>
+          <li>The word "Location" disappears from the UI</li>
+        </ul>
+      </div>
+      <div class="impact-box stays">
+        <h3>What stays the same</h3>
+        <ul>
+          <li>All your existing layout data</li>
+          <li>How session planning works</li>
+          <li>How the dispatcher builds consists</li>
+          <li>Waybills, car roster, operating sessions</li>
+        </ul>
+      </div>
+    </div>
+
+    <p>This is a <strong>rename and UI reorganisation only</strong> — the underlying data does not change. Your existing layout would look identical after the update, just with different labels.</p>
+
+    <hr />
+
+    <h2>Your feedback</h2>
+    <p>Nothing is final. If the community prefers different terminology or a different approach, we'll adjust before building anything.</p>
+
+    <div class="callout">
+      <div class="callout-title">Questions for the community</div>
+      <ol>
+        <li><strong>Do "Town" and "Track" feel right for your layout?</strong> Or does your railroad use different language — Division, District, Industry Lead, something else?</li>
+        <li><strong>Are there layout configurations this doesn't fit?</strong> For example, a point-to-point without town structure, or a switching layout that's all one area.</li>
+        <li><strong>Is the current setup confusing to you,</strong> or did you figure it out and it's fine as-is?</li>
+        <li><strong>Any other thoughts?</strong> We're open to completely different approaches if the community has better ideas.</li>
+      </ol>
+    </div>
+
+    <p>Reply in the forum thread linked from the <a href="/updates">Updates &amp; Roadmap</a> page, or reach out directly via Patreon.</p>
+  </main>
+
+  <footer>
+    &copy; 2026 Waypoint &mdash;
+    <a href="/">Home</a> &middot;
+    <a href="/updates">Updates &amp; Roadmap</a> &middot;
+    <a href="https://www.patreon.com/WaypointOps">Patreon</a>
+  </footer>
+
+</body>
+</html>
