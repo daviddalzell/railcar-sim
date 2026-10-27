@@ -66,7 +66,7 @@ def delete(photo_path: str):
         marker = f"/object/public/{_BUCKET}/"
         idx = photo_path.find(marker)
         if idx != -1:
-            storage_path = f"uploads/{photo_path[idx + len(marker):]}"
+            storage_path = photo_path[idx + len(marker):]
             client.storage.from_(_BUCKET).remove([storage_path])
     else:
         Path(photo_path).unlink(missing_ok=True)

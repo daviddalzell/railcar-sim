@@ -299,7 +299,9 @@ async function refreshLibraryGrid() {
       });
     }
   } catch (err) {
-    grid.innerHTML = `<p class="muted" style="text-align:center">Failed to load library: ${err.message}</p>`;
+    grid.innerHTML = err.status === 401
+      ? `<p class="muted" style="text-align:center">Sign in to access your photo library.</p>`
+      : `<p class="muted" style="text-align:center">Failed to load library: ${err.message}</p>`;
   }
   updateDeleteSelectedBtn();
 }
@@ -2854,11 +2856,32 @@ $("#btn-seed-commodity-map").addEventListener("click", async () => {
 // ── Export / Import ───────────────────────────────────────────────────────────
 $("#btn-open-photo-library").addEventListener("click", () => openPhotoLibrary(null));
 
-$("#btn-export-backup").addEventListener("click", () => {
-  const a = document.createElement("a");
-  a.href = "/api/export";
-  a.download = "";
-  a.click();
+$("#btn-export-backup").addEventListener("click", async () => {
+  const btn = $("#btn-export-backup");
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Exporting…";
+  try {
+    const res = await fetch("/api/export", {
+      headers: { "Authorization": `Bearer ${_authToken()}`, "X-Subscriber-Id": _subscriberId },
+    });
+    if (!res.ok) throw new Error(`Export failed (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `railcar-backup-${today}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showToast("Export failed: " + err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
 });
 
 $("#btn-import-trigger").addEventListener("click", () => {
