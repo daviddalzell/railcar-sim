@@ -51,8 +51,8 @@ def main() -> None:
 
 
 SEQUENCE_TABLES = [
-    "cars", "car_types", "locations", "industries", "waybills",
-    "movement_logs", "switching_areas", "dispatch_plan",
+    "cars", "car_types", "locations", "tracks", "industries", "waybills",
+    "movement_logs", "dispatch_plan",
 ]
 
 
