@@ -12,7 +12,7 @@ os.environ.setdefault("AUTH_DISABLED", "true")
 
 from database import Base, get_db
 from main import app
-from models import Car, CommodityCarTypeMap, Industry, Location, Waybill
+from models import Car, CommodityCarTypeMap, Industry, Track, Waybill
 
 
 @pytest.fixture()
@@ -44,7 +44,7 @@ def client(db_session):
 # ── Factory helpers ────────────────────────────────────────────────────────────
 
 def make_location(db, name, loc_type="staging"):
-    loc = Location(name=name, location_type=loc_type)
+    loc = Track(name=name, location_type=loc_type)
     db.add(loc)
     db.flush()
     return loc

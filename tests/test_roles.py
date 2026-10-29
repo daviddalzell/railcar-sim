@@ -80,8 +80,8 @@ def test_operator_cannot_create_switching_area(operator_client):
 
 
 def test_operator_cannot_delete_switching_area(operator_client, db_session):
-    from models import SwitchingArea
-    area = SwitchingArea(name="Test Yard", car_capacity=10)
+    from models import Location
+    area = Location(name="Test Yard", car_capacity=10)
     db_session.add(area)
     db_session.flush()
     r = operator_client.delete(f"/api/switching-areas/{area.id}")
@@ -158,8 +158,8 @@ def test_admin_can_delete_car(admin_client, db_session):
 # ── Dispatcher: operators cannot build/delete plans ──────────────────────────
 
 def test_operator_cannot_build_dispatch_plan(operator_client, db_session):
-    from models import SwitchingArea
-    area = SwitchingArea(name="Yard", car_capacity=10)
+    from models import Location
+    area = Location(name="Yard", car_capacity=10)
     db_session.add(area)
     db_session.flush()
     origin = make_location(db_session, "Staging", "staging")

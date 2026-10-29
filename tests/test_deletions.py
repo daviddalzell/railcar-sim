@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 David Dalzell
 # SPDX-License-Identifier: MIT
 
-from models import Car, Location, Waybill
+from models import Car, Track, Waybill
 from tests.conftest import make_car, make_location, make_waybill
 
 
@@ -47,7 +47,7 @@ def test_delete_staging_source_location_gone(client, db_session):
 
     r = client.delete(f"/api/locations/{staging_a.id}?merge_into_id={staging_b.id}")
     assert r.status_code == 200
-    gone = db_session.get(Location, staging_a.id)
+    gone = db_session.get(Track, staging_a.id)
     assert gone is None
 
 
@@ -68,7 +68,7 @@ def test_delete_non_staging_no_cars_succeeds(client, db_session):
     r = client.delete(f"/api/locations/{yard.id}")
     assert r.status_code == 200
     assert r.json()["action"] == "deleted"
-    gone = db_session.get(Location, yard.id)
+    gone = db_session.get(Track, yard.id)
     assert gone is None
 
 

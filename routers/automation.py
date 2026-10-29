@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Car, CommodityCarTypeMap, Industry, Location, Waybill
+from models import Car, CommodityCarTypeMap, Industry, Track, Waybill
 from converters import car_to_dict, waybill_to_dict
 from schemas import GenerateWaybillsRequest
 
@@ -223,8 +223,8 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
 
     # Generate waybills for every staging and yard location so cars at any
     # dispatch point get full inbound/outbound/empty routes.
-    origin_locations = db.query(Location).filter(
-        Location.location_type.in_(["staging", "yard"])
+    origin_locations = db.query(Track).filter(
+        Track.location_type.in_(["staging", "yard"])
     ).all()
     if not origin_locations:
         return {"created": 0, "skipped": 0, "waybills": []}
@@ -374,7 +374,7 @@ def auto_assign_waybills(db: Session = Depends(get_db)):
 
     staging_ids = {
         loc.id for loc in
-        db.query(Location).filter(Location.location_type.in_(["staging", "yard"])).all()
+        db.query(Track).filter(Track.location_type.in_(["staging", "yard"])).all()
     }
     if not staging_ids:
         return {"assigned": 0, "cars_updated": [car_to_dict(c) for c in cars]}
@@ -398,7 +398,7 @@ def auto_assign_single_car(car_id: int, db: Session = Depends(get_db)):
     db.refresh(car)
     staging_ids = {
         loc.id for loc in
-        db.query(Location).filter(Location.location_type.in_(["staging", "yard"])).all()
+        db.query(Track).filter(Track.location_type.in_(["staging", "yard"])).all()
     }
     unassigned = db.query(Waybill).filter(Waybill.car_id.is_(None)).all()
     # Only seed the starting location if the car is at a staging/yard — if it's

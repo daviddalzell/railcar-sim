@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Tables in FK-safe insert order; movement_logs is handled separately (regenerated fresh).
 _TABLES = [
     "car_types",
-    "switching_areas",
     "locations",
+    "tracks",
     "industries",
     "commodity_car_type_map",
     "cars",

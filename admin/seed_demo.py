@@ -67,12 +67,12 @@ def regenerate_movement_logs(db):
     Called after cloning the demo-template schema so timestamps are always
     relative to the moment of reset rather than when the template was last edited.
     """
-    from models import Car, Location, MovementLog
+    from models import Car, MovementLog, Track
     db.query(MovementLog).delete(synchronize_session=False)
     db.flush()
 
     cars = db.query(Car).filter(Car.car_type != "caboose").limit(10).all()
-    locations = db.query(Location).all()
+    locations = db.query(Track).all()
     if len(cars) < 2 or len(locations) < 2:
         db.commit()
         return
@@ -95,7 +95,7 @@ def seed_demo():
     from sqlalchemy import text
     from models import (
         Car, CarType, CommodityCarTypeMap, DispatchPlan,
-        Industry, Location, MovementLog, SwitchingArea, Waybill,
+        Industry, Location, MovementLog, Track, Waybill,
     )
 
     db = SessionLocal()
@@ -114,7 +114,7 @@ def seed_demo():
 
         # ── Truncate in reverse FK order ────────────────────────────────────
         for model in (DispatchPlan, MovementLog, Waybill, Car,
-                      CommodityCarTypeMap, Industry, Location, SwitchingArea, CarType):
+                      CommodityCarTypeMap, Industry, Track, Location, CarType):
             db.query(model).delete(synchronize_session=False)
         db.flush()
 
@@ -137,21 +137,21 @@ def seed_demo():
             db.add(CommodityCarTypeMap(commodity=commodity, car_type=car_type))
         db.flush()
 
-        # ── Switching area ───────────────────────────────────────────────────
-        yard_area = SwitchingArea(name="Millbrook Yard", car_capacity=20)
+        # ── Location (top-level grouping) ────────────────────────────────────
+        yard_area = Location(name="Millbrook Yard", car_capacity=20)
         db.add(yard_area)
         db.flush()
 
-        # ── Locations ────────────────────────────────────────────────────────
-        loc_yard = Location(name="Millbrook Yard", location_type="yard",
-                            switching_area_id=yard_area.id, car_capacity=20)
-        loc_grain = Location(name="Riverside Grain", location_type="industry",
-                             switching_area_id=yard_area.id, car_capacity=6)
-        loc_fuel = Location(name="Valley Fuel", location_type="industry",
-                            switching_area_id=yard_area.id, car_capacity=4)
-        loc_lumber = Location(name="Millbrook Lumber", location_type="industry",
-                              switching_area_id=yard_area.id, car_capacity=4)
-        loc_staging = Location(name="West Staging", location_type="staging", car_capacity=30)
+        # ── Tracks ───────────────────────────────────────────────────────────
+        loc_yard = Track(name="Millbrook Yard", location_type="yard",
+                         location_id=yard_area.id, car_capacity=20)
+        loc_grain = Track(name="Riverside Grain", location_type="industry",
+                          location_id=yard_area.id, car_capacity=6)
+        loc_fuel = Track(name="Valley Fuel", location_type="industry",
+                         location_id=yard_area.id, car_capacity=4)
+        loc_lumber = Track(name="Millbrook Lumber", location_type="industry",
+                           location_id=yard_area.id, car_capacity=4)
+        loc_staging = Track(name="West Staging", location_type="staging", car_capacity=30)
         for loc in (loc_yard, loc_grain, loc_fuel, loc_lumber, loc_staging):
             db.add(loc)
         db.flush()

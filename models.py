@@ -85,26 +85,30 @@ class DemoLead(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
 
-class SwitchingArea(Base):
-    __tablename__ = "switching_areas"
+class Location(Base):
+    """Top-level grouping of tracks (e.g. a town, yard complex, or staging area).
+    Formerly named SwitchingArea."""
+    __tablename__ = "locations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     car_capacity: Mapped[int] = mapped_column(Integer, default=10)
 
-    locations: Mapped[List["Location"]] = relationship("Location", back_populates="switching_area")
+    tracks: Mapped[List["Track"]] = relationship("Track", back_populates="location")
 
 
-class Location(Base):
-    __tablename__ = "locations"
+class Track(Base):
+    """An individual track within a Location (e.g. an industry siding, yard track, or staging track).
+    Formerly named Location."""
+    __tablename__ = "tracks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     location_type: Mapped[str] = mapped_column(String, default="yard")  # yard / industry / staging
-    switching_area_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("switching_areas.id"), nullable=True)
+    location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
     car_capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-    switching_area: Mapped[Optional["SwitchingArea"]] = relationship("SwitchingArea", back_populates="locations")
+    location: Mapped[Optional["Location"]] = relationship("Location", back_populates="tracks")
     cars: Mapped[List["Car"]] = relationship("Car", back_populates="current_location")
     industries: Mapped[List["Industry"]] = relationship("Industry", back_populates="location")
     origin_waybills: Mapped[List["Waybill"]] = relationship("Waybill", foreign_keys="Waybill.origin_id", back_populates="origin")
@@ -116,7 +120,7 @@ class Industry(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
+    location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tracks.id"), nullable=True)
     accepted_car_types: Mapped[str] = mapped_column(String, default="")
     commodities: Mapped[str] = mapped_column(String, default="")
     industry_role: Mapped[str] = mapped_column(String, default="consumer")
@@ -125,7 +129,7 @@ class Industry(Base):
     outbound_car_types: Mapped[str] = mapped_column(String, default="")
     spot_numbers: Mapped[str] = mapped_column(String, default="")
 
-    location: Mapped[Optional["Location"]] = relationship("Location", back_populates="industries")
+    location: Mapped[Optional["Track"]] = relationship("Track", back_populates="industries")
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="industry")
 
 
@@ -138,11 +142,11 @@ class Car(Base):
     car_number: Mapped[str] = mapped_column(String, default="")
     reporting_marks: Mapped[str] = mapped_column(String, default="")
     photo_path: Mapped[str] = mapped_column(String, default="")
-    current_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
+    current_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tracks.id"), nullable=True)
     active_waybill_slot: Mapped[int] = mapped_column(Integer, default=0)
     cp_session_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
-    current_location: Mapped[Optional["Location"]] = relationship("Location", back_populates="cars")
+    current_location: Mapped[Optional["Track"]] = relationship("Track", back_populates="cars")
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="car", order_by="Waybill.slot_index", foreign_keys="Waybill.car_id")
     movement_logs: Mapped[List["MovementLog"]] = relationship("MovementLog", back_populates="car")
 
@@ -154,8 +158,8 @@ class Waybill(Base):
     name: Mapped[str] = mapped_column(String, default="")
     car_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("cars.id"), nullable=True)
     slot_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    origin_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
-    destination_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
+    origin_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tracks.id"), nullable=True)
+    destination_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tracks.id"), nullable=True)
     industry_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("industries.id"), nullable=True)
     commodity: Mapped[str] = mapped_column(String, default="")
     is_empty: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -163,8 +167,8 @@ class Waybill(Base):
     is_priority: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     car: Mapped[Optional["Car"]] = relationship("Car", back_populates="waybills", foreign_keys=[car_id])
-    origin: Mapped[Optional["Location"]] = relationship("Location", foreign_keys=[origin_id], back_populates="origin_waybills")
-    destination: Mapped[Optional["Location"]] = relationship("Location", foreign_keys=[destination_id], back_populates="destination_waybills")
+    origin: Mapped[Optional["Track"]] = relationship("Track", foreign_keys=[origin_id], back_populates="origin_waybills")
+    destination: Mapped[Optional["Track"]] = relationship("Track", foreign_keys=[destination_id], back_populates="destination_waybills")
     industry: Mapped[Optional["Industry"]] = relationship("Industry", back_populates="waybills")
 
 
@@ -174,8 +178,8 @@ class MovementLog(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     car_id: Mapped[int] = mapped_column(Integer, ForeignKey("cars.id"), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    from_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
-    to_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
+    from_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tracks.id"), nullable=True)
+    to_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tracks.id"), nullable=True)
     note: Mapped[str] = mapped_column(String, default="")
     operator_email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
@@ -223,9 +227,9 @@ class DispatchPlan(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     plan_type: Mapped[str] = mapped_column(String, default="switching")  # "switching" | "transfer" (future)
-    origin_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
-    switching_area_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("switching_areas.id"), nullable=True)
-    destination_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
+    origin_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tracks.id"), nullable=True)
+    location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
+    destination_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tracks.id"), nullable=True)
     setout_ids_json: Mapped[str]           = mapped_column(String, default="[]")
     pickup_ids_json: Mapped[str]           = mapped_column(String, default="[]")
     spots_ids_json:  Mapped[str]           = mapped_column(String, default="[]")
