@@ -46,6 +46,9 @@ def seed_commodity_map(db: Session = Depends(get_db)):
 @router.post("/commodity-car-type-map/suggest")
 def suggest_commodity_endpoint(request: Request, data: CommoditySuggestRequest, db: Session = Depends(get_db)):
     tenant = getattr(request.state, "tenant", None)
+    from utils.geo import get_client_ip, is_free_tier, is_restricted_region
+    if is_free_tier(tenant) and is_restricted_region(get_client_ip(request)):
+        raise HTTPException(451, "Free AI tier is not available in your region (EU, UK, or Switzerland) due to privacy requirements. Add your own API key in Settings → AI.")
     if not get_provider(tenant).is_available():
         raise HTTPException(503, "No AI provider available — check your API key settings")
     existing = {r.commodity: r.car_type for r in db.query(CommodityCarTypeMap).all()}

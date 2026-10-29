@@ -56,6 +56,9 @@ def delete_industry(request: Request, ind_id: int, db: Session = Depends(get_db)
 @router.post("/industries/suggest")
 def suggest_industry_endpoint(request: Request, data: IndustrySuggestRequest, db: Session = Depends(get_db)):
     tenant = getattr(request.state, "tenant", None)
+    from utils.geo import get_client_ip, is_free_tier, is_restricted_region
+    if is_free_tier(tenant) and is_restricted_region(get_client_ip(request)):
+        raise HTTPException(451, "Free AI tier is not available in your region (EU, UK, or Switzerland) due to privacy requirements. Add your own API key in Settings → AI.")
     if not get_provider(tenant).is_available():
         raise HTTPException(503, "No AI provider available — check your API key settings")
     existing = [r.name for r in db.query(Industry).all()]

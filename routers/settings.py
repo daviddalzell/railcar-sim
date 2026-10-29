@@ -3,6 +3,7 @@
 
 import logging
 import os
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -62,12 +63,18 @@ def get_settings(request: Request, db: Session = Depends(get_db)):
     row = db.query(Tenant).filter(Tenant.id == tenant_ctx.id).first()
     if not row:
         raise HTTPException(404, "Tenant not found")
+    from utils.geo import get_client_ip, is_free_tier, is_restricted_region
+    client_ip = get_client_ip(request)
+    on_free_tier = is_free_tier(row)
     return {
         "name": row.name or "",
         "vision_provider": row.vision_provider or os.environ.get("VISION_PROVIDER", "gemini"),
         "gemini_key_set": bool(row.gemini_api_key or os.environ.get("GEMINI_API_KEY")),
         "anthropic_key_set": bool(row.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY")),
         "openai_key_set": bool(row.openai_api_key or os.environ.get("OPENAI_API_KEY")),
+        "ai_notice_acknowledged": bool(row.ai_notice_acknowledged_at),
+        "ai_on_free_tier": on_free_tier,
+        "is_restricted_region": is_restricted_region(client_ip) if on_free_tier else False,
         "source": "tenant",
     }
 
@@ -105,6 +112,19 @@ def update_settings(request: Request, data: TenantSettingsUpdate, db: Session = 
     db.commit()
     invalidate_tenant_cache(tenant_ctx.slug)
     return {"ok": True}
+
+
+@router.post("/tenant-settings/acknowledge-ai-notice", status_code=204)
+def acknowledge_ai_notice(request: Request, db: Session = Depends(get_db),
+                          _=Depends(get_current_user)):
+    tenant_ctx = getattr(request.state, "tenant", None)
+    if not tenant_ctx or tenant_ctx.id == 0:
+        return
+    row = db.query(Tenant).filter(Tenant.id == tenant_ctx.id).first()
+    if row and not row.ai_notice_acknowledged_at:
+        row.ai_notice_acknowledged_at = datetime.now(timezone.utc)
+        db.commit()
+        invalidate_tenant_cache(tenant_ctx.slug)
 
 
 @router.post("/tenant-settings/invite", status_code=200)
