@@ -306,7 +306,7 @@
     <h1>Clearer Layout Setup: Renaming Locations &amp; Switching Areas</h1>
     <div class="doc-meta">
       <span>Posted October 2026</span>
-      <span>Status: Open for feedback</span>
+      <span>Status: Shipping — backend complete, UI update coming next</span>
     </div>
 
     <h2>The problem</h2>
@@ -325,7 +325,7 @@
 
       <div><span class="tag tag-before">Switching Area</span></div>
       <div class="row-arrow">→</div>
-      <div><span class="tag tag-after">Town / Station</span></div>
+      <div><span class="tag tag-after">Location</span></div>
 
       <div><span class="tag tag-before">Location</span></div>
       <div class="row-arrow">→</div>
@@ -336,7 +336,8 @@
       <div><div style="display:flex;align-items:center;gap:0.5rem"><span class="tag tag-same">Industry</span> <span class="row-note">unchanged</span></div></div>
     </div>
 
-    <p>The hierarchy would read: <strong>Town → Tracks → Industries</strong>. A track is a specific siding or lead within the town. An industry is a spot on that track — a grain elevator, a fuel dealer, a team track spot.</p>
+    <p>The hierarchy reads: <strong>Location → Tracks → Industries</strong>. A track is a specific siding or lead within the location. An industry is a spot on that track — a grain elevator, a fuel dealer, a team track spot.</p>
+    <p><em>Note: Community feedback suggested "Town" felt too specific for layouts that use yard complexes, junctions, or staging areas as top-level groups. "Location" was chosen as the final name for its flexibility across layout types.</em></p>
 
     <h2>Before and after</h2>
 
@@ -344,8 +345,8 @@
       <div class="diagram-box">
         <div class="diagram-label before">Current — flat lists</div>
         <div class="tree">
-          <div><span class="pill pill-area">Area</span> Millbrook</div>
-          <div><span class="pill pill-area">Area</span> East Junction</div>
+          <div><span class="pill pill-area">S.Area</span> Millbrook</div>
+          <div><span class="pill pill-area">S.Area</span> East Junction</div>
           <div style="margin-top:0.4rem"></div>
           <div><span class="pill pill-track">Location</span> Yard Lead</div>
           <div><span class="pill pill-track">Location</span> Grain Siding</div>
