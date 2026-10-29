@@ -182,6 +182,14 @@ async function api(method, path, body) {
     const loginUrl = document.querySelector("meta[name=supabase-login-url]")?.content;
     if (loginUrl) { window.location.href = loginUrl; return; }
   }
+  if (res.status === 451) {
+    const d = await res.json().catch(() => ({}));
+    const err = new Error(d.detail || "AI features unavailable in your region");
+    err.status = 451;
+    const dlg = document.getElementById("ai-region-dialog");
+    if (dlg && !dlg.open) dlg.showModal();
+    throw err;
+  }
   if (res.status === 204) return null;
   let data;
   try {
@@ -3975,4 +3983,37 @@ $("#invite-send-btn")?.addEventListener("click", async () => {
   ]);
   document.querySelector('a[href*="patreon.com"]')
     ?.addEventListener("click", () => track("patreon_link_clicked"));
+
+  // AI privacy notice — check at first launch, not just when Settings tab is opened
+  const tsData = await api("GET", "/api/tenant-settings").catch(() => null);
+  if (tsData?.source === "tenant") {
+    const restricted = tsData.is_restricted_region && tsData.ai_on_free_tier;
+    if (restricted) {
+      document.getElementById("ai-region-dialog")?.showModal();
+      document.querySelectorAll(".ai-suggest-btn, #btn-stylize, #btn-add-car").forEach(btn => {
+        btn.disabled = true;
+        btn.title = "AI features unavailable in your region — add your own API key in Settings";
+      });
+    } else if (!tsData.ai_notice_acknowledged) {
+      document.getElementById("ai-notice-dialog")?.showModal();
+    }
+  }
 })();
+
+// ── AI notice button handlers ──────────────────────────────────────────────────
+document.getElementById("btn-ai-notice-accept")?.addEventListener("click", async () => {
+  await api("POST", "/api/tenant-settings/acknowledge-ai-notice").catch(() => null);
+  document.getElementById("ai-notice-dialog")?.close();
+});
+
+document.getElementById("btn-region-open-settings")?.addEventListener("click", () => {
+  document.getElementById("ai-region-dialog")?.close();
+  document.querySelector('.tab-link[data-tab="settings"]')?.click();
+  setTimeout(() => {
+    document.getElementById("settings-gemini-key")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 100);
+});
+
+document.getElementById("btn-region-close")?.addEventListener("click", () => {
+  document.getElementById("ai-region-dialog")?.close();
+});

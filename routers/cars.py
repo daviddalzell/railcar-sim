@@ -24,6 +24,19 @@ from vision import analyze_car_photo, call_with_retry, get_provider
 _PROMPTS_DIR = Path("prompts")
 
 
+def _check_geo(request: Request, tenant) -> None:
+    """Block free-tier AI for EU/UK/Switzerland users (HTTP 451)."""
+    from utils.geo import get_client_ip, is_free_tier, is_restricted_region
+    if is_free_tier(tenant) and is_restricted_region(get_client_ip(request)):
+        raise HTTPException(
+            status_code=451,
+            detail=(
+                "Free AI tier is not available in your region (EU, UK, or Switzerland) "
+                "due to privacy requirements. Add your own API key in Settings → AI."
+            ),
+        )
+
+
 def _load_stylize_config() -> dict:
     p = _PROMPTS_DIR / "stylize_car.json"
     try:
@@ -87,6 +100,7 @@ async def upload_car_photo(request: Request, file: UploadFile = File(...), skip_
     if skip_analysis:
         return {"photo_path": photo_path, "car_type": "", "color": "", "car_number": "", "reporting_marks": ""}
 
+    _check_geo(request, tenant)
     from auth import is_demo
     import demo_limits
     if is_demo(request) and not demo_limits.check_and_increment("analysis"):
@@ -127,6 +141,8 @@ def analyze_existing_photo(request: Request, data: AnalyzePhotoRequest):
     import demo_limits
     if is_demo(request) and not demo_limits.check_and_increment("analysis"):
         raise HTTPException(429, "Demo analysis limit reached (10/hr) — subscribe to use AI features on your own layout.")
+    tenant = getattr(request.state, "tenant", None)
+    _check_geo(request, tenant)
     photo_path = data.photo_path
     if photo_path.startswith("http"):
         # Supabase CDN URL — download to a temp file for analysis
@@ -161,6 +177,7 @@ def stylize_car_photo(request: Request, data: StylizeRequest):
     import demo_limits
     if is_demo(request) and not demo_limits.check_and_increment("stylize"):
         raise HTTPException(429, "Demo stylize limit reached (5/hr) — subscribe to use AI features on your own layout.")
+    _check_geo(request, getattr(request.state, "tenant", None))
     from google import genai
     from google.genai import types
 

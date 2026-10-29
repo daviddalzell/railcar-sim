@@ -27,6 +27,7 @@ class Tenant(Base):
     openai_api_key: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     vision_provider: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     patreon_member_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    ai_notice_acknowledged_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
 
 
