@@ -800,6 +800,10 @@
     <section id="tab-settings" class="tab-panel hidden">
       <div class="section-header"><h2>Settings</h2></div>
       <div id="settings-content" style="max-width:520px;">
+        <div id="settings-demo-notice" style="display:none;margin-bottom:1.25rem;padding:.75rem 1rem;border:1px solid var(--border,#2d3447);border-radius:6px;font-size:0.85rem;color:var(--muted,#9aa3b2)">
+          Settings are view-only in the demo.
+          <a href="https://www.patreon.com/waypoint_ops" target="_blank" rel="noopener">Subscribe to create your own layout →</a>
+        </div>
         <p class="muted" id="settings-source-note"></p>
 
         <label>Layout name
@@ -1334,6 +1338,50 @@
       </button>
     </div>
   </dialog>
+
+  {% if is_demo %}
+  <!-- ── Demo Welcome Modal (email capture + AI disclosure) ── -->
+  <dialog id="demo-welcome-dialog" style="
+    background:#161b26;border:1px solid #2d3447;border-radius:10px;
+    color:#c8cdd8;font-family:inherit;max-width:520px;width:90%;padding:0;
+    box-shadow:0 8px 40px rgba(0,0,0,0.7);">
+    <div style="padding:1.5rem 1.75rem 0">
+      <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#3b82f6;margin-bottom:0.4rem">Welcome</div>
+      <h2 style="margin:0 0 1rem;font-size:1.2rem;color:#e8eaf0">Welcome to the Waypoint Demo</h2>
+      <p style="margin:0 0 0.75rem;font-size:0.88rem;line-height:1.6;color:#9aa3b2">
+        You're exploring a sample model railway layout. Cars, waybills, and operations reset nightly — feel free to try everything.
+      </p>
+      <p style="margin:0 0 1.25rem;font-size:0.82rem;line-height:1.5;color:#6b7280;border-left:3px solid #2d3447;padding-left:0.75rem">
+        <strong style="color:#9aa3b2">AI features</strong> are active in this demo. All AI processing uses a private API key — your data is not used for model training or human review.
+      </p>
+      <div style="margin-bottom:1rem">
+        <label for="demo-lead-email" style="display:block;font-size:0.8rem;color:#9aa3b2;margin-bottom:0.4rem;font-weight:500">
+          Get updates on Waypoint developments <span style="color:#6b7280;font-weight:400">(optional)</span>
+        </label>
+        <input type="email" id="demo-lead-email" placeholder="you@example.com" autocomplete="email" style="
+          width:100%;box-sizing:border-box;background:#0f1420;border:1px solid #2d3447;border-radius:6px;
+          color:#c8cdd8;font-family:inherit;font-size:0.88rem;padding:0.55rem 0.75rem;outline:none;">
+        <label style="display:flex;align-items:flex-start;gap:0.5rem;margin-top:0.6rem;cursor:pointer;font-size:0.82rem;color:#9aa3b2">
+          <input type="checkbox" id="demo-lead-marketing" style="margin-top:2px;accent-color:#3b82f6;flex-shrink:0">
+          Yes, keep me updated on new features and releases
+        </label>
+      </div>
+    </div>
+    <div style="padding:1rem 1.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;border-top:1px solid #1e2535;margin-top:0.5rem">
+      <button id="btn-demo-welcome-skip" style="
+        background:transparent;border:none;color:#5a6475;font-family:inherit;
+        font-size:0.82rem;cursor:pointer;padding:0;text-decoration:underline;">
+        No thanks, just explore
+      </button>
+      <button id="btn-demo-welcome-continue" style="
+        background:#3b82f6;border:none;border-radius:6px;color:#fff;
+        font-family:inherit;font-size:0.9rem;font-weight:600;
+        padding:0.6rem 1.4rem;cursor:pointer;">
+        Continue to Demo
+      </button>
+    </div>
+  </dialog>
+  {% endif %}
 
   <script src="/static/app.js"></script>
 </body>
