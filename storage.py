@@ -92,6 +92,31 @@ def photo_url(photo_path: str) -> str:
     return "/" + photo_path.replace("\\", "/")   # local dev: prepend /
 
 
+def purge_folder(folder: str) -> int:
+    """Delete every file in a storage folder. Returns count of files deleted."""
+    deleted = 0
+    if _using_supabase():
+        client = _get_client()
+        try:
+            items = client.storage.from_(_BUCKET).list(folder)
+        except Exception:
+            return 0
+        for item in items:
+            name = item.get("name")
+            if not name:
+                continue
+            client.storage.from_(_BUCKET).remove([f"{folder}/{name}"])
+            deleted += 1
+    else:
+        scan_dir = UPLOADS_DIR / folder if folder != "uploads" else UPLOADS_DIR
+        if scan_dir.exists():
+            for f in scan_dir.iterdir():
+                if f.is_file():
+                    f.unlink()
+                    deleted += 1
+    return deleted
+
+
 def list_uploaded_files(folder: str = "uploads") -> list[dict]:
     """List user-uploaded files in folder (not static defaults). Returns [{path, url}]."""
     if _using_supabase():

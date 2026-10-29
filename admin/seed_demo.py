@@ -102,6 +102,16 @@ def seed_demo():
     try:
         db.execute(text(f'SET search_path TO "{_SCHEMA}", public'))
 
+        # ── Purge demo tenant's uploaded photos from storage ─────────────────
+        # Seeded cars only use static paths, so all Supabase files are safe to remove.
+        from models import Tenant
+        demo_tenant = db.query(Tenant).filter_by(slug="demo").first()
+        if demo_tenant and demo_tenant.schema_name:
+            import storage as _storage
+            purged = _storage.purge_folder(demo_tenant.schema_name)
+            if purged:
+                print(f"[seed_demo] Purged {purged} uploaded file(s) from storage")
+
         # ── Truncate in reverse FK order ────────────────────────────────────
         for model in (DispatchPlan, MovementLog, Waybill, Car,
                       CommodityCarTypeMap, Industry, Location, SwitchingArea, CarType):

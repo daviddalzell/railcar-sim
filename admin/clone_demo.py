@@ -48,6 +48,21 @@ def clone_to_demo(template_schema: str = "t_demo_template") -> bool:
         print(f"[clone_demo] Cannot read {template_schema}: {exc} — falling back to hardcoded seed")
         return False
 
+    # Purge demo tenant's uploaded photos before wiping the car rows
+    try:
+        from sqlalchemy import text as _text
+        with engine.connect() as _conn:
+            row = _conn.execute(
+                _text("SELECT schema_name FROM public.tenants WHERE slug = 'demo' LIMIT 1")
+            ).fetchone()
+        if row and row[0]:
+            import storage as _storage
+            purged = _storage.purge_folder(row[0])
+            if purged:
+                print(f"[clone_demo] Purged {purged} uploaded file(s) from storage")
+    except Exception as _exc:
+        print(f"[clone_demo] Storage purge skipped: {_exc}")
+
     with engine.begin() as conn:
         # Truncate all public schema tables in one statement (CASCADE handles FKs,
         # RESTART IDENTITY resets sequences to 1 ready for the incoming rows).
