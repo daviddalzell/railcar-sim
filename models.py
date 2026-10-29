@@ -74,6 +74,17 @@ class AccessKey(Base):
     redeemed_by_email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
+class DemoLead(Base):
+    """Email addresses captured from demo visitors, with marketing opt-in flag."""
+    __tablename__ = "demo_leads"
+    __table_args__ = {} if _is_sqlite else {"schema": "public"}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    marketing_opt_in: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 class SwitchingArea(Base):
     __tablename__ = "switching_areas"
 

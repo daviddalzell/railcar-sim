@@ -51,6 +51,7 @@ from routers import (
     webhooks,
     ops_events,
     admin_keys,
+    demo_leads,
 )
 
 _auth = [Depends(get_current_user)]
@@ -402,3 +403,4 @@ app.include_router(session.sse_router)
 app.include_router(ops_events.router)
 # Admin key management and public redemption — no tenant auth required
 app.include_router(admin_keys.router)
+app.include_router(demo_leads.router)

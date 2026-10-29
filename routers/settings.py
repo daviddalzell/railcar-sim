@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from auth import get_current_user
+from auth import get_current_user, is_demo
 from database import get_db
 from middleware.tenant import invalidate_tenant_cache
 from models import Tenant, TenantMember
@@ -66,13 +66,14 @@ def get_settings(request: Request, db: Session = Depends(get_db)):
     from utils.geo import get_client_ip, is_free_tier, is_restricted_region
     client_ip = get_client_ip(request)
     on_free_tier = is_free_tier(row)
+    demo = is_demo(request)
     return {
         "name": row.name or "",
         "vision_provider": row.vision_provider or os.environ.get("VISION_PROVIDER", "gemini"),
         "gemini_key_set": bool(row.gemini_api_key or os.environ.get("GEMINI_API_KEY")),
         "anthropic_key_set": bool(row.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY")),
         "openai_key_set": bool(row.openai_api_key or os.environ.get("OPENAI_API_KEY")),
-        "ai_notice_acknowledged": bool(row.ai_notice_acknowledged_at),
+        "ai_notice_acknowledged": demo or bool(row.ai_notice_acknowledged_at),
         "ai_on_free_tier": on_free_tier,
         "is_restricted_region": is_restricted_region(client_ip) if on_free_tier else False,
         "source": "tenant",
@@ -81,7 +82,6 @@ def get_settings(request: Request, db: Session = Depends(get_db)):
 
 @router.patch("/tenant-settings", status_code=200)
 def update_settings(request: Request, data: TenantSettingsUpdate, db: Session = Depends(get_db)):
-    from auth import is_demo
     if is_demo(request):
         raise HTTPException(403, "Settings cannot be changed in the demo")
     tenant_ctx = getattr(request.state, "tenant", None)
@@ -130,7 +130,6 @@ def acknowledge_ai_notice(request: Request, db: Session = Depends(get_db),
 @router.post("/tenant-settings/invite", status_code=200)
 def invite_operator(request: Request, data: InviteOperatorRequest, db: Session = Depends(get_db),
                     user: dict = Depends(get_current_user)):
-    from auth import is_demo
     if is_demo(request):
         raise HTTPException(403, "Invitations are disabled in the demo")
     if (user or {}).get("role") != "admin":
@@ -274,7 +273,6 @@ def invite_operator(request: Request, data: InviteOperatorRequest, db: Session =
 @router.get("/tenant-settings/members")
 def list_members(request: Request, db: Session = Depends(get_db),
                  user: dict = Depends(get_current_user)):
-    from auth import is_demo
     if is_demo(request):
         return []
     if (user or {}).get("role") != "admin":
@@ -354,7 +352,6 @@ def mark_joined(request: Request, db: Session = Depends(get_db),
 @router.patch("/tenant-settings/members/{member_id}", status_code=200)
 def update_member_role(member_id: int, data: MemberRoleUpdate, request: Request,
                        db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
-    from auth import is_demo
     if is_demo(request):
         raise HTTPException(403, "Disabled in demo")
     if (user or {}).get("role") != "admin":
@@ -389,7 +386,6 @@ def update_member_role(member_id: int, data: MemberRoleUpdate, request: Request,
 @router.delete("/tenant-settings/members/{member_id}", status_code=204)
 def remove_member(member_id: int, request: Request,
                   db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
-    from auth import is_demo
     if is_demo(request):
         raise HTTPException(403, "Disabled in demo")
     if (user or {}).get("role") != "admin":

@@ -3876,6 +3876,13 @@ async function loadSettings() {
 
   const saveBtn = $("#settings-save-btn");
   if (saveBtn && data.source === "env") saveBtn.disabled = true;
+
+  if (document.getElementById("demo-banner")) {
+    const notice = document.getElementById("settings-demo-notice");
+    if (notice) notice.style.display = "";
+    document.querySelectorAll("#settings-content input, #settings-content select, #settings-content button, #settings-content a.clear-key-link")
+      .forEach(el => { el.disabled = true; });
+  }
 }
 
 $("#settings-save-btn")?.addEventListener("click", async () => {
@@ -3984,18 +3991,27 @@ $("#invite-send-btn")?.addEventListener("click", async () => {
   document.querySelector('a[href*="patreon.com"]')
     ?.addEventListener("click", () => track("patreon_link_clicked"));
 
-  // AI privacy notice — check at first launch, not just when Settings tab is opened
-  const tsData = await api("GET", "/api/tenant-settings").catch(() => null);
-  if (tsData?.source === "tenant") {
-    const restricted = tsData.is_restricted_region && tsData.ai_on_free_tier;
-    if (restricted) {
-      document.getElementById("ai-region-dialog")?.showModal();
-      document.querySelectorAll(".ai-suggest-btn, #btn-stylize, #btn-add-car").forEach(btn => {
-        btn.disabled = true;
-        btn.title = "AI features unavailable in your region — add your own API key in Settings";
-      });
-    } else if (!tsData.ai_notice_acknowledged) {
-      document.getElementById("ai-notice-dialog")?.showModal();
+  // Demo welcome modal — once per browser session
+  const demoWelcomeDlg = document.getElementById("demo-welcome-dialog");
+  if (demoWelcomeDlg && !sessionStorage.getItem("demo_welcomed")) {
+    sessionStorage.setItem("demo_welcomed", "1");
+    demoWelcomeDlg.showModal();
+  }
+
+  // AI privacy notice — check at first launch (skipped for demo: welcome modal covers disclosure)
+  if (!demoWelcomeDlg) {
+    const tsData = await api("GET", "/api/tenant-settings").catch(() => null);
+    if (tsData?.source === "tenant") {
+      const restricted = tsData.is_restricted_region && tsData.ai_on_free_tier;
+      if (restricted) {
+        document.getElementById("ai-region-dialog")?.showModal();
+        document.querySelectorAll(".ai-suggest-btn, #btn-stylize, #btn-add-car").forEach(btn => {
+          btn.disabled = true;
+          btn.title = "AI features unavailable in your region — add your own API key in Settings";
+        });
+      } else if (!tsData.ai_notice_acknowledged) {
+        document.getElementById("ai-notice-dialog")?.showModal();
+      }
     }
   }
 })();
@@ -4016,4 +4032,23 @@ document.getElementById("btn-region-open-settings")?.addEventListener("click", (
 
 document.getElementById("btn-region-close")?.addEventListener("click", () => {
   document.getElementById("ai-region-dialog")?.close();
+});
+
+// ── Demo welcome modal button handlers ────────────────────────────────────────
+async function _submitDemoLead() {
+  const email = (document.getElementById("demo-lead-email")?.value || "").trim();
+  const marketing = document.getElementById("demo-lead-marketing")?.checked || false;
+  if (email) {
+    await fetch("/api/demo-leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, marketing_opt_in: marketing }),
+    }).catch(() => null);
+  }
+  document.getElementById("demo-welcome-dialog")?.close();
+}
+
+document.getElementById("btn-demo-welcome-continue")?.addEventListener("click", _submitDemoLead);
+document.getElementById("btn-demo-welcome-skip")?.addEventListener("click", () => {
+  document.getElementById("demo-welcome-dialog")?.close();
 });
