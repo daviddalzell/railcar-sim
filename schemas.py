@@ -23,21 +23,23 @@ class CarUpdate(BaseModel):
     photo_path: Optional[str] = None
 
 
-class LocationCreate(BaseModel):
+class TrackCreate(BaseModel):
+    """Create/update a Track (formerly Location)."""
     name: str
     location_type: str = "yard"
-    switching_area_id: Optional[int] = None
+    switching_area_id: Optional[int] = None  # kept for backward compat; maps to Track.location_id
     car_capacity: Optional[int] = None
 
 
-class SwitchingAreaCreate(BaseModel):
+class LocationCreate(BaseModel):
+    """Create/update a Location (formerly SwitchingArea)."""
     name: str
     car_capacity: int = 10
 
 
 class DispatchBuildRequest(BaseModel):
     origin_location_id: int
-    switching_area_id: int
+    switching_area_id: int  # kept for backward compat; maps to DispatchPlan.location_id
     destination_location_id: int
 
 

@@ -44,7 +44,7 @@ DEFAULT_CAR_TYPES = [
 
 
 def init_db():
-    from models import Car, CarType, Location, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock, SwitchingArea, DispatchPlan, Tenant  # noqa: F401
+    from models import Car, CarType, Location, Track, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock, DispatchPlan, Tenant  # noqa: F401
     Base.metadata.create_all(bind=engine)
     if not _is_sqlite:
         # Postgres schema is managed by Alembic; only seed default data below.

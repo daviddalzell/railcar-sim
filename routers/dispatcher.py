@@ -11,7 +11,7 @@ from starlette.requests import Request
 
 from auth import require_admin
 from database import get_db
-from models import Car, DispatchPlan, Location, SwitchingArea
+from models import Car, DispatchPlan, Location, Track
 from converters import car_to_dict, dispatch_plan_to_dict
 from schemas import DispatchBuildRequest, DispatchPlanIdentityUpdate, DispatchPowerUpdate, DispatchPlanStatusUpdate
 
@@ -29,12 +29,12 @@ def _clear_dispatch_plan(db: Session):
 
 def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id: int, db: Session) -> tuple:
     """Core build logic. Returns (consist_inbound, outbound, local_spots, available_spots, warnings)."""
-    area = db.get(SwitchingArea, data_area_id)
-    origin = db.get(Location, data_origin_id)
+    area = db.get(Location, data_area_id)
+    origin = db.get(Track, data_origin_id)
 
-    area_location_ids = {l.id for l in area.locations}
-    dispatch_ids = {l.id for l in db.query(Location).filter(
-        Location.location_type.in_(["staging", "yard"])
+    area_location_ids = {t.id for t in area.tracks}
+    dispatch_ids = {t.id for t in db.query(Track).filter(
+        Track.location_type.in_(["staging", "yard"])
     ).all()}
 
     # Collect car IDs already claimed by other non-complete plans
@@ -106,15 +106,15 @@ def _tenant_slug(request: Request) -> str:
 
 @router.post("/dispatcher/build-plan")
 def build_dispatch_plan(request: Request, data: DispatchBuildRequest, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
-    area = db.get(SwitchingArea, data.switching_area_id)
+    area = db.get(Location, data.switching_area_id)
     if not area:
-        raise HTTPException(404, "Switching area not found")
-    origin = db.get(Location, data.origin_location_id)
+        raise HTTPException(404, "Location not found")
+    origin = db.get(Track, data.origin_location_id)
     if not origin:
-        raise HTTPException(404, "Origin location not found")
-    destination = db.get(Location, data.destination_location_id)
+        raise HTTPException(404, "Origin track not found")
+    destination = db.get(Track, data.destination_location_id)
     if not destination:
-        raise HTTPException(404, "Destination location not found")
+        raise HTTPException(404, "Destination track not found")
 
     consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
         data.origin_location_id, data.switching_area_id, data.destination_location_id, db
@@ -123,7 +123,7 @@ def build_dispatch_plan(request: Request, data: DispatchBuildRequest, db: Sessio
     plan = DispatchPlan(
         plan_type="switching",
         origin_location_id=data.origin_location_id,
-        switching_area_id=data.switching_area_id,
+        location_id=data.switching_area_id,
         destination_location_id=data.destination_location_id,
         setout_ids_json=json.dumps([c.id for c in consist_inbound]),
         pickup_ids_json=json.dumps([c.id for c in outbound]),
@@ -249,18 +249,18 @@ def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict =
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")
-    if not plan.origin_location_id or not plan.switching_area_id or not plan.destination_location_id:
-        raise HTTPException(400, "Plan has no origin, destination, or switching area to rebuild from")
+    if not plan.origin_location_id or not plan.location_id or not plan.destination_location_id:
+        raise HTTPException(400, "Plan has no origin, destination, or location to rebuild from")
 
-    area = db.get(SwitchingArea, plan.switching_area_id)
+    area = db.get(Location, plan.location_id)
     if not area:
-        raise HTTPException(404, "Switching area not found")
-    origin = db.get(Location, plan.origin_location_id)
+        raise HTTPException(404, "Location not found")
+    origin = db.get(Track, plan.origin_location_id)
     if not origin:
-        raise HTTPException(404, "Origin location not found")
-    destination = db.get(Location, plan.destination_location_id)
+        raise HTTPException(404, "Origin track not found")
+    destination = db.get(Track, plan.destination_location_id)
     if not destination:
-        raise HTTPException(404, "Destination location not found")
+        raise HTTPException(404, "Destination track not found")
 
     # Temporarily exclude this plan from claimed IDs so it can rebuild freely
     plan.setout_ids_json = "[]"
@@ -269,7 +269,7 @@ def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict =
     db.flush()
 
     consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
-        plan.origin_location_id, plan.switching_area_id, plan.destination_location_id, db
+        plan.origin_location_id, plan.location_id, plan.destination_location_id, db
     )
 
     plan.setout_ids_json = json.dumps([c.id for c in consist_inbound])

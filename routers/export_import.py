@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request
 
 from database import get_db
-from models import Car, CarType, CommodityCarTypeMap, DispatchPlan, Industry, Location, MovementLog, SwitchingArea, Waybill
+from models import Car, CarType, CommodityCarTypeMap, DispatchPlan, Industry, Location, MovementLog, Track, Waybill
 from converters import row_to_dict
 from schemas import CarImportCommit
 
@@ -123,8 +123,8 @@ def export_data(db: Session = Depends(get_db)):
     import urllib.request
     from datetime import date as _date
     tables = {
-        "switching_areas":        [row_to_dict(r) for r in db.query(SwitchingArea).all()],
         "locations":              [row_to_dict(r) for r in db.query(Location).all()],
+        "tracks":                 [row_to_dict(r) for r in db.query(Track).all()],
         "industries":             [row_to_dict(r) for r in db.query(Industry).all()],
         "commodity_car_type_map": [row_to_dict(r) for r in db.query(CommodityCarTypeMap).all()],
         "cars":                   [row_to_dict(r) for r in db.query(Car).all()],
@@ -195,6 +195,10 @@ async def import_data(request: Request, file: UploadFile = File(...), db: Sessio
             elif old_fname not in photo_remap and any(old_fname in e for e in photo_errors):
                 car_row["photo_path"] = ""  # upload failed — clear rather than keep broken path
 
+    # Detect old vs new backup format:
+    # Old format has "switching_areas" + "locations"; new format has "locations" + "tracks".
+    is_new_format = "tracks" in tables
+
     # Clear in reverse FK order
     db.query(DispatchPlan).delete(synchronize_session=False)
     db.query(MovementLog).delete(synchronize_session=False)
@@ -202,13 +206,18 @@ async def import_data(request: Request, file: UploadFile = File(...), db: Sessio
     db.query(Car).delete(synchronize_session=False)
     db.query(CommodityCarTypeMap).delete(synchronize_session=False)
     db.query(Industry).delete(synchronize_session=False)
+    db.query(Track).delete(synchronize_session=False)
     db.query(Location).delete(synchronize_session=False)
-    db.query(SwitchingArea).delete(synchronize_session=False)
     db.flush()
 
-    # Insert in FK order (SwitchingArea before Location)
-    import_table(db, SwitchingArea,       tables.get("switching_areas", []))
-    import_table(db, Location,            tables.get("locations", []))
+    if is_new_format:
+        # New backup: "locations" = Location, "tracks" = Track
+        import_table(db, Location, tables.get("locations", []))
+        import_table(db, Track,    tables.get("tracks", []))
+    else:
+        # Old backup: "switching_areas" = Location (old SwitchingArea), "locations" = Track (old Location)
+        import_table(db, Location, tables.get("switching_areas", []))
+        import_table(db, Track,    tables.get("locations", []))
     import_table(db, Industry,            tables.get("industries", []))
     import_table(db, CommodityCarTypeMap, tables.get("commodity_car_type_map", []))
     import_table(db, Car,                 tables.get("cars", []))

@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Car, MovementLog, SwitchingArea, Location
-from converters import car_to_dict, switching_area_to_dict
+from models import Car, Location, MovementLog, Track
+from converters import car_to_dict, location_group_to_dict
 
 router = APIRouter(prefix="/api", tags=["operations"])
 
@@ -28,29 +28,30 @@ def _enrich_car_for_status(car: Car) -> dict:
 
 @router.get("/layout-status")
 def layout_status(db: Session = Depends(get_db)):
-    areas = db.query(SwitchingArea).all()
+    areas = db.query(Location).all()
     area_dicts = []
     for area in areas:
-        d = switching_area_to_dict(area, db)
-        loc_ids = [l.id for l in area.locations]
-        cars = db.query(Car).filter(Car.current_location_id.in_(loc_ids)).all() if loc_ids else []
+        d = location_group_to_dict(area, db)
+        track_ids = [t.id for t in area.tracks]
+        cars = db.query(Car).filter(Car.current_location_id.in_(track_ids)).all() if track_ids else []
         d["cars"] = [_enrich_car_for_status(c) for c in cars]
         area_dicts.append(d)
 
-    yard_locs = db.query(Location).filter(
-        Location.location_type.in_(["staging", "yard"])
+    yard_tracks = db.query(Track).filter(
+        Track.location_type.in_(["staging", "yard"])
     ).all()
     yard_dicts = []
-    for loc in yard_locs:
-        cars = db.query(Car).filter(Car.current_location_id == loc.id).all()
+    for track in yard_tracks:
+        cars = db.query(Car).filter(Car.current_location_id == track.id).all()
         yard_dicts.append({
-            "id": loc.id,
-            "name": loc.name,
-            "location_type": loc.location_type,
+            "id": track.id,
+            "name": track.name,
+            "location_type": track.location_type,
             "car_count": len(cars),
             "cars": [_enrich_car_for_status(c) for c in cars],
         })
 
+    # "switching_areas" key kept for old-frontend backward compat
     return {"switching_areas": area_dicts, "yards": yard_dicts}
 
 
