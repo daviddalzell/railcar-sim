@@ -17,5 +17,7 @@ alembic>=1.13.0
 supabase>=2.0.0
 python-json-logger>=3.0.0
 
+PyGithub>=2.1.0
+
 pytest
 httpx
