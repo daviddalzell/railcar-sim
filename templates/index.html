@@ -1290,110 +1290,90 @@
   </div>
 
   <!-- ── AI Privacy Notice (shown at first launch) ── -->
-  <dialog id="ai-notice-dialog" style="
-    background:#161b26;border:1px solid #2d3447;border-radius:10px;
-    color:#c8cdd8;font-family:inherit;max-width:540px;width:90%;padding:0;
-    box-shadow:0 8px 40px rgba(0,0,0,0.7);">
-    <div style="padding:1.5rem 1.75rem 0">
-      <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#d97706;margin-bottom:0.4rem">Privacy Notice</div>
-      <h2 style="font-size:1.1rem;font-weight:700;color:#f0f2f5;margin-bottom:1rem;line-height:1.3">API Key &amp; Privacy Disclosure</h2>
-    </div>
-    <div style="padding:0 1.75rem;max-height:55vh;overflow-y:auto;font-size:0.84rem;line-height:1.65;color:#8b95a5">
-      <p style="margin-bottom:0.75rem">To get you started instantly, this application provides a shared, temporary API key at startup. You can use the application under this key, or input your own personal free or paid API key at any time in the settings.</p>
-      <p style="margin-bottom:0.5rem">Please be aware of how your data is handled depending on which key is active:</p>
-      <p style="margin-bottom:0.5rem"><strong style="color:#c8cdd8">Startup (Shared Key Active):</strong> While using the application's built-in startup key, your prompts, uploaded files, and generated responses are processed through a standard public API quota. Google uses data sent through free-tier API quotas to train its AI models, and a subset of this data may be subject to human review. Do not input confidential data, proprietary code, or sensitive personal information while the startup key is active.</p>
-      <p style="margin-bottom:0.5rem"><strong style="color:#c8cdd8">User-Provided Keys:</strong> Once you input your own API key, your data privacy is governed entirely by the terms of your personal Google AI Studio or Google Cloud Vertex AI account.</p>
-      <ul style="padding-left:1.25rem;margin-bottom:0.75rem">
-        <li style="margin-bottom:0.3rem">If you input your own <strong style="color:#c8cdd8">Free Tier API Key</strong>, Google retains the right to use your data for model training and human review.</li>
-        <li style="margin-bottom:0.3rem">If you input your own <strong style="color:#c8cdd8">Paid Tier API Key</strong> (Pay-as-you-go), your data is private, is not used for model training, and is not reviewed by humans.</li>
-      </ul>
-      <p style="margin-bottom:1rem"><strong style="color:#c8cdd8">Limitations of Output:</strong> All AI-generated responses are for informational purposes only. Content should not be used as a substitute for professional legal, medical, financial, or technical advice.</p>
-    </div>
-    <div style="padding:1.25rem 1.75rem;border-top:1px solid #1e2330;display:flex;justify-content:flex-end">
-      <button id="btn-ai-notice-accept" style="
-        background:#d97706;border:none;border-radius:6px;color:#fff;
-        font-family:inherit;font-size:0.88rem;font-weight:600;
-        padding:0.6rem 1.5rem;cursor:pointer;">
-        I Understand &mdash; Continue
-      </button>
+  <dialog id="ai-notice-dialog" style="background:transparent;border:none;padding:0;max-width:100%;width:100%;display:flex;align-items:center;justify-content:center;">
+    <div style="background:#161b26;border:1px solid #2d3447;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.7);color:#c8cdd8;font-family:inherit;max-width:540px;width:90%;display:flex;flex-direction:column;max-height:90vh;">
+      <div style="padding:1.5rem 1.75rem 0;flex-shrink:0">
+        <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#d97706;margin-bottom:0.4rem">Privacy Notice</div>
+        <h2 style="font-size:1.1rem;font-weight:700;color:#f0f2f5;margin-bottom:1rem;line-height:1.3">API Key &amp; Privacy Disclosure</h2>
+      </div>
+      <div style="padding:0 1.75rem;flex:1;overflow-y:auto;font-size:0.84rem;line-height:1.65;color:#8b95a5">
+        <p style="margin-bottom:0.75rem">To get you started instantly, this application provides a shared, temporary API key at startup. You can use the application under this key, or input your own personal free or paid API key at any time in the settings.</p>
+        <p style="margin-bottom:0.5rem">Please be aware of how your data is handled depending on which key is active:</p>
+        <p style="margin-bottom:0.5rem"><strong style="color:#c8cdd8">Startup (Shared Key Active):</strong> While using the application's built-in startup key, your prompts, uploaded files, and generated responses are processed through a standard public API quota. Google uses data sent through free-tier API quotas to train its AI models, and a subset of this data may be subject to human review. Do not input confidential data, proprietary code, or sensitive personal information while the startup key is active.</p>
+        <p style="margin-bottom:0.5rem"><strong style="color:#c8cdd8">User-Provided Keys:</strong> Once you input your own API key, your data privacy is governed entirely by the terms of your personal Google AI Studio or Google Cloud Vertex AI account.</p>
+        <ul style="padding-left:1.25rem;margin-bottom:0.75rem">
+          <li style="margin-bottom:0.3rem">If you input your own <strong style="color:#c8cdd8">Free Tier API Key</strong>, Google retains the right to use your data for model training and human review.</li>
+          <li style="margin-bottom:0.3rem">If you input your own <strong style="color:#c8cdd8">Paid Tier API Key</strong> (Pay-as-you-go), your data is private, is not used for model training, and is not reviewed by humans.</li>
+        </ul>
+        <p style="margin-bottom:1rem"><strong style="color:#c8cdd8">Limitations of Output:</strong> All AI-generated responses are for informational purposes only. Content should not be used as a substitute for professional legal, medical, financial, or technical advice.</p>
+      </div>
+      <div style="padding:1.25rem 1.75rem;border-top:1px solid #1e2330;display:flex;justify-content:flex-end;flex-shrink:0">
+        <button id="btn-ai-notice-accept" style="background:#d97706;border:none;border-radius:6px;color:#fff;font-family:inherit;font-size:0.88rem;font-weight:600;padding:0.6rem 1.5rem;cursor:pointer;">
+          I Understand &mdash; Continue
+        </button>
+      </div>
     </div>
   </dialog>
 
   <!-- ── AI Regional Restriction (EU/UK/CH free-tier users) ── -->
-  <dialog id="ai-region-dialog" style="
-    background:#161b26;border:1px solid #2d3447;border-radius:10px;
-    color:#c8cdd8;font-family:inherit;max-width:500px;width:90%;padding:0;
-    box-shadow:0 8px 40px rgba(0,0,0,0.7);">
-    <div style="padding:1.5rem 1.75rem 0">
-      <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#d97706;margin-bottom:0.4rem">Regional Notice</div>
-      <h2 style="font-size:1.05rem;font-weight:700;color:#f0f2f5;margin-bottom:1rem;line-height:1.3">AI Features Unavailable in Your Region</h2>
-    </div>
-    <div style="padding:0 1.75rem 1rem;font-size:0.84rem;line-height:1.65;color:#8b95a5">
-      <p style="margin-bottom:0.75rem">Your location has been detected as being within the <strong style="color:#c8cdd8">European Union, United Kingdom, or Switzerland</strong>.</p>
-      <p style="margin-bottom:0.75rem">The shared API key used by this application does not meet the data privacy requirements applicable in your region (GDPR&nbsp;/&nbsp;UK&nbsp;GDPR&nbsp;/&nbsp;Swiss&nbsp;nDSG). AI features have been disabled while the shared key is active.</p>
-      <p>To use AI features, add your own <strong style="color:#c8cdd8">paid-tier API key</strong> from Google AI Studio or Google Cloud Vertex AI. A paid-tier key ensures your data is private and is not used for model training.</p>
-    </div>
-    <div style="padding:1.25rem 1.75rem;border-top:1px solid #1e2330;display:flex;gap:0.75rem;justify-content:flex-end;flex-wrap:wrap">
-      <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener"
-         style="background:#1e2330;border:1px solid #2d3447;border-radius:6px;color:#d97706;
-                font-family:inherit;font-size:0.82rem;font-weight:500;padding:0.5rem 1rem;
-                text-decoration:none;display:inline-flex;align-items:center;">
-        Get a Google AI API key &#8599;
-      </a>
-      <button id="btn-region-open-settings" style="
-        background:#d97706;border:none;border-radius:6px;color:#fff;
-        font-family:inherit;font-size:0.82rem;font-weight:600;
-        padding:0.5rem 1rem;cursor:pointer;">
-        Open Settings
-      </button>
-      <button id="btn-region-close" style="
-        background:transparent;border:1px solid #2d3447;border-radius:6px;color:#5a6475;
-        font-family:inherit;font-size:0.82rem;padding:0.5rem 0.9rem;cursor:pointer;">
-        Close
-      </button>
+  <dialog id="ai-region-dialog" style="background:transparent;border:none;padding:0;max-width:100%;width:100%;display:flex;align-items:center;justify-content:center;">
+    <div style="background:#161b26;border:1px solid #2d3447;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.7);color:#c8cdd8;font-family:inherit;max-width:500px;width:90%;display:flex;flex-direction:column;max-height:90vh;">
+      <div style="padding:1.5rem 1.75rem 0;flex-shrink:0">
+        <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#d97706;margin-bottom:0.4rem">Regional Notice</div>
+        <h2 style="font-size:1.05rem;font-weight:700;color:#f0f2f5;margin-bottom:1rem;line-height:1.3">AI Features Unavailable in Your Region</h2>
+      </div>
+      <div style="padding:0 1.75rem 1rem;flex:1;overflow-y:auto;font-size:0.84rem;line-height:1.65;color:#8b95a5">
+        <p style="margin-bottom:0.75rem">Your location has been detected as being within the <strong style="color:#c8cdd8">European Union, United Kingdom, or Switzerland</strong>.</p>
+        <p style="margin-bottom:0.75rem">The shared API key used by this application does not meet the data privacy requirements applicable in your region (GDPR&nbsp;/&nbsp;UK&nbsp;GDPR&nbsp;/&nbsp;Swiss&nbsp;nDSG). AI features have been disabled while the shared key is active.</p>
+        <p>To use AI features, add your own <strong style="color:#c8cdd8">paid-tier API key</strong> from Google AI Studio or Google Cloud Vertex AI. A paid-tier key ensures your data is private and is not used for model training.</p>
+      </div>
+      <div style="padding:1.25rem 1.75rem;border-top:1px solid #1e2330;display:flex;gap:0.75rem;justify-content:flex-end;flex-wrap:wrap;flex-shrink:0">
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener"
+           style="background:#1e2330;border:1px solid #2d3447;border-radius:6px;color:#d97706;font-family:inherit;font-size:0.82rem;font-weight:500;padding:0.5rem 1rem;text-decoration:none;display:inline-flex;align-items:center;">
+          Get a Google AI API key &#8599;
+        </a>
+        <button id="btn-region-open-settings" style="background:#d97706;border:none;border-radius:6px;color:#fff;font-family:inherit;font-size:0.82rem;font-weight:600;padding:0.5rem 1rem;cursor:pointer;">
+          Open Settings
+        </button>
+        <button id="btn-region-close" style="background:transparent;border:1px solid #2d3447;border-radius:6px;color:#5a6475;font-family:inherit;font-size:0.82rem;padding:0.5rem 0.9rem;cursor:pointer;">
+          Close
+        </button>
+      </div>
     </div>
   </dialog>
 
   {% if is_demo %}
   <!-- ── Demo Welcome Modal (email capture + AI disclosure) ── -->
-  <dialog id="demo-welcome-dialog" style="
-    background:#161b26;border:1px solid #2d3447;border-radius:10px;
-    color:#c8cdd8;font-family:inherit;max-width:520px;width:90%;padding:0;
-    box-shadow:0 8px 40px rgba(0,0,0,0.7);">
-    <div style="padding:1.5rem 1.75rem 0">
-      <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#3b82f6;margin-bottom:0.4rem">Welcome</div>
-      <h2 style="margin:0 0 1rem;font-size:1.2rem;color:#e8eaf0">Welcome to the Waypoint Demo</h2>
-      <p style="margin:0 0 0.75rem;font-size:0.88rem;line-height:1.6;color:#9aa3b2">
-        You're exploring a sample model railway layout. Cars, waybills, and operations reset nightly — feel free to try everything.
-      </p>
-      <p style="margin:0 0 1.25rem;font-size:0.82rem;line-height:1.5;color:#6b7280;border-left:3px solid #2d3447;padding-left:0.75rem">
-        <strong style="color:#9aa3b2">AI features</strong> are active in this demo. All AI processing uses a private API key — your data is not used for model training or human review.
-      </p>
-      <div style="margin-bottom:1rem">
-        <label for="demo-lead-email" style="display:block;font-size:0.8rem;color:#9aa3b2;margin-bottom:0.4rem;font-weight:500">
-          Get updates on Waypoint developments <span style="color:#6b7280;font-weight:400">(optional)</span>
-        </label>
-        <input type="email" id="demo-lead-email" placeholder="you@example.com" autocomplete="email" style="
-          width:100%;box-sizing:border-box;background:#0f1420;border:1px solid #2d3447;border-radius:6px;
-          color:#c8cdd8;font-family:inherit;font-size:0.88rem;padding:0.55rem 0.75rem;outline:none;">
-        <label style="display:flex;align-items:flex-start;gap:0.5rem;margin-top:0.6rem;cursor:pointer;font-size:0.82rem;color:#9aa3b2">
-          <input type="checkbox" id="demo-lead-marketing" style="margin-top:2px;accent-color:#3b82f6;flex-shrink:0">
-          Yes, keep me updated on new features and releases
-        </label>
+  <dialog id="demo-welcome-dialog" style="background:transparent;border:none;padding:0;max-width:100%;width:100%;display:flex;align-items:center;justify-content:center;">
+    <div style="background:#161b26;border:1px solid #2d3447;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.7);color:#c8cdd8;font-family:inherit;max-width:520px;width:90%;display:flex;flex-direction:column;max-height:90vh;">
+      <div style="padding:1.5rem 1.75rem 0;flex:1;overflow-y:auto;">
+        <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#3b82f6;margin-bottom:0.4rem">Welcome</div>
+        <h2 style="margin:0 0 1rem;font-size:1.2rem;color:#e8eaf0">Welcome to the Waypoint Demo</h2>
+        <p style="margin:0 0 0.75rem;font-size:0.88rem;line-height:1.6;color:#9aa3b2">
+          You're exploring a sample model railway layout. Cars, waybills, and operations reset nightly — feel free to try everything.
+        </p>
+        <p style="margin:0 0 1.25rem;font-size:0.82rem;line-height:1.5;color:#6b7280;border-left:3px solid #2d3447;padding-left:0.75rem">
+          <strong style="color:#9aa3b2">AI features</strong> are active in this demo. All AI processing uses a private API key — your data is not used for model training or human review.
+        </p>
+        <div style="margin-bottom:1rem">
+          <label for="demo-lead-email" style="display:block;font-size:0.8rem;color:#9aa3b2;margin-bottom:0.4rem;font-weight:500">
+            Get updates on Waypoint developments <span style="color:#6b7280;font-weight:400">(optional)</span>
+          </label>
+          <input type="email" id="demo-lead-email" placeholder="you@example.com" autocomplete="email" style="width:100%;box-sizing:border-box;background:#0f1420;border:1px solid #2d3447;border-radius:6px;color:#c8cdd8;font-family:inherit;font-size:0.88rem;padding:0.55rem 0.75rem;outline:none;">
+          <label style="display:flex;align-items:flex-start;gap:0.5rem;margin-top:0.6rem;cursor:pointer;font-size:0.82rem;color:#9aa3b2">
+            <input type="checkbox" id="demo-lead-marketing" style="margin-top:2px;accent-color:#3b82f6;flex-shrink:0">
+            Yes, keep me updated on new features and releases
+          </label>
+        </div>
       </div>
-    </div>
-    <div style="padding:1rem 1.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;border-top:1px solid #1e2535;margin-top:0.5rem">
-      <button id="btn-demo-welcome-skip" style="
-        background:transparent;border:none;color:#5a6475;font-family:inherit;
-        font-size:0.82rem;cursor:pointer;padding:0;text-decoration:underline;">
-        No thanks, just explore
-      </button>
-      <button id="btn-demo-welcome-continue" style="
-        background:#3b82f6;border:none;border-radius:6px;color:#fff;
-        font-family:inherit;font-size:0.9rem;font-weight:600;
-        padding:0.6rem 1.4rem;cursor:pointer;">
-        Continue to Demo
-      </button>
+      <div style="padding:1rem 1.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;border-top:1px solid #1e2535;flex-shrink:0">
+        <button id="btn-demo-welcome-skip" style="background:transparent;border:none;color:#5a6475;font-family:inherit;font-size:0.82rem;cursor:pointer;padding:0;text-decoration:underline;">
+          No thanks, just explore
+        </button>
+        <button id="btn-demo-welcome-continue" style="background:#3b82f6;border:none;border-radius:6px;color:#fff;font-family:inherit;font-size:0.9rem;font-weight:600;padding:0.6rem 1.4rem;cursor:pointer;">
+          Continue to Demo
+        </button>
+      </div>
     </div>
   </dialog>
   {% endif %}
