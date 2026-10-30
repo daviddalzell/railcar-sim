@@ -15,14 +15,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "demo_leads",
-        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("email", sa.String(), nullable=False, unique=True),
-        sa.Column("marketing_opt_in", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
-        schema="public",
-    )
+    op.execute(sa.text("""
+        CREATE TABLE IF NOT EXISTS public.demo_leads (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR NOT NULL UNIQUE,
+            marketing_opt_in BOOLEAN NOT NULL DEFAULT false,
+            created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now()
+        )
+    """))
 
 
 def downgrade() -> None:

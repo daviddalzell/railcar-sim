@@ -17,11 +17,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "tenants",
-        sa.Column("ai_notice_acknowledged_at", sa.DateTime(), nullable=True),
-        schema="public",
-    )
+    op.execute(sa.text(
+        "ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS"
+        " ai_notice_acknowledged_at TIMESTAMP WITHOUT TIME ZONE"
+    ))
 
 
 def downgrade() -> None:
