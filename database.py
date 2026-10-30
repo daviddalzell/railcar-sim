@@ -45,11 +45,11 @@ DEFAULT_CAR_TYPES = [
 
 def init_db():
     from models import Car, CarType, Location, Track, Industry, Waybill, MovementLog, CommodityCarTypeMap, LayoutSettings, SessionClock, DispatchPlan, Tenant  # noqa: F401
-    Base.metadata.create_all(bind=engine)
     if not _is_sqlite:
-        # Postgres schema is managed by Alembic; only seed default data below.
+        # Postgres schema is managed by Alembic; never call create_all() here.
         _seed_defaults()
         return
+    Base.metadata.create_all(bind=engine)
     # SQLite only: run column migrations so older local databases stay compatible.
     with engine.connect() as conn:
         try:
