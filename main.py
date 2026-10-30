@@ -52,6 +52,7 @@ from routers import (
     ops_events,
     admin_keys,
     demo_leads,
+    feedback,
 )
 
 _auth = [Depends(get_current_user)]
@@ -397,6 +398,7 @@ app.include_router(uploads.router,       dependencies=_auth)
 app.include_router(operations.router,    dependencies=_auth)
 app.include_router(export_import.router, dependencies=_auth)
 app.include_router(settings.router,      dependencies=_auth)
+app.include_router(feedback.router,      dependencies=_auth)
 # Webhook and SSE endpoints registered without auth
 app.include_router(webhooks.router)
 app.include_router(session.sse_router)

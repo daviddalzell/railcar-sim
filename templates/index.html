@@ -44,6 +44,7 @@
         <li><a href="#" data-tab="layout" class="tab-link">Layout Setup</a></li>
         <li><a href="#" data-tab="help" class="tab-link">Help</a></li>
         <li><a href="#" data-tab="settings" class="tab-link">Settings</a></li>
+        <li><a href="#" id="btn-open-feedback" class="tab-link" style="color:var(--pico-muted-color)">Send feedback</a></li>
       </ul>
       {% if supabase_url and not is_demo %}
       <button id="account-btn" aria-label="Account" style="display:none;"></button>
@@ -1378,6 +1379,80 @@
   </dialog>
   {% endif %}
 
+  <!-- Feedback dialog -->
+  <dialog id="feedback-dialog">
+    <article>
+      <header>
+        <button aria-label="Close" rel="prev"></button>
+        <h3>Send feedback</h3>
+      </header>
+      <p class="muted" style="font-size:0.88rem;margin-bottom:1rem">
+        Something not right? Tell us what happened &mdash; we&rsquo;ll look into it.
+      </p>
+      <form id="feedback-form">
+        <label for="fb-what-tried">What were you trying to do?</label>
+        <textarea id="fb-what-tried" rows="3" required
+          placeholder="e.g. Move car BNSF 1234 to the grain elevator"></textarea>
+        <label for="fb-what-happened">What happened instead?</label>
+        <textarea id="fb-what-happened" rows="3" required
+          placeholder="e.g. The car disappeared from the list"></textarea>
+      </form>
+      <div id="feedback-confirm" hidden style="text-align:center;padding:1rem 0">
+        <p><strong>Got it &mdash; thanks!</strong></p>
+        <p class="muted" style="font-size:0.88rem">We&rsquo;ll look into it shortly.</p>
+      </div>
+      <footer>
+        <button class="outline secondary" rel="prev">Cancel</button>
+        <button id="btn-submit-feedback" class="outline">Send</button>
+      </footer>
+    </article>
+  </dialog>
+
   <script src="/static/app.js"></script>
+  <script>
+    // Feedback modal
+    document.getElementById("btn-open-feedback").addEventListener("click", function(e) {
+      e.preventDefault();
+      document.getElementById("feedback-form").hidden = false;
+      document.getElementById("feedback-confirm").hidden = true;
+      var btn = document.getElementById("btn-submit-feedback");
+      btn.hidden = false;
+      btn.disabled = false;
+      btn.removeAttribute("aria-busy");
+      document.getElementById("fb-what-tried").value = "";
+      document.getElementById("fb-what-happened").value = "";
+      document.getElementById("feedback-dialog").showModal();
+    });
+
+    document.getElementById("btn-submit-feedback").addEventListener("click", async function() {
+      var form = document.getElementById("feedback-form");
+      if (!form.reportValidity()) return;
+      var btn = document.getElementById("btn-submit-feedback");
+      btn.setAttribute("aria-busy", "true");
+      btn.disabled = true;
+      try {
+        var resp = await fetch("/api/feedback", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + (sessionStorage.getItem("waypoint_token") || "")
+          },
+          body: JSON.stringify({
+            what_tried: document.getElementById("fb-what-tried").value,
+            what_happened: document.getElementById("fb-what-happened").value,
+            page_url: window.location.href,
+            browser: navigator.userAgent
+          })
+        });
+        if (!resp.ok) throw new Error("Server error " + resp.status);
+        document.getElementById("feedback-form").hidden = true;
+        document.getElementById("feedback-confirm").hidden = false;
+        btn.hidden = true;
+      } catch(err) {
+        btn.removeAttribute("aria-busy");
+        btn.disabled = false;
+      }
+    });
+  </script>
 </body>
 </html>
