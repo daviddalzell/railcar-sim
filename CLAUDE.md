@@ -61,6 +61,59 @@ python -m admin.migrate_all_tenants           # all tenants (as Fly does)
 
 ---
 
+## Local development
+
+```bash
+# Install deps
+pip install -r requirements.txt
+
+# Run with SQLite (no Supabase needed)
+AUTH_DISABLED=1 uvicorn main:app --reload
+
+# Run against production Postgres (copy from Fly secrets)
+cp .env.example .env   # fill in DATABASE_URL + SUPABASE_* vars
+uvicorn main:app --reload
+```
+
+SQLite mode uses a local `railcar.db` file. `init_db()` creates the schema automatically — no Alembic needed. `AUTH_DISABLED=1` skips Supabase auth and returns a synthetic admin user for every request.
+
+---
+
+## Environment variables
+
+### Required in production (set as Fly secrets)
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Supabase Postgres connection string |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_KEY` | Supabase service role key (admin — keep secret) |
+| `SUPABASE_ANON_KEY` | Supabase anon key (used client-side) |
+
+### Optional / feature flags
+
+| Variable | Purpose |
+|---|---|
+| `AUTH_DISABLED` | Set to any value to skip auth (local dev only) |
+| `DEFAULT_TENANT_SLUG` | Fallback tenant when subdomain doesn't match (e.g. during DNS setup) |
+| `ADMIN_PASSWORD` | Password for `/admin` routes |
+| `SYNC_SECRET` | Shared secret for Patreon webhook validation |
+| `PATREON_ACCESS_TOKEN` | Patreon API token for member sync |
+| `PATREON_CAMPAIGN_ID` | Patreon campaign to sync from |
+| `PATREON_WEBHOOK_SECRET` | Patreon webhook signature validation |
+| `APP_URL` | Base URL (e.g. `https://waypoint-ops.com`) — used in emails |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Welcome email SMTP config |
+| `DEMO_TEMPLATE_EMAIL` | Email of the Supabase user whose layout seeds the demo |
+| `VISION_PROVIDER` | AI vision provider: `gemini` (default), `openai`, or `ollama` |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Gemini vision config |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Anthropic (Claude) config |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | OpenAI config |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_NUM_CTX` / `OLLAMA_MAX_IMAGE_PX` | Local Ollama config |
+| `AI_MAX_RETRIES` / `AI_RETRY_BASE_DELAY` | AI retry tuning |
+| `LOG_FORMAT` | Set to `json` on Fly for structured logs |
+
+---
+
 ## Testing
 
 ```bash
@@ -93,6 +146,84 @@ Test helpers live in `tests/conftest.py`: `make_car`, `make_location` (creates a
 
 ---
 
+## Admin scripts (`admin/`)
+
+| Script | Usage | Purpose |
+|---|---|---|
+| `migrate_all_tenants.py` | Fly release command | Runs `alembic upgrade head` for public schema + every tenant schema |
+| `provision_tenant.py` | `python -m admin.provision_tenant --slug=x --name="X" --admin-email=x@x.com` | Creates Postgres schema, seeds defaults, creates Supabase auth user, sends welcome email |
+| `seed_demo.py` | `python -m admin.seed_demo` | Wipes and reseeds the demo tenant with sample layout data (runs nightly in production) |
+| `reset_demo.py` | `python -m admin.reset_demo` | Alias for seed_demo used by the nightly cron |
+| `reset_tenant.py` | `python -m admin.reset_tenant --slug=x` | Wipes all layout data for a tenant (keeps the tenant row and auth users) |
+| `clone_demo.py` | `python -m admin.clone_demo --slug=x` | Copies demo layout data into a tenant's schema |
+| `sync_patreon.py` | `python -m admin.sync_patreon` | Syncs Patreon members → tenant subscription status |
+
+---
+
+## Tenant management
+
+### Provisioning a new tenant
+```bash
+python -m admin.provision_tenant \
+  --slug club-springfield \
+  --name "Springfield Model Railroad Club" \
+  --admin-email admin@springfield.com
+```
+This creates schema `t_club_springfield`, seeds car types + commodity map, inserts the `public.tenants` row, and sends a Supabase invite email.
+
+### Diagnosing a tenant with missing data
+Upload a diagnostic script via `fly sftp shell`, then run it:
+```bash
+fly sftp shell -a waypoint-app <<'EOF'
+put /path/to/diagnose.py /app/diagnose.py
+EOF
+fly ssh console -a waypoint-app -C "python /app/diagnose.py"
+```
+Check: tenant row exists in `public.tenants`, schema exists, table counts > 0, `subscription_status = 'active'`.
+
+### Auth / JWT
+- Tenant is resolved from the **subdomain** (`host` header), not from the JWT
+- JWT metadata fields that matter: `role` (`admin` or `operator`), `tenant_slug`
+- Default role if not set: `operator` (read-only for most resources)
+- Demo tenant bypasses Supabase auth entirely — any request to `demo.waypoint-ops.com` gets a synthetic admin user
+- Revoked users are tracked in `public.tenant_members` (`is_active = false`)
+- Tenant context is cached in-memory; call `invalidate_tenant_cache(slug)` after updating a tenant row
+
+---
+
+## Frontend (`static/app.js`)
+
+Single file, ~4000 lines, vanilla JS. Major sections in order:
+
+| Line | Section |
+|---|---|
+| 6 | **State** — module-level arrays: `cars`, `locations` (Locations), `tracks`, `industries`, `waybills`, `switchingAreas` |
+| 143 | **Helpers** — `api()`, `showToast()`, `withLoading()`, `track()` (GA events) |
+| 242 | **Photo library** — `openPhotoLibrary()`, `refreshLibraryGrid()` |
+| 397 | **Tab navigation** — tab switching, URL hash handling |
+| 423 | **Roster** — `loadRoster()`, `renderCarGrid()`, `carCardHTML()` |
+| 624 | **Add car via photo** — `processPhotoFile()`, `runStylize()`, `applyAnalysis()` |
+| 891 | **Car detail dialog** — `openCarDetail()` |
+| 1236 | **Waybill pool** — `loadWaybillPool()`, `renderWaybillPool()`, `openWaybillEditDialog()` |
+| 1396 | **Operations view** — `loadOperations()`, `renderPlanPreview()` |
+| 1591 | **Operating session** — `renderActiveSession()`, `detectSpottingConflicts()`, `handleEndSession()` |
+| 2047 | **Layout setup** — `loadLayout()`, `renderLocationList()`, `renderIndustryList()`, `renderCarTypeList()` |
+| 2864 | **Export / Import** — backup download and ZIP restore |
+| 3107 | **Switching Areas** — `renderSwitchingAreaList()`, `populateSwitchingAreaSelect()` *(to be replaced in PR 2)* |
+| 3218 | **Layout status strip** — `renderLayoutStatus()` |
+| 3284 | **Dispatcher** — `loadDispatcherPanel()`, `renderConsistCard()`, `wireConsistCard()` |
+| 3757 | **Settings tab** — `loadSettings()`, `loadMembers()` |
+| 3966 | **Bootstrap** — `init()` entry point; loads all tabs, wires event listeners, opens dialogs |
+| 4019 | **AI notice / Demo welcome** — dialog button handlers |
+
+Key patterns:
+- `api(method, path, body)` — all fetch calls go through this; throws on non-2xx
+- `showToast(message, type, duration)` — user feedback
+- `withLoading(btn, label, fn)` — disables a button, shows spinner, re-enables after `fn` resolves
+- `track(eventName, params)` — Google Analytics event helper
+
+---
+
 ## Domain model
 
 ```
@@ -110,8 +241,28 @@ DispatchPlan      (consist built by the virtual dispatcher)
 
 ---
 
+## Pending work
+
+**PR 2 — `feature/layout-rename-frontend`** (not yet started)
+Branch off main after confirming production is stable post-PR-1. Scope:
+- Replace flat `renderSwitchingAreaList()` + `renderLocationList()` with a new `renderLocationTree()` — 3-level nested tree (Location → Track → Industries)
+- Mobile accordion + sticky breadcrumb + bottom-sheet forms
+- Update all API calls: `/api/switching-areas` → `/api/locations`, `/api/locations` → `/api/tracks`
+- Remove backward-compat response keys (`switching_area_id`, `switching_areas` in layout status)
+- Remove backward-compat endpoint aliases from `routers/locations.py`
+- Waybill industry `<select>` → `<optgroup>` grouped by Location
+- UX: undo toast on delete (5s), localStorage collapse state, inline rename for Location/Track names
+
+---
+
 ## Conventions
 
+### Python naming
+- Leading underscore (`_fn`) only for functions that are **private to a single module** (e.g. `_run_build_algorithm` in `routers/dispatcher.py`)
+- Shared helpers in `converters.py`, `schemas.py` etc. are public exports — no underscore
+- No leading underscores on module-level variables or constants
+
+### General
 - **No comments** unless the WHY is non-obvious
 - **No `create_all()` on Postgres** — see migration rules above
 - Response dicts keep both old and new key names during transition (e.g. `switching_area_id` + `location_id`) — remove old keys in PR 2
