@@ -795,6 +795,21 @@
         </div>
       </div>
 
+      <div class="help-section">
+        <button class="help-section-header">▶ Troubleshooting</button>
+        <div class="help-section-body hidden">
+          <p>Try these steps in order if something isn't working as expected.</p>
+          <ol>
+            <li><strong>Sign out and back in.</strong> Your login session can expire silently. Signing out and back in issues a fresh token and fixes most "data not loading" issues.</li>
+            <li><strong>Try an incognito / private window.</strong> Open a private window, go to your layout URL, and log in fresh. If things work there, the problem is a stale session or cached state in your normal browser — clearing your browser cache will fix it.</li>
+            <li><strong>Check you're on the right URL.</strong> Make sure the address bar shows your layout's subdomain (e.g. <code>yourname.waypoint-ops.com</code>). Bookmarks to the wrong URL can land you on a different layout.</li>
+            <li><strong>Check the browser console for errors.</strong> Right-click anywhere on the page → <strong>Inspect</strong> (or press F12) → click the <strong>Console</strong> tab → refresh the page. Screenshot any red errors and send them to support.</li>
+            <li><strong>Check the network tab.</strong> Still in DevTools, click the <strong>Network</strong> tab → refresh → type <code>/api/</code> in the filter box. Look at the Status column. Any response that isn't 200 (green) points to the problem — screenshot it and send to support.</li>
+          </ol>
+          <p>If none of the above help, email <a href="mailto:support@waypoint-ops.com">support@waypoint-ops.com</a> with a description of what you see and any screenshots from steps 4–5.</p>
+        </div>
+      </div>
+
     </section>
 
     <section id="tab-settings" class="tab-panel hidden">
