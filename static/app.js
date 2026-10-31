@@ -597,18 +597,6 @@ $("#btn-toggle-freight-cars").addEventListener("click", () => {
   }
 });
 
-$("#btn-toggle-locations").addEventListener("click", () => {
-  const body = $("#location-body");
-  const btn  = $("#btn-toggle-locations");
-  if (body.classList.contains("hidden")) {
-    show(body);
-    btn.textContent = "▼";
-  } else {
-    hide(body);
-    btn.textContent = "▶";
-  }
-});
-
 $("#btn-toggle-industries").addEventListener("click", () => {
   const body = $("#industries-body");
   const btn  = $("#btn-toggle-industries");
@@ -1298,14 +1286,32 @@ function openWaybillEditDialog(waybillId = null) {
   $("#we-commodity").value = w?.commodity || "";
   $("#we-empty").checked = w?.is_empty || false;
 
-  const locOptions = '<option value="">—</option>' +
-    locations.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
-  const indOptions = '<option value="">—</option>' +
-    industries.map(i => `<option value="${i.id}">${i.name}</option>`).join("");
-
-  $("#we-origin").innerHTML = locOptions;
-  $("#we-destination").innerHTML = locOptions;
-  $("#we-industry").innerHTML = indOptions;
+  const buildTrackOptions = () => {
+    const grouped = switchingAreas.map(g => {
+      const tracks = locations.filter(l => l.location_id === g.id);
+      if (!tracks.length) return "";
+      return `<optgroup label="${g.name}">${tracks.map(l => `<option value="${l.id}">${l.name}</option>`).join("")}</optgroup>`;
+    }).join("");
+    const ungrouped = locations.filter(l => !l.location_id)
+      .map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+    return '<option value="">—</option>' + grouped + ungrouped;
+  };
+  const buildIndOptions = () => {
+    const grouped = switchingAreas.map(g => {
+      const tracks = locations.filter(l => l.location_id === g.id);
+      const inds = industries.filter(i => tracks.some(t => t.id === i.location_id));
+      if (!inds.length) return "";
+      return `<optgroup label="${g.name}">${inds.map(i => `<option value="${i.id}">${i.name}</option>`).join("")}</optgroup>`;
+    }).join("");
+    const ungroupedInds = industries.filter(i => {
+      const track = locations.find(l => l.id === i.location_id);
+      return !track?.location_id;
+    }).map(i => `<option value="${i.id}">${i.name}</option>`).join("");
+    return '<option value="">—</option>' + grouped + ungroupedInds;
+  };
+  $("#we-origin").innerHTML = buildTrackOptions();
+  $("#we-destination").innerHTML = buildTrackOptions();
+  $("#we-industry").innerHTML = buildIndOptions();
 
   if (w?.origin_id) $("#we-origin").value = w.origin_id;
   if (w?.destination_id) $("#we-destination").value = w.destination_id;
@@ -1403,8 +1409,8 @@ async function loadOperations() {
   // Dispatcher always visible
   if (!locations.length || !switchingAreas.length) {
     [locations, switchingAreas] = await Promise.all([
+      api("GET", "/api/tracks"),
       api("GET", "/api/locations"),
-      api("GET", "/api/switching-areas"),
     ]);
   }
   if (!settings) {
@@ -2048,22 +2054,20 @@ $("#btn-confirm-end-session").addEventListener("click", async () => {
 async function loadLayout() {
   [[locations, industries, commodityMap, carTypes, switchingAreas], settings] = await Promise.all([
     Promise.all([
-      api("GET", "/api/locations"),
+      api("GET", "/api/tracks"),
       api("GET", "/api/industries"),
       api("GET", "/api/commodity-car-type-map"),
       api("GET", "/api/car-types"),
-      api("GET", "/api/switching-areas"),
+      api("GET", "/api/locations"),
     ]),
     api("GET", "/api/settings"),
   ]);
-  renderLocationList();
+  renderLocationTree();
   renderIndustryList();
   populateIndustryLocationSelect();
   renderCommodityMapList();
   populateCarTypeSelects();
   renderCarTypeList();
-  renderSwitchingAreaList();
-  populateSwitchingAreaSelect();
   if (settings) {
     $("#clock-start-time").value = settings.clock_start_time;
     $("#clock-speed").value = String(settings.clock_speed);
@@ -2212,68 +2216,252 @@ $("#ops-mode-form").addEventListener("submit", async e => {
   showToast("Operations mode saved.", "success");
 });
 
-function renderLocationList() {
-  const list = $("#location-list");
-  if (!locations.length) {
-    list.innerHTML = emptyState("📍", "No locations yet — add one with the + button.");
+// ── Location Tree ────────────────────────────────────────────────────────────
+
+const TREE_COLLAPSE_KEY = "waypoint_tree_collapsed";
+
+function getTreeCollapseState() {
+  try {
+    return JSON.parse(localStorage.getItem(TREE_COLLAPSE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function setTreeCollapsed(key, collapsed) {
+  const state = getTreeCollapseState();
+  if (collapsed) state[key] = true;
+  else delete state[key];
+  localStorage.setItem(TREE_COLLAPSE_KEY, JSON.stringify(state));
+}
+
+function openCascadeDeleteDialog(title, desc, onConfirm) {
+  $("#cascade-delete-title").textContent = title;
+  $("#cascade-delete-desc").textContent = desc;
+  const confirmBtn = $("#btn-cascade-delete-confirm");
+  const freshBtn = confirmBtn.cloneNode(true);
+  confirmBtn.replaceWith(freshBtn);
+  freshBtn.addEventListener("click", async () => {
+    try {
+      await onConfirm();
+      $("#cascade-delete-dialog").close();
+    } catch (err) {
+      showToast("Error: " + err.message, "error");
+    }
+  });
+  $("#cascade-delete-dialog").showModal();
+}
+["#btn-cascade-delete-cancel", "#btn-close-cascade-delete"].forEach(sel =>
+  $(sel).addEventListener("click", () => $("#cascade-delete-dialog").close())
+);
+
+function makeInlineRenameHandler(nameEl, onSave) {
+  nameEl.addEventListener("click", () => {
+    const current = nameEl.textContent;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = current;
+    input.className = "inline-rename-input";
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = async (save) => {
+      if (done) return;
+      done = true;
+      const newVal = input.value.trim();
+      if (save && newVal && newVal !== current) {
+        try {
+          await onSave(newVal);
+        } catch (err) {
+          showToast("Error: " + err.message, "error");
+        }
+      }
+      await loadLayout();
+    };
+    input.addEventListener("blur", () => finish(true));
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); finish(true); }
+      if (e.key === "Escape") { e.preventDefault(); finish(false); }
+    });
+  });
+}
+
+function renderLocationTree() {
+  const root = $("#location-tree");
+  if (!root) return;
+  const collapsed = getTreeCollapseState();
+
+  const trackRow = (t) => {
+    const inds = industries.filter(i => i.location_id === t.id);
+    const indRows = inds.map(i => `
+      <div class="tree-industry-row">
+        <span>🏭 ${i.name}</span>
+      </div>`).join("");
+    return `
+      <div class="tree-track" data-track-id="${t.id}">
+        <div class="tree-track-row">
+          <span class="tree-track-name" data-id="${t.id}">${t.name}</span>
+          <em class="muted small">${t.location_type}</em>
+          <span class="muted small">${t.current_car_count ?? 0}${t.car_capacity ? "/" + t.car_capacity : ""} cars</span>
+          <span class="tree-actions">
+            <button class="outline small edit-track" data-id="${t.id}">✏️</button>
+            <button class="outline small contrast del-track" data-id="${t.id}">🗑</button>
+          </span>
+        </div>
+        ${inds.length ? `<div class="tree-industries">${indRows}</div>` : ""}
+      </div>`;
+  };
+
+  const groupBlock = (group) => {
+    const tracks = group ? locations.filter(l => l.location_id === group.id) : locations.filter(l => !l.location_id);
+    const key = group ? `group-${group.id}` : "ungrouped";
+    const isCollapsed = !!collapsed[key];
+    const count = group ? (group.current_car_count ?? 0) : null;
+    const cap = group ? (group.car_capacity ?? null) : null;
+    return `
+      <div class="tree-group" data-group-key="${key}">
+        <div class="tree-group-row">
+          <button class="outline small tree-toggle" data-key="${key}">${isCollapsed ? "▶" : "▼"}</button>
+          ${group
+            ? `<span class="tree-group-name" data-id="${group.id}">${group.name}</span>
+               <span class="muted small">${count}${cap ? "/" + cap : ""} cars</span>`
+            : `<span class="muted"><em>Ungrouped tracks</em></span>`}
+          <span class="tree-actions">
+            <button class="outline small add-track-to-group" data-group-id="${group ? group.id : ""}">+ Track</button>
+            ${group ? `
+              <button class="outline small edit-group" data-id="${group.id}">✏️</button>
+              <button class="outline small contrast del-group" data-id="${group.id}">🗑</button>` : ""}
+          </span>
+        </div>
+        <div class="tree-group-body ${isCollapsed ? "hidden" : ""}" data-key="${key}">
+          ${tracks.length ? tracks.map(trackRow).join("") : '<p class="muted small">No tracks yet.</p>'}
+        </div>
+      </div>`;
+  };
+
+  const ungroupedTracks = locations.filter(l => !l.location_id);
+  root.innerHTML = switchingAreas.map(groupBlock).join("") +
+    (ungroupedTracks.length ? groupBlock(null) : "");
+
+  if (!switchingAreas.length && !ungroupedTracks.length) {
+    root.innerHTML = emptyState("📍", "No locations yet — add a group with the + Group button.");
     return;
   }
-  list.innerHTML = locations.map(l => `
-    <div class="layout-item">
-      <span><strong>${l.name}</strong> <em>${l.location_type}</em></span>
-      <span>
-        <button class="outline small edit-loc" data-id="${l.id}">✏️</button>
-        <button class="outline small contrast del-loc" data-id="${l.id}">🗑</button>
-      </span>
-    </div>
-  `).join("");
 
-  $$(".edit-loc").forEach(btn => {
+  // Collapse toggles
+  root.querySelectorAll(".tree-toggle").forEach(btn => {
     btn.addEventListener("click", () => {
-      const loc = locations.find(l => l.id === parseInt(btn.dataset.id));
-      if (!loc) return;
-      $("#loc-name").value = loc.name;
-      $("#loc-type").value = loc.location_type;
-      $("#loc-switching-area").value = loc.switching_area_id || "";
-      $("#loc-capacity").value = loc.car_capacity ?? "";
-      $("#loc-edit-id").value = loc.id;
-      show($("#location-form"));
+      const key = btn.dataset.key;
+      const body = root.querySelector(`.tree-group-body[data-key="${key}"]`);
+      const nowCollapsed = !body.classList.contains("hidden");
+      body.classList.toggle("hidden", nowCollapsed);
+      btn.textContent = nowCollapsed ? "▶" : "▼";
+      setTreeCollapsed(key, nowCollapsed);
     });
   });
 
-  $$(".del-loc").forEach(btn => {
+  // Add track to group
+  root.querySelectorAll(".add-track-to-group").forEach(btn => {
+    btn.addEventListener("click", () => {
+      $("#tf-name").value = "";
+      $("#tf-type").value = "yard";
+      $("#tf-capacity").value = "";
+      $("#tf-group-id").value = btn.dataset.groupId || "";
+      $("#tf-edit-id").value = "";
+      show($("#track-form"));
+    });
+  });
+
+  // Edit group
+  root.querySelectorAll(".edit-group").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const group = switchingAreas.find(a => a.id === parseInt(btn.dataset.id));
+      if (!group) return;
+      $("#lg-name").value = group.name;
+      $("#lg-capacity").value = group.car_capacity ?? "";
+      $("#lg-edit-id").value = group.id;
+      show($("#lg-form"));
+    });
+  });
+
+  // Delete group (cascade warning)
+  root.querySelectorAll(".del-group").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const group = switchingAreas.find(a => a.id === parseInt(btn.dataset.id));
+      if (!group) return;
+      const tracks = locations.filter(l => l.location_id === group.id);
+      openCascadeDeleteDialog(
+        `Delete "${group.name}"?`,
+        tracks.length
+          ? `${tracks.length} track${tracks.length === 1 ? "" : "s"} will become ungrouped — they are not deleted.`
+          : "This cannot be undone.",
+        () => api("DELETE", `/api/locations/${group.id}`).then(loadLayout)
+      );
+    });
+  });
+
+  // Edit track
+  root.querySelectorAll(".edit-track").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const t = locations.find(l => l.id === parseInt(btn.dataset.id));
+      if (!t) return;
+      $("#tf-name").value = t.name;
+      $("#tf-type").value = t.location_type;
+      $("#tf-capacity").value = t.car_capacity ?? "";
+      $("#tf-group-id").value = t.location_id || "";
+      $("#tf-edit-id").value = t.id;
+      show($("#track-form"));
+    });
+  });
+
+  // Delete track (cascade warning, with staging-merge / blocking-cars special cases)
+  root.querySelectorAll(".del-track").forEach(btn => {
     btn.addEventListener("click", () => {
       const locId = parseInt(btn.dataset.id);
       const loc = locations.find(l => l.id === locId);
       if (!loc) return;
       if (loc.location_type === "staging") {
         openStagingMergeDialog(loc);
-      } else {
-        const blocking = cars.filter(c => c.current_location_id === locId);
-        if (blocking.length) {
-          openLocationBlockDialog(loc, blocking);
-        } else {
-          confirmThenDeleteLocation(btn, locId);
-        }
+        return;
       }
+      const blocking = cars.filter(c => c.current_location_id === locId);
+      if (blocking.length) {
+        openLocationBlockDialog(loc, blocking);
+        return;
+      }
+      const indCount = industries.filter(i => i.location_id === locId).length;
+      openCascadeDeleteDialog(
+        `Delete "${loc.name}"?`,
+        indCount ? `This will also remove ${indCount} industr${indCount === 1 ? "y" : "ies"}.` : "This cannot be undone.",
+        () => api("DELETE", `/api/tracks/${locId}`).then(loadLayout)
+      );
     });
   });
-}
 
-function confirmThenDeleteLocation(btn, locId) {
-  if (!btn.dataset.confirm) {
-    btn.dataset.confirm = "1";
-    btn.classList.add("btn-confirming");
-    const orig = btn.innerHTML;
-    btn.textContent = "Sure?";
-    setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.innerHTML = orig; }, 3000);
-    return;
-  }
-  btn.classList.remove("btn-confirming");
-  delete btn.dataset.confirm;
-  api("DELETE", `/api/locations/${locId}`)
-    .then(() => loadLayout())
-    .catch(err => showToast("Error: " + err.message, "error"));
+  // Inline rename — group names (PUT /api/locations is a full replace)
+  root.querySelectorAll(".tree-group-name").forEach(nameEl => {
+    makeInlineRenameHandler(nameEl, (newVal) => {
+      const group = switchingAreas.find(a => a.id === parseInt(nameEl.dataset.id));
+      return api("PUT", `/api/locations/${nameEl.dataset.id}`, {
+        name: newVal,
+        car_capacity: group?.car_capacity ?? 10,
+      });
+    });
+  });
+
+  // Inline rename — track names (PUT /api/tracks is a full replace)
+  root.querySelectorAll(".tree-track-name").forEach(nameEl => {
+    makeInlineRenameHandler(nameEl, (newVal) => {
+      const track = locations.find(l => l.id === parseInt(nameEl.dataset.id));
+      return api("PUT", `/api/tracks/${nameEl.dataset.id}`, {
+        name: newVal,
+        location_type: track?.location_type || "yard",
+        location_id: track?.location_id || null,
+        car_capacity: track?.car_capacity ?? null,
+      });
+    });
+  });
 }
 
 function openStagingMergeDialog(loc) {
@@ -2305,7 +2493,7 @@ $("#btn-staging-merge-confirm").addEventListener("click", async () => {
   const mergeInto = parseInt($("#staging-merge-target").value);
   if (!stagingMergeDeleteId || isNaN(mergeInto)) return;
   try {
-    await api("DELETE", `/api/locations/${stagingMergeDeleteId}?merge_into_id=${mergeInto}`);
+    await api("DELETE", `/api/tracks/${stagingMergeDeleteId}?merge_into_id=${mergeInto}`);
     $("#staging-merge-dialog").close();
     showToast("Staging location merged and deleted.", "success");
     await loadLayout();
@@ -2515,8 +2703,14 @@ function getSpotPickerValues(el) {
 
 function populateIndustryLocationSelect() {
   const sel = $("#ind-location");
-  sel.innerHTML = '<option value="">— no location —</option>' +
-    locations.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+  const grouped = switchingAreas.map(g => {
+    const tracks = locations.filter(l => l.location_id === g.id);
+    if (!tracks.length) return "";
+    return `<optgroup label="${g.name}">${tracks.map(l => `<option value="${l.id}">${l.name}</option>`).join("")}</optgroup>`;
+  }).join("");
+  const ungrouped = locations.filter(l => !l.location_id)
+    .map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+  sel.innerHTML = '<option value="">— no track —</option>' + grouped + ungrouped;
 }
 
 function refreshSpotPickerForLocation(selectedStr = "") {
@@ -2527,33 +2721,57 @@ function refreshSpotPickerForLocation(selectedStr = "") {
 
 $("#ind-location").addEventListener("change", () => refreshSpotPickerForLocation());
 
-$("#btn-add-location").addEventListener("click", () => {
-  $("#loc-name").value = "";
-  $("#loc-type").value = "yard";
-  $("#loc-switching-area").value = "";
-  $("#loc-capacity").value = "";
-  $("#loc-edit-id").value = "";
-  show($("#location-form"));
+// Location group form handlers
+$("#btn-add-location-group").addEventListener("click", () => {
+  $("#lg-name").value = "";
+  $("#lg-capacity").value = "";
+  $("#lg-edit-id").value = "";
+  show($("#lg-form"));
 });
-$("#btn-cancel-location").addEventListener("click", () => hide($("#location-form")));
-
-$("#location-form").addEventListener("submit", async e => {
+$("#btn-cancel-lg").addEventListener("click", () => hide($("#lg-form")));
+$("#lg-form").addEventListener("submit", async e => {
   e.preventDefault();
-  const editId = $("#loc-edit-id").value;
-  const saVal = $("#loc-switching-area").value;
+  const editId = $("#lg-edit-id").value;
   const body = {
-    name: $("#loc-name").value.trim(),
-    location_type: $("#loc-type").value,
-    switching_area_id: saVal ? parseInt(saVal) : null,
-    car_capacity: $("#loc-capacity").value ? parseInt($("#loc-capacity").value) : null,
+    name: $("#lg-name").value.trim(),
+    car_capacity: $("#lg-capacity").value ? parseInt($("#lg-capacity").value) : null,
   };
-  if (editId) {
-    await api("PUT", `/api/locations/${editId}`, body);
-  } else {
-    await api("POST", "/api/locations", body);
+  try {
+    if (editId) {
+      await api("PUT", `/api/locations/${editId}`, body);
+    } else {
+      await api("POST", "/api/locations", body);
+    }
+    hide($("#lg-form"));
+    await loadLayout();
+  } catch (err) {
+    showToast("Error: " + err.message, "error");
   }
-  hide($("#location-form"));
-  await loadLayout();
+});
+
+// Track form handlers
+$("#btn-cancel-track-form").addEventListener("click", () => hide($("#track-form")));
+$("#track-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const editId = $("#tf-edit-id").value;
+  const groupId = $("#tf-group-id").value;
+  const body = {
+    name: $("#tf-name").value.trim(),
+    location_type: $("#tf-type").value,
+    location_id: groupId ? parseInt(groupId) : null,
+    car_capacity: $("#tf-capacity").value ? parseInt($("#tf-capacity").value) : null,
+  };
+  try {
+    if (editId) {
+      await api("PUT", `/api/tracks/${editId}`, body);
+    } else {
+      await api("POST", "/api/tracks", body);
+    }
+    hide($("#track-form"));
+    await loadLayout();
+  } catch (err) {
+    showToast("Error: " + err.message, "error");
+  }
 });
 
 $("#btn-add-industry").addEventListener("click", () => {
@@ -3104,115 +3322,6 @@ $("#btn-help-expand-all").addEventListener("click", () => {
   $("#btn-help-expand-all").textContent = helpAllExpanded ? "Collapse All" : "Expand All";
 });
 
-// ── Switching Areas ───────────────────────────────────────────────────────────
-
-function populateSwitchingAreaSelect() {
-  const sel = $("#loc-switching-area");
-  const prev = sel.value;
-  sel.innerHTML = '<option value="">— no switching area —</option>' +
-    switchingAreas.map(a => `<option value="${a.id}">${a.name}</option>`).join("");
-  if (prev) sel.value = prev;
-}
-
-function renderSwitchingAreaList() {
-  const list = $("#switching-area-list");
-  if (!list) return;
-  if (!switchingAreas.length) {
-    list.innerHTML = '<p class="muted small">No switching areas defined.</p>';
-    return;
-  }
-  list.innerHTML = switchingAreas.map(a => {
-    const locBadges = (a.locations || []).map(l =>
-      `<span class="waybill-badge muted">${l.name}</span>`
-    ).join(" ");
-    const count = a.current_car_count ?? 0;
-    const cap = a.car_capacity ?? 10;
-    return `
-    <div class="layout-item layout-item-stack">
-      <div class="layout-item-main">
-        <span style="flex:1">
-          <strong>${a.name}</strong>
-          <span class="muted">${count}/${cap} cars</span>
-          ${locBadges}
-        </span>
-        <span>
-          <button class="outline small edit-sa" data-id="${a.id}">✏️</button>
-          <button class="outline small contrast del-sa" data-id="${a.id}" data-name="${a.name}">🗑</button>
-        </span>
-      </div>
-    </div>`;
-  }).join("");
-
-  list.querySelectorAll(".edit-sa").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const area = switchingAreas.find(a => a.id === parseInt(btn.dataset.id));
-      if (!area) return;
-      $("#sa-name").value = area.name;
-      $("#sa-capacity").value = area.car_capacity;
-      $("#sa-edit-id").value = area.id;
-      show($("#switching-area-form"));
-    });
-  });
-
-  list.querySelectorAll(".del-sa").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      if (!btn.dataset.confirm) {
-        btn.dataset.confirm = "1";
-        btn.classList.add("btn-confirming");
-        const orig = btn.innerHTML;
-        btn.textContent = "Sure?";
-        setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.innerHTML = orig; }, 3000);
-        return;
-      }
-      btn.classList.remove("btn-confirming");
-      delete btn.dataset.confirm;
-      try {
-        await api("DELETE", `/api/switching-areas/${btn.dataset.id}`);
-        await loadLayout();
-      } catch (err) {
-        showToast("Error: " + err.message, "error");
-      }
-    });
-  });
-}
-
-$("#btn-toggle-switching-areas").addEventListener("click", () => {
-  const body = $("#switching-area-body");
-  const btn = $("#btn-toggle-switching-areas");
-  const collapsed = body.classList.toggle("hidden");
-  btn.textContent = collapsed ? "▶" : "▼";
-});
-
-$("#btn-add-switching-area").addEventListener("click", () => {
-  $("#sa-name").value = "";
-  $("#sa-capacity").value = "10";
-  $("#sa-edit-id").value = "";
-  show($("#switching-area-body"));
-  $("#btn-toggle-switching-areas").textContent = "▼";
-  show($("#switching-area-form"));
-});
-$("#btn-cancel-switching-area").addEventListener("click", () => hide($("#switching-area-form")));
-
-$("#switching-area-form").addEventListener("submit", async e => {
-  e.preventDefault();
-  const editId = $("#sa-edit-id").value;
-  const body = {
-    name: $("#sa-name").value.trim(),
-    car_capacity: parseInt($("#sa-capacity").value),
-  };
-  try {
-    if (editId) {
-      await api("PUT", `/api/switching-areas/${editId}`, body);
-    } else {
-      await api("POST", "/api/switching-areas", body);
-    }
-    hide($("#switching-area-form"));
-    await loadLayout();
-  } catch (err) {
-    showToast("Error: " + err.message, "error");
-  }
-});
-
 // ── Layout Status strip ───────────────────────────────────────────────────────
 
 async function renderLayoutStatus() {
@@ -3236,7 +3345,7 @@ async function renderLayoutStatus() {
     ).join("");
   }
 
-  areasEl.innerHTML = status.switching_areas.map(a => {
+  areasEl.innerHTML = status.locations.map(a => {
     const pct = a.car_capacity > 0 ? Math.round((a.current_car_count / a.car_capacity) * 100) : 0;
     return `
     <div class="layout-status-row">
@@ -3683,7 +3792,7 @@ $("#btn-build-consist").addEventListener("click", async () => {
     try {
       const newPlan = await api("POST", "/api/dispatcher/build-plan", {
         origin_location_id: originId,
-        switching_area_id: areaId,
+        location_id: areaId,
         destination_location_id: destId,
       });
       track("dispatcher_plan_built");
@@ -3976,11 +4085,11 @@ $("#invite-send-btn")?.addEventListener("click", async () => {
     (async () => {
       [[locations, industries, waybillPool, carTypes, switchingAreas], settings] = await Promise.all([
         Promise.all([
-          api("GET", "/api/locations"),
+          api("GET", "/api/tracks"),
           api("GET", "/api/industries"),
           api("GET", "/api/waybills"),
           api("GET", "/api/car-types"),
-          api("GET", "/api/switching-areas"),
+          api("GET", "/api/locations"),
         ]),
         api("GET", "/api/settings"),
       ]);

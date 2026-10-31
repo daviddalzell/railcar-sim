@@ -402,118 +402,87 @@
       </div>
       <hr />
 
-      <div class="grid layout-grid">
-
-        <!-- Locations column -->
-        <div>
-          <div class="section-header">
-            <div class="section-header-title">
-              <button id="btn-toggle-locations" class="outline small">▼</button>
-              <h3>Locations</h3>
-            </div>
-            <button id="btn-add-location" class="outline small">+</button>
-          </div>
-          <div id="location-body">
-          <form id="location-form" class="hidden inline-form">
-            <input id="loc-name" type="text" placeholder="Location name" required />
-            <select id="loc-type">
-              <option value="yard">Yard</option>
-              <option value="industry">Industry</option>
-              <option value="staging">Staging</option>
-              <option value="storage">Storage</option>
-            </select>
-            <select id="loc-switching-area">
-              <option value="">— no switching area —</option>
-            </select>
-            <input id="loc-capacity" type="number" min="1" placeholder="Track capacity (optional)" style="width:14rem" />
-            <button type="submit" class="small">Save</button>
-            <button type="button" id="btn-cancel-location" class="outline secondary small">✕</button>
-            <input type="hidden" id="loc-edit-id" value="" />
-          </form>
-          <div id="location-list"></div>
-          </div><!-- /location-body -->
+      <!-- Location Tree -->
+      <div class="section-header">
+        <div class="section-header-title">
+          <h3>Locations &amp; Tracks</h3>
         </div>
-
-        <!-- Industries column -->
-        <div>
-          <div class="section-header">
-            <div class="section-header-title">
-              <button id="btn-toggle-industries" class="outline small">▼</button>
-              <h3>Industries</h3>
-            </div>
-            <button id="btn-add-industry" class="outline small">+</button>
-          </div>
-          <div id="industries-body">
-          <form id="industry-form" class="hidden inline-form">
-            <div class="suggest-row">
-              <input id="ind-name" type="text" placeholder="Industry name" required />
-              <button type="button" id="btn-suggest-industry" class="outline ai-suggest-btn">✨ AI Suggest</button>
-            </div>
-            <select id="ind-location">
-              <option value="">— no location —</option>
-            </select>
-            <label class="checkbox-label">
-              <input type="checkbox" id="ind-receiver" checked /> Receives loaded cars
-            </label>
-            <div id="ind-inbound-section">
-              <div id="ind-inbound-car-types" class="car-type-picker"></div>
-              <div class="commodity-wrap">
-                <input id="ind-inbound-commodities" type="text" placeholder="Inbound commodities (comma-sep)" autocomplete="off" />
-                <ul id="inbound-commodity-suggestions" class="suggestion-dropdown hidden"></ul>
-              </div>
-              <small id="inbound-commodity-warn" class="hidden error-msg"></small>
-            </div>
-            <label class="checkbox-label">
-              <input type="checkbox" id="ind-shipper" /> Ships loaded cars
-            </label>
-            <div id="ind-outbound-section" class="hidden">
-              <div id="ind-outbound-car-types" class="car-type-picker"></div>
-              <div class="commodity-wrap">
-                <input id="ind-outbound-commodities" type="text" placeholder="Outbound commodities (comma-sep)" autocomplete="off" />
-                <ul id="outbound-commodity-suggestions" class="suggestion-dropdown hidden"></ul>
-              </div>
-              <small id="outbound-commodity-warn" class="hidden error-msg"></small>
-            </div>
-            <label style="font-size:0.85rem;margin-bottom:0.2rem">Spot Number(s)</label>
-            <div id="ind-spot-numbers" class="spot-picker"></div>
-            <button type="submit" class="small">Save</button>
-            <button type="button" id="btn-cancel-industry" class="outline secondary small">✕</button>
-            <input type="hidden" id="ind-edit-id" value="" />
-          </form>
-          <div id="industry-list"></div>
-          </div><!-- /industries-body -->
-        </div>
-
+        <button id="btn-add-location-group" class="outline small">+ Group</button>
       </div>
+      <!-- Location group create/edit form -->
+      <form id="lg-form" class="hidden inline-form">
+        <input id="lg-name" type="text" placeholder="Group name (e.g. Millbrook Yard)" required />
+        <input id="lg-capacity" type="number" min="1" placeholder="Car capacity (optional)" style="width:14rem" />
+        <button type="submit" class="small">Save</button>
+        <button type="button" id="btn-cancel-lg" class="outline secondary small">✕</button>
+        <input type="hidden" id="lg-edit-id" />
+      </form>
+      <!-- Track create/edit form -->
+      <form id="track-form" class="hidden inline-form">
+        <input id="tf-name" type="text" placeholder="Track name" required />
+        <select id="tf-type">
+          <option value="yard">Yard</option>
+          <option value="industry">Industry</option>
+          <option value="staging">Staging</option>
+          <option value="storage">Storage</option>
+        </select>
+        <input id="tf-capacity" type="number" min="1" placeholder="Capacity (optional)" style="width:14rem" />
+        <input type="hidden" id="tf-group-id" />
+        <button type="submit" class="small">Save</button>
+        <button type="button" id="btn-cancel-track-form" class="outline secondary small">✕</button>
+        <input type="hidden" id="tf-edit-id" />
+      </form>
+      <div id="location-tree"></div>
 
-      <!-- Switching Areas -->
+      <!-- Industries -->
       <hr />
       <div>
         <div class="section-header">
           <div class="section-header-title">
-            <button id="btn-toggle-switching-areas" class="outline small" title="Collapse / expand">▶</button>
-            <h3>Switching Areas</h3>
+            <button id="btn-toggle-industries" class="outline small">▼</button>
+            <h3>Industries</h3>
           </div>
-          <button id="btn-add-switching-area" class="outline small">+</button>
+          <button id="btn-add-industry" class="outline small">+</button>
         </div>
-        <div id="switching-area-body" class="hidden">
-          <form id="switching-area-form" class="hidden inline-form">
-            <div class="grid">
-              <label>Area Name
-                <input id="sa-name" type="text" required />
-              </label>
-              <label>Car Capacity
-                <input id="sa-capacity" type="number" min="1" value="10" required />
-              </label>
+        <div id="industries-body">
+        <form id="industry-form" class="hidden inline-form">
+          <div class="suggest-row">
+            <input id="ind-name" type="text" placeholder="Industry name" required />
+            <button type="button" id="btn-suggest-industry" class="outline ai-suggest-btn">✨ AI Suggest</button>
+          </div>
+          <select id="ind-location">
+            <option value="">— no track —</option>
+          </select>
+          <label class="checkbox-label">
+            <input type="checkbox" id="ind-receiver" checked /> Receives loaded cars
+          </label>
+          <div id="ind-inbound-section">
+            <div id="ind-inbound-car-types" class="car-type-picker"></div>
+            <div class="commodity-wrap">
+              <input id="ind-inbound-commodities" type="text" placeholder="Inbound commodities (comma-sep)" autocomplete="off" />
+              <ul id="inbound-commodity-suggestions" class="suggestion-dropdown hidden"></ul>
             </div>
-            <div class="button-row">
-              <button type="submit" class="small">Save</button>
-              <button type="button" id="btn-cancel-switching-area" class="outline secondary small">✕</button>
-              <input type="hidden" id="sa-edit-id" value="" />
+            <small id="inbound-commodity-warn" class="hidden error-msg"></small>
+          </div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="ind-shipper" /> Ships loaded cars
+          </label>
+          <div id="ind-outbound-section" class="hidden">
+            <div id="ind-outbound-car-types" class="car-type-picker"></div>
+            <div class="commodity-wrap">
+              <input id="ind-outbound-commodities" type="text" placeholder="Outbound commodities (comma-sep)" autocomplete="off" />
+              <ul id="outbound-commodity-suggestions" class="suggestion-dropdown hidden"></ul>
             </div>
-          </form>
-          <div id="switching-area-list"></div>
-        </div>
+            <small id="outbound-commodity-warn" class="hidden error-msg"></small>
+          </div>
+          <label style="font-size:0.85rem;margin-bottom:0.2rem">Spot Number(s)</label>
+          <div id="ind-spot-numbers" class="spot-picker"></div>
+          <button type="submit" class="small">Save</button>
+          <button type="button" id="btn-cancel-industry" class="outline secondary small">✕</button>
+          <input type="hidden" id="ind-edit-id" value="" />
+        </form>
+        <div id="industry-list"></div>
+        </div><!-- /industries-body -->
       </div>
 
       <!-- Commodity → Car Type mapping -->
@@ -997,6 +966,20 @@
       <div id="location-block-car-list"></div>
       <footer>
         <button class="outline secondary" id="btn-location-block-close">OK — I'll move them</button>
+      </footer>
+    </article>
+  </dialog>
+
+  <dialog id="cascade-delete-dialog">
+    <article>
+      <header>
+        <button aria-label="Close" rel="prev" id="btn-close-cascade-delete"></button>
+        <h3 id="cascade-delete-title">Delete?</h3>
+      </header>
+      <p id="cascade-delete-desc"></p>
+      <footer>
+        <button class="contrast" id="btn-cascade-delete-confirm">Delete</button>
+        <button class="outline secondary" id="btn-cascade-delete-cancel">Cancel</button>
       </footer>
     </article>
   </dialog>
