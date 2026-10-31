@@ -16,7 +16,7 @@ from schemas import LocationCreate, TrackCreate
 router = APIRouter(prefix="/api", tags=["locations"])
 
 
-# ── Tracks (/api/tracks — primary new path) ───────────────────────────────────
+# ── Tracks (/api/tracks) ─────────────────────────────────────────────────────
 
 @router.get("/tracks")
 def list_tracks(db: Session = Depends(get_db)):
@@ -28,7 +28,7 @@ def create_track(data: TrackCreate, db: Session = Depends(get_db), _: dict = Dep
     track = Track(
         name=data.name,
         location_type=data.location_type,
-        location_id=data.switching_area_id,
+        location_id=data.location_id,
         car_capacity=data.car_capacity,
     )
     db.add(track)
@@ -44,7 +44,7 @@ def update_track(track_id: int, data: TrackCreate, db: Session = Depends(get_db)
         raise HTTPException(404, "Track not found")
     track.name = data.name
     track.location_type = data.location_type
-    track.location_id = data.switching_area_id
+    track.location_id = data.location_id
     track.car_capacity = data.car_capacity
     db.commit()
     return track_to_dict(track)
@@ -93,38 +93,16 @@ def delete_track(request: Request, track_id: int, merge_into_id: Optional[int] =
         return {"action": "deleted"}
 
 
-# ── Backward-compat aliases: /api/locations → Track CRUD (old frontend uses this path) ───
+# ── Locations (/api/locations) ────────────────────────────────────────────────
 
 @router.get("/locations")
-def list_locations_alias(db: Session = Depends(get_db)):
-    return list_tracks(db)
-
-
-@router.post("/locations", status_code=201)
-def create_location_alias(data: TrackCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
-    return create_track(data, db, _)
-
-
-@router.put("/locations/{track_id}")
-def update_location_alias(track_id: int, data: TrackCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
-    return update_track(track_id, data, db, _)
-
-
-@router.delete("/locations/{track_id}")
-def delete_location_alias(request: Request, track_id: int, merge_into_id: Optional[int] = None, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
-    return delete_track(request, track_id, merge_into_id, db, _)
-
-
-# ── Locations (/api/switching-areas — old path, kept for compat) ──────────────
-
-@router.get("/switching-areas")
-def list_switching_areas(db: Session = Depends(get_db)):
+def list_locations(db: Session = Depends(get_db)):
     areas = db.query(Location).all()
     return [location_group_to_dict(a, db) for a in areas]
 
 
-@router.post("/switching-areas", status_code=201)
-def create_switching_area(data: LocationCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+@router.post("/locations", status_code=201)
+def create_location(data: LocationCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     area = Location(name=data.name, car_capacity=data.car_capacity)
     db.add(area)
     db.commit()
@@ -132,8 +110,8 @@ def create_switching_area(data: LocationCreate, db: Session = Depends(get_db), _
     return location_group_to_dict(area, db)
 
 
-@router.put("/switching-areas/{area_id}")
-def update_switching_area(area_id: int, data: LocationCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+@router.put("/locations/{area_id}")
+def update_location(area_id: int, data: LocationCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     area = db.get(Location, area_id)
     if not area:
         raise HTTPException(404, "Location not found")
@@ -143,8 +121,8 @@ def update_switching_area(area_id: int, data: LocationCreate, db: Session = Depe
     return location_group_to_dict(area, db)
 
 
-@router.delete("/switching-areas/{area_id}", status_code=204)
-def delete_switching_area(request: Request, area_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+@router.delete("/locations/{area_id}", status_code=204)
+def delete_location(request: Request, area_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     from auth import is_demo
     if is_demo(request):
         raise HTTPException(403, "Deleting locations is disabled in the demo")

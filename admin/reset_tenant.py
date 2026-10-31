@@ -28,7 +28,6 @@ TENANT_TABLES = [
     "cars",
     "industries",
     "locations",
-    "switching_areas",
     "commodity_car_type_map",
     "car_types",
     "session_clock",

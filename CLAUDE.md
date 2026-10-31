@@ -246,12 +246,13 @@ DispatchPlan      (consist built by the virtual dispatcher)
 **PR 2 — `feature/layout-rename-frontend`** (not yet started)
 Branch off main after confirming production is stable post-PR-1. Scope:
 - Replace flat `renderSwitchingAreaList()` + `renderLocationList()` with a new `renderLocationTree()` — 3-level nested tree (Location → Track → Industries)
-- Mobile accordion + sticky breadcrumb + bottom-sheet forms
+- Touch layout (phone + iPad, portrait and landscape): accordion tree + bottom-sheet forms at a single breakpoint (≤1024px); desktop split is a future enhancement
 - Update all API calls: `/api/switching-areas` → `/api/locations`, `/api/locations` → `/api/tracks`
 - Remove backward-compat response keys (`switching_area_id`, `switching_areas` in layout status)
 - Remove backward-compat endpoint aliases from `routers/locations.py`
 - Waybill industry `<select>` → `<optgroup>` grouped by Location
-- UX: undo toast on delete (5s), localStorage collapse state, inline rename for Location/Track names
+- UX: confirmation dialog for all deletes with cascade warning (e.g. "Delete Springfield? This will also remove 3 tracks and 7 industries."); localStorage collapse state; click-to-edit inline rename for Location and Track names
+- **Add `app.js` cache-busting** — inject git SHA into template context at startup; render `<script src="/static/app.js?v={{ asset_version }}">` so browsers never serve stale JS against a new backend after the backward-compat aliases are removed. Pattern: read SHA once with `subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])` in `main.py`, pass as `asset_version` to all `TemplateResponse` calls.
 
 ---
 

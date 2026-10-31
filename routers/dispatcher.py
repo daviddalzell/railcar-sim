@@ -106,7 +106,7 @@ def _tenant_slug(request: Request) -> str:
 
 @router.post("/dispatcher/build-plan")
 def build_dispatch_plan(request: Request, data: DispatchBuildRequest, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
-    area = db.get(Location, data.switching_area_id)
+    area = db.get(Location, data.location_id)
     if not area:
         raise HTTPException(404, "Location not found")
     origin = db.get(Track, data.origin_location_id)
@@ -117,13 +117,13 @@ def build_dispatch_plan(request: Request, data: DispatchBuildRequest, db: Sessio
         raise HTTPException(404, "Destination track not found")
 
     consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
-        data.origin_location_id, data.switching_area_id, data.destination_location_id, db
+        data.origin_location_id, data.location_id, data.destination_location_id, db
     )
 
     plan = DispatchPlan(
         plan_type="switching",
         origin_location_id=data.origin_location_id,
-        location_id=data.switching_area_id,
+        location_id=data.location_id,
         destination_location_id=data.destination_location_id,
         setout_ids_json=json.dumps([c.id for c in consist_inbound]),
         pickup_ids_json=json.dumps([c.id for c in outbound]),

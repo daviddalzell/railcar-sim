@@ -83,7 +83,7 @@ def init_db():
         except Exception:
             pass
         try:
-            conn.execute(text("ALTER TABLE locations ADD COLUMN switching_area_id INTEGER REFERENCES switching_areas(id)"))
+            conn.execute(text("ALTER TABLE tracks ADD COLUMN location_id INTEGER REFERENCES locations(id)"))
             conn.commit()
         except Exception:
             pass

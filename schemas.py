@@ -24,10 +24,10 @@ class CarUpdate(BaseModel):
 
 
 class TrackCreate(BaseModel):
-    """Create/update a Track (formerly Location)."""
+    """Create/update a Track."""
     name: str
     location_type: str = "yard"
-    switching_area_id: Optional[int] = None  # kept for backward compat; maps to Track.location_id
+    location_id: Optional[int] = None
     car_capacity: Optional[int] = None
 
 
@@ -39,7 +39,7 @@ class LocationCreate(BaseModel):
 
 class DispatchBuildRequest(BaseModel):
     origin_location_id: int
-    switching_area_id: int  # kept for backward compat; maps to DispatchPlan.location_id
+    location_id: int
     destination_location_id: int
 
 
