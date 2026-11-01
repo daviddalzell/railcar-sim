@@ -2606,23 +2606,14 @@ function renderIndustryList() {
   });
 
   $$(".del-ind").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      if (!btn.dataset.confirm) {
-        btn.dataset.confirm = "1";
-        btn.classList.add("btn-confirming");
-        const orig = btn.innerHTML;
-        btn.textContent = "Sure?";
-        setTimeout(() => { delete btn.dataset.confirm; btn.classList.remove("btn-confirming"); btn.innerHTML = orig; }, 3000);
-        return;
-      }
-      btn.classList.remove("btn-confirming");
-      delete btn.dataset.confirm;
-      try {
-        await api("DELETE", `/api/industries/${btn.dataset.id}`);
-        await loadLayout();
-      } catch (err) {
-        showToast("Error: " + err.message, "error");
-      }
+    btn.addEventListener("click", () => {
+      const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
+      if (!ind) return;
+      openCascadeDeleteDialog(
+        `Delete "${ind.name}"?`,
+        "Waybills that reference this industry are also removed or unassigned.",
+        () => api("DELETE", `/api/industries/${ind.id}`).then(loadLayout)
+      );
     });
   });
 
@@ -3465,7 +3456,7 @@ function renderConsistCard(plan) {
   const instrLabel = { free: "Notes", timetable_train_order: "Train Order", track_warrant: "Track Warrant" }[opsMode] || "Notes";
 
   const route = plan.origin_name && plan.destination_name
-    ? `<div class="muted small consist-route">${plan.origin_name}${plan.switching_area_name ? ` → ${plan.switching_area_name}` : ""} → ${plan.destination_name}</div>`
+    ? `<div class="muted small consist-route">${plan.origin_name}${plan.location_name ? ` → ${plan.location_name}` : ""} → ${plan.destination_name}</div>`
     : "";
 
   const assignedElsewhere = new Set(
@@ -3781,7 +3772,7 @@ $("#btn-build-consist").addEventListener("click", async () => {
   const originId = parseInt($("#disp-origin").value);
   const areaId   = parseInt($("#disp-area").value);
   const destId   = parseInt($("#disp-destination").value);
-  if (!originId || !areaId || !destId) { showToast("Select an origin, switching area, and destination first.", "warning"); return; }
+  if (!originId || !areaId || !destId) { showToast("Select an origin, location, and destination first.", "warning"); return; }
   const btn = $("#btn-build-consist");
   await withLoading(btn, "Building…", async () => {
     try {
