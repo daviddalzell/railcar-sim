@@ -1741,3 +1741,16 @@ button.small {
 }
 /* Push page content up so the bar never covers the last element */
 body { padding-bottom: 3.5rem; }
+
+/* ── Full-viewport overlay dialogs (demo welcome, AI notices) ──────────────── */
+/* These centre their custom card via flex. The flex centring must apply ONLY
+   when open — setting display:flex inline overrides the UA
+   `dialog:not([open]) { display: none }` rule, which leaves the dialog painted
+   after .close() and makes its buttons appear unresponsive. */
+#demo-welcome-dialog[open],
+#ai-notice-dialog[open],
+#ai-region-dialog[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
