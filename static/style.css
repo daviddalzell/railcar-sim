@@ -1754,3 +1754,9 @@ body { padding-bottom: 3.5rem; }
   align-items: center;
   justify-content: center;
 }
+
+/* "Continue to Demo" stays inactive until a valid email is entered. */
+#btn-demo-welcome-continue:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

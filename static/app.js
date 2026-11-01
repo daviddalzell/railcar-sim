@@ -4052,3 +4052,16 @@ document.getElementById("btn-demo-welcome-continue")?.addEventListener("click", 
 document.getElementById("btn-demo-welcome-skip")?.addEventListener("click", () => {
   document.getElementById("demo-welcome-dialog")?.close();
 });
+
+// Enable "Continue to Demo" only when a valid email is entered.
+// Users without an email use "No thanks, just explore" to enter.
+(() => {
+  const demoEmail = document.getElementById("demo-lead-email");
+  const demoContinue = document.getElementById("btn-demo-welcome-continue");
+  if (!demoEmail || !demoContinue) return;
+  const syncDemoContinue = () => {
+    demoContinue.disabled = !(demoEmail.value.trim() && demoEmail.checkValidity());
+  };
+  demoEmail.addEventListener("input", syncDemoContinue);
+  syncDemoContinue();
+})();
