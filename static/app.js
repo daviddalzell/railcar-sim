@@ -1277,6 +1277,19 @@ function renderWaybillPool() {
   });
 }
 
+// Build track <option> markup grouped by Location group via <optgroup>.
+// placeholderHtml is the leading empty option. filterFn selects which tracks appear.
+function buildTrackOptgroups(placeholderHtml, filterFn = () => true) {
+  const grouped = switchingAreas.map(g => {
+    const tracks = locations.filter(l => l.location_id === g.id && filterFn(l));
+    if (!tracks.length) return "";
+    return `<optgroup label="${g.name}">${tracks.map(l => `<option value="${l.id}">${l.name}</option>`).join("")}</optgroup>`;
+  }).join("");
+  const ungrouped = locations.filter(l => !l.location_id && filterFn(l))
+    .map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+  return placeholderHtml + grouped + ungrouped;
+}
+
 function openWaybillEditDialog(waybillId = null) {
   editingWaybillId = waybillId;
   const w = waybillId ? waybillPool.find(x => x.id === waybillId) : null;
@@ -1286,16 +1299,7 @@ function openWaybillEditDialog(waybillId = null) {
   $("#we-commodity").value = w?.commodity || "";
   $("#we-empty").checked = w?.is_empty || false;
 
-  const buildTrackOptions = () => {
-    const grouped = switchingAreas.map(g => {
-      const tracks = locations.filter(l => l.location_id === g.id);
-      if (!tracks.length) return "";
-      return `<optgroup label="${g.name}">${tracks.map(l => `<option value="${l.id}">${l.name}</option>`).join("")}</optgroup>`;
-    }).join("");
-    const ungrouped = locations.filter(l => !l.location_id)
-      .map(l => `<option value="${l.id}">${l.name}</option>`).join("");
-    return '<option value="">—</option>' + grouped + ungrouped;
-  };
+  const buildTrackOptions = () => buildTrackOptgroups('<option value="">—</option>');
   const buildIndOptions = () => {
     const grouped = switchingAreas.map(g => {
       const tracks = locations.filter(l => l.location_id === g.id);
@@ -2702,15 +2706,7 @@ function getSpotPickerValues(el) {
 }
 
 function populateIndustryLocationSelect() {
-  const sel = $("#ind-location");
-  const grouped = switchingAreas.map(g => {
-    const tracks = locations.filter(l => l.location_id === g.id);
-    if (!tracks.length) return "";
-    return `<optgroup label="${g.name}">${tracks.map(l => `<option value="${l.id}">${l.name}</option>`).join("")}</optgroup>`;
-  }).join("");
-  const ungrouped = locations.filter(l => !l.location_id)
-    .map(l => `<option value="${l.id}">${l.name}</option>`).join("");
-  sel.innerHTML = '<option value="">— no track —</option>' + grouped + ungrouped;
+  $("#ind-location").innerHTML = buildTrackOptgroups('<option value="">— no track —</option>');
 }
 
 function refreshSpotPickerForLocation(selectedStr = "") {
@@ -3396,9 +3392,8 @@ async function loadDispatcherPanel() {
   const originSel = $("#disp-origin");
   const areaSel = $("#disp-area");
   const destSel = $("#disp-destination");
-  const yardLocs = locations.filter(l => l.location_type === "staging" || l.location_type === "yard");
-  const yardOptions = '<option value="">— select —</option>' +
-    yardLocs.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+  const yardFilter = l => l.location_type === "staging" || l.location_type === "yard";
+  const yardOptions = buildTrackOptgroups('<option value="">— select —</option>', yardFilter);
   originSel.innerHTML = yardOptions;
   destSel.innerHTML = yardOptions;
   areaSel.innerHTML = '<option value="">— select area —</option>' +
