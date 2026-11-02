@@ -16,16 +16,21 @@ _supabase = None
 def _get_supabase():
     global _supabase
     if _supabase is None:
-        from supabase import create_client
+        import httpx
+        from supabase import ClientOptions, create_client
         url = os.environ.get("SUPABASE_URL", "")
         key = os.environ.get("SUPABASE_KEY", "")
         if not url or not key:
             raise RuntimeError("SUPABASE_URL and SUPABASE_KEY must be set when AUTH_DISABLED is not set")
-        _supabase = create_client(url, key)
+        # Explicit timeout so a slow Supabase response cannot hang the request.
+        _supabase = create_client(
+            url, key,
+            options=ClientOptions(httpx_client=httpx.Client(timeout=10)),
+        )
     return _supabase
 
 
-async def get_current_user(
+def get_current_user(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
 ) -> dict:
@@ -33,6 +38,10 @@ async def get_current_user(
 
     When AUTH_DISABLED is set (local dev), returns a synthetic admin user
     without touching Supabase at all.
+
+    Sync on purpose: this makes blocking Supabase and DB calls. FastAPI runs a
+    sync dependency in a threadpool, so a slow call ties up one thread. An async
+    def would run those calls on the event loop and could freeze the worker.
     """
     if os.environ.get("AUTH_DISABLED"):
         return {"id": "local", "email": "local@dev", "role": "admin", "tenant_slug": "local"}
