@@ -250,15 +250,46 @@
     <div class="timeline">
 
       <div class="entry shipped">
-        <div class="entry-date">Oct 2026</div>
+        <div class="entry-date">Nov 2026</div>
         <div class="entry-body">
-          <div class="badge badge-shipped">Shipping</div>
-          <div class="entry-title">Clearer Layout Setup: Locations, Tracks &amp; Industries</div>
+          <div class="badge badge-shipped">Shipped</div>
+          <div class="entry-title">Layout Setup is now a nested tree</div>
           <div class="entry-desc">
-            <p>The "Switching Area" / "Location" naming is being replaced with vocabulary that matches how modellers actually talk about their layouts. After community feedback, the final names are <strong>Location</strong> (a town, yard complex, or staging area) and <strong>Track</strong> (an individual siding or track within it).</p>
-            <p>The hierarchy reads: <strong>Location → Tracks → Industries</strong>. Nothing changes about how your layout operates — this is a rename and a UI reorganisation. The backend has shipped; the new nested tree UI is rolling out in the next update.</p>
+            <p>Layout Setup is reorganised around how modellers talk about their layouts. Each <strong>Location</strong> (a town, yard complex, or staging area) expands to show its <strong>Tracks</strong>, and each track shows its <strong>Industries</strong>. Your collapse state is remembered between visits.</p>
+            <ul>
+              <li><strong>Click to rename</strong> — click a location or track name to edit it in place.</li>
+              <li><strong>Grouped dropdowns</strong> — track pickers in waybills, industries, and the dispatcher now group tracks under their location.</li>
+              <li><strong>Safer deletes</strong> — deleting a location, track, or industry shows a confirmation with a cascade warning first.</li>
+              <li><strong>Phone &amp; iPad</strong> — the tree and its forms adapt to touch screens.</li>
+            </ul>
+            <p>This completes the "Switching Area → Location / Track" rename. Nothing changes about how your layout operates.</p>
           </div>
           <a class="rfc-link" href="/updates/rfc-layout-setup-rename">See the original proposal →</a>
+        </div>
+      </div>
+
+      <div class="entry shipped">
+        <div class="entry-date">Nov 2026</div>
+        <div class="entry-body">
+          <div class="badge badge-shipped">Shipped</div>
+          <div class="entry-title">Send feedback from inside the app</div>
+          <div class="entry-desc">
+            <p>A new <strong>Send feedback</strong> link in the navigation lets you report a problem or share an idea without leaving the app. It attaches your layout, the page you were on, and your browser automatically — so there is no need to join another site.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="entry shipped">
+        <div class="entry-date">Nov 2026</div>
+        <div class="entry-body">
+          <div class="badge badge-fix">Fix</div>
+          <div class="entry-title">Reliability &amp; polish</div>
+          <div class="entry-desc">
+            <ul>
+              <li><strong>Faster, more reliable</strong> — resolved intermittent slowness some users saw. The sign-in path now has a timeout and can no longer tie up the app.</li>
+              <li><strong>Dialogs close properly</strong> — fixed pop-up dialogs that would not dismiss when you clicked a button.</li>
+            </ul>
+          </div>
         </div>
       </div>
 
