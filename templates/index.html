@@ -1366,7 +1366,7 @@
   <dialog id="feedback-dialog">
     <article>
       <header>
-        <button aria-label="Close" rel="prev"></button>
+        <button aria-label="Close" rel="prev" id="feedback-close-x"></button>
         <h3>Send feedback</h3>
       </header>
       <p class="muted" style="font-size:0.88rem;margin-bottom:1rem">
@@ -1385,8 +1385,8 @@
         <p class="muted" style="font-size:0.88rem">We&rsquo;ll look into it shortly.</p>
       </div>
       <footer>
-        <button class="outline secondary" rel="prev">Cancel</button>
-        <button id="btn-submit-feedback" class="outline">Send</button>
+        <button type="button" class="outline secondary" id="feedback-cancel">Cancel</button>
+        <button type="button" id="btn-submit-feedback" class="outline">Send</button>
       </footer>
     </article>
   </dialog>
@@ -1394,6 +1394,13 @@
   <script src="/static/app.js?v={{ asset_version }}"></script>
   <script>
     // Feedback modal
+    ["feedback-close-x", "feedback-cancel"].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener("click", function() {
+        document.getElementById("feedback-dialog").close();
+      });
+    });
+
     document.getElementById("btn-open-feedback").addEventListener("click", function(e) {
       e.preventDefault();
       document.getElementById("feedback-form").hidden = false;
