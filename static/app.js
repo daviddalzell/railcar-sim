@@ -2307,22 +2307,33 @@ function renderLocationTree() {
 
   const trackRow = (t) => {
     const inds = industries.filter(i => i.location_id === t.id);
-    const indRows = inds.map(i => `
-      <div class="tree-industry-row">
-        <span>🏭 ${i.name}</span>
-      </div>`).join("");
+    const type = t.location_type || "yard";
+    const tkey = `track-${t.id}`;
+    const tCollapsed = !!collapsed[tkey];
+    const indRows = inds.length
+      ? inds.map(i => `
+        <div class="tree-industry-row" data-ind-id="${i.id}">
+          <span class="ind-bullet">•</span>
+          <span class="ind-name">${i.name}</span>
+          <span class="tree-actions">
+            <button class="tree-icon-btn edit-ind-tree" data-id="${i.id}" title="Edit">✏️</button>
+            <button class="tree-icon-btn del-ind-tree" data-id="${i.id}" title="Delete">🗑</button>
+          </span>
+        </div>`).join("")
+      : `<div class="tree-industry-empty"><em>No industries on this track</em></div>`;
     return `
       <div class="tree-track" data-track-id="${t.id}">
         <div class="tree-track-row">
+          <button class="tree-caret track-caret" data-tkey="${tkey}" aria-label="Toggle">${tCollapsed ? "▶" : "▼"}</button>
           <span class="tree-track-name" data-id="${t.id}">${t.name}</span>
-          <em class="muted small">${t.location_type}</em>
-          <span class="muted small">${t.current_car_count ?? 0}${t.car_capacity ? "/" + t.car_capacity : ""} cars</span>
+          <span class="track-type-badge track-type-${type}">${type}</span>
           <span class="tree-actions">
-            <button class="outline small edit-track" data-id="${t.id}">✏️</button>
-            <button class="outline small contrast del-track" data-id="${t.id}">🗑</button>
+            <button class="tree-add-muted add-industry-to-track" data-id="${t.id}">+ Industry</button>
+            <button class="tree-icon-btn edit-track" data-id="${t.id}" title="Edit">✏️</button>
+            <button class="tree-icon-btn del-track" data-id="${t.id}" title="Delete">🗑</button>
           </span>
         </div>
-        ${inds.length ? `<div class="tree-industries">${indRows}</div>` : ""}
+        <div class="tree-industries ${tCollapsed ? "hidden" : ""}" data-tkey="${tkey}">${indRows}</div>
       </div>`;
   };
 
@@ -2332,23 +2343,24 @@ function renderLocationTree() {
     const isCollapsed = !!collapsed[key];
     const count = group ? (group.current_car_count ?? 0) : null;
     const cap = group ? (group.car_capacity ?? null) : null;
+    const full = group && cap != null && count >= cap;
     return `
       <div class="tree-group" data-group-key="${key}">
         <div class="tree-group-row">
-          <button class="outline small tree-toggle" data-key="${key}">${isCollapsed ? "▶" : "▼"}</button>
+          <button class="tree-caret group-caret" data-key="${key}" aria-label="Toggle">${isCollapsed ? "▶" : "▼"}</button>
           ${group
             ? `<span class="tree-group-name" data-id="${group.id}">${group.name}</span>
-               <span class="muted small">${count}${cap ? "/" + cap : ""} cars</span>`
-            : `<span class="muted"><em>Ungrouped tracks</em></span>`}
+               <span class="car-count-pill${full ? " full" : ""}">${count}${cap != null ? " / " + cap : ""} cars</span>`
+            : `<span class="tree-group-name muted"><em>Ungrouped tracks</em></span>`}
           <span class="tree-actions">
-            <button class="outline small add-track-to-group" data-group-id="${group ? group.id : ""}">+ Track</button>
+            <button class="tree-add add-track-to-group" data-group-id="${group ? group.id : ""}">+ Track</button>
             ${group ? `
-              <button class="outline small edit-group" data-id="${group.id}">✏️</button>
-              <button class="outline small contrast del-group" data-id="${group.id}">🗑</button>` : ""}
+              <button class="tree-icon-btn edit-group" data-id="${group.id}" title="Edit">✏️</button>
+              <button class="tree-icon-btn del-group" data-id="${group.id}" title="Delete">🗑</button>` : ""}
           </span>
         </div>
         <div class="tree-group-body ${isCollapsed ? "hidden" : ""}" data-key="${key}">
-          ${tracks.length ? tracks.map(trackRow).join("") : '<p class="muted small">No tracks yet.</p>'}
+          ${tracks.length ? tracks.map(trackRow).join("") : '<p class="muted small tree-empty">No tracks yet.</p>'}
         </div>
       </div>`;
   };
@@ -2358,12 +2370,12 @@ function renderLocationTree() {
     (ungroupedTracks.length ? groupBlock(null) : "");
 
   if (!switchingAreas.length && !ungroupedTracks.length) {
-    root.innerHTML = emptyState("📍", "No locations yet — add a group with the + Group button.");
+    root.innerHTML = emptyState("📍", "No locations yet — add a location with the + Location button.");
     return;
   }
 
-  // Collapse toggles
-  root.querySelectorAll(".tree-toggle").forEach(btn => {
+  // Location collapse
+  root.querySelectorAll(".group-caret").forEach(btn => {
     btn.addEventListener("click", () => {
       const key = btn.dataset.key;
       const body = root.querySelector(`.tree-group-body[data-key="${key}"]`);
@@ -2371,6 +2383,44 @@ function renderLocationTree() {
       body.classList.toggle("hidden", nowCollapsed);
       btn.textContent = nowCollapsed ? "▶" : "▼";
       setTreeCollapsed(key, nowCollapsed);
+    });
+  });
+
+  // Track collapse
+  root.querySelectorAll(".track-caret").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tkey = btn.dataset.tkey;
+      const body = root.querySelector(`.tree-industries[data-tkey="${tkey}"]`);
+      const nowCollapsed = !body.classList.contains("hidden");
+      body.classList.toggle("hidden", nowCollapsed);
+      btn.textContent = nowCollapsed ? "▶" : "▼";
+      setTreeCollapsed(tkey, nowCollapsed);
+    });
+  });
+
+  // Add industry to a track (opens the industry form pre-filled)
+  root.querySelectorAll(".add-industry-to-track").forEach(btn => {
+    btn.addEventListener("click", () => openIndustryForm(parseInt(btn.dataset.id)));
+  });
+
+  // Edit industry from the tree
+  root.querySelectorAll(".edit-ind-tree").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
+      if (ind) openIndustryEdit(ind);
+    });
+  });
+
+  // Delete industry from the tree
+  root.querySelectorAll(".del-ind-tree").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
+      if (!ind) return;
+      openCascadeDeleteDialog(
+        `Delete "${ind.name}"?`,
+        "Waybills that reference this industry are also removed or unassigned.",
+        () => api("DELETE", `/api/industries/${ind.id}`).then(loadLayout)
+      );
     });
   });
 
@@ -2598,19 +2648,7 @@ function renderIndustryList() {
   $$(".edit-ind").forEach(btn => {
     btn.addEventListener("click", () => {
       const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
-      if (!ind) return;
-      $("#ind-name").value = ind.name;
-      $("#ind-location").value = ind.location_id || "";
-      refreshSpotPickerForLocation(ind.spot_numbers || "");
-      populateCarTypeMultiSelect($("#ind-inbound-car-types"), ind.inbound_car_types || ind.accepted_car_types || "");
-      $("#ind-inbound-commodities").value = ind.commodities || "";
-      populateCarTypeMultiSelect($("#ind-outbound-car-types"), ind.outbound_car_types || "");
-      $("#ind-outbound-commodities").value = ind.outbound_commodities || "";
-      $("#ind-edit-id").value = ind.id;
-      roleToCheckboxes(ind.industry_role || "consumer");
-      hide($("#inbound-commodity-warn"));
-      hide($("#outbound-commodity-warn"));
-      show($("#industry-form"));
+      if (ind) openIndustryEdit(ind);
     });
   });
 
@@ -2770,20 +2808,46 @@ $("#track-form").addEventListener("submit", async e => {
   }
 });
 
-$("#btn-add-industry").addEventListener("click", () => {
+// Open the industry form for a new industry, optionally pre-attached to a track.
+function openIndustryForm(trackId = null) {
   $("#ind-name").value = "";
-  $("#ind-location").value = "";
   populateCarTypeMultiSelect($("#ind-inbound-car-types"), "");
   $("#ind-inbound-commodities").value = "";
   populateCarTypeMultiSelect($("#ind-outbound-car-types"), "");
   $("#ind-outbound-commodities").value = "";
-  populateSpotPicker($("#ind-spot-numbers"), 0, "");
   $("#ind-edit-id").value = "";
   roleToCheckboxes("consumer");
   hide($("#inbound-commodity-warn"));
   hide($("#outbound-commodity-warn"));
+  if (trackId) {
+    $("#ind-location").value = String(trackId);
+    refreshSpotPickerForLocation("");
+  } else {
+    $("#ind-location").value = "";
+    populateSpotPicker($("#ind-spot-numbers"), 0, "");
+  }
   show($("#industry-form"));
-});
+  $("#industry-form").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// Open the industry form to edit an existing industry.
+function openIndustryEdit(ind) {
+  $("#ind-name").value = ind.name;
+  $("#ind-location").value = ind.location_id || "";
+  refreshSpotPickerForLocation(ind.spot_numbers || "");
+  populateCarTypeMultiSelect($("#ind-inbound-car-types"), ind.inbound_car_types || ind.accepted_car_types || "");
+  $("#ind-inbound-commodities").value = ind.commodities || "";
+  populateCarTypeMultiSelect($("#ind-outbound-car-types"), ind.outbound_car_types || "");
+  $("#ind-outbound-commodities").value = ind.outbound_commodities || "";
+  $("#ind-edit-id").value = ind.id;
+  roleToCheckboxes(ind.industry_role || "consumer");
+  hide($("#inbound-commodity-warn"));
+  hide($("#outbound-commodity-warn"));
+  show($("#industry-form"));
+  $("#industry-form").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+$("#btn-add-industry").addEventListener("click", () => openIndustryForm());
 $("#btn-cancel-industry").addEventListener("click", () => hide($("#industry-form")));
 
 $("#btn-suggest-industry").addEventListener("click", async () => {
