@@ -232,6 +232,14 @@ Key patterns:
 - `withLoading(btn, label, fn)` — disables a button, shows spinner, re-enables after `fn` resolves
 - `track(eventName, params)` — Google Analytics event helper
 
+### Dialogs
+
+Native `<dialog>` elements. Three rules prevent the recurring "dialog won't dismiss" bugs (see `tests/test_dialogs.py`, which enforces the first two):
+
+- **Never set `display` inline on a `<dialog>`.** It overrides the browser rule `dialog:not([open]) { display: none }`, so `.close()` leaves the dialog painted. Put any `display` rule in an `[open]`-scoped CSS selector instead (e.g. `#my-dialog[open] { display: flex }`).
+- **Close buttons use `rel="prev"` (the empty header ×) — never on a button with text.** PicoCSS styles a `rel="prev"` button as the close-icon, so a text button renders squished. For a text "Cancel", use a plain `<button type="button">` with `class="dialog-close"`.
+- **Do not hand-wire close handlers.** A delegated handler in `static/app.js` closes the nearest `<dialog>` for any `rel="prev"` or `.dialog-close` click. Give new dialogs one of those controls and dismissal works automatically.
+
 ---
 
 ## Domain model

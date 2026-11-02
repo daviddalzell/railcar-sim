@@ -204,6 +204,14 @@ async function api(method, path, body) {
 function hide(el) { el.classList.add("hidden"); }
 function show(el) { el.classList.remove("hidden"); }
 
+// Guard: one delegated handler closes the nearest <dialog> for any close
+// control — a `rel="prev"` button (the header × convention) or a `.dialog-close`
+// element. Dialogs then dismiss even when a per-dialog handler is missing.
+document.addEventListener("click", e => {
+  const closer = e.target.closest('dialog [rel="prev"], dialog .dialog-close');
+  if (closer) closer.closest("dialog")?.close();
+});
+
 function showToast(message, type = "info", duration = 3500) {
   const openDialog = document.querySelector("dialog[open]");
   const container = openDialog
