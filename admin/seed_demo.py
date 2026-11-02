@@ -281,7 +281,7 @@ def seed_demo():
         plan = DispatchPlan(
             plan_type="switching",
             origin_location_id=loc_staging.id,
-            switching_area_id=yard_area.id,
+            location_id=yard_area.id,
             destination_location_id=loc_yard.id,
             setout_ids_json=json.dumps(setout_ids),
             pickup_ids_json=json.dumps(pickup_ids),

@@ -77,23 +77,19 @@ def industry_to_dict(i: Industry) -> dict:
 
 
 def track_to_dict(t: Track) -> dict:
-    """Serialize a Track (formerly Location). Keeps switching_area_id key for old-frontend compat."""
     return {
         "id": t.id,
         "name": t.name,
         "location_type": t.location_type,
-        "switching_area_id": t.location_id,  # backward compat: old frontend reads this key
         "location_id": t.location_id,
         "car_capacity": t.car_capacity,
     }
 
 
-# Alias kept so any remaining callers don't break during transition
 location_to_dict = track_to_dict
 
 
 def location_group_to_dict(area: Location, db: Session) -> dict:
-    """Serialize a Location (formerly SwitchingArea). Keeps 'locations' list key for old-frontend compat."""
     track_ids = [t.id for t in area.tracks]
     current_count = db.query(Car).filter(Car.current_location_id.in_(track_ids)).count() if track_ids else 0
     dispatch_ids = {t.id for t in db.query(Track).filter(
@@ -115,12 +111,10 @@ def location_group_to_dict(area: Location, db: Session) -> dict:
         "car_capacity": area.car_capacity,
         "current_car_count": current_count,
         "available_spots": available_spots,
-        # "locations" key kept for old-frontend backward compat (listed the sub-tracks)
-        "locations": [{"id": t.id, "name": t.name, "location_type": t.location_type} for t in area.tracks],
+        "tracks": [{"id": t.id, "name": t.name, "location_type": t.location_type} for t in area.tracks],
     }
 
 
-# Alias so old callers (operations.py, dispatcher status) keep working
 switching_area_to_dict = location_group_to_dict
 
 
@@ -154,10 +148,8 @@ def dispatch_plan_to_dict(plan: DispatchPlan, db: Session) -> dict:
         "status": plan.status or "draft",
         "origin_location_id": plan.origin_location_id,
         "origin_name": origin.name if origin else None,
-        # switching_area_id key kept for old-frontend backward compat
-        "switching_area_id": plan.location_id,
         "location_id": plan.location_id,
-        "switching_area_name": area.name if area else None,
+        "location_name": area.name if area else None,
         "destination_location_id": plan.destination_location_id,
         "destination_name": destination.name if destination else None,
         "setouts": setouts,

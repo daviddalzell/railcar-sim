@@ -51,8 +51,7 @@ def layout_status(db: Session = Depends(get_db)):
             "cars": [_enrich_car_for_status(c) for c in cars],
         })
 
-    # "switching_areas" key kept for old-frontend backward compat
-    return {"switching_areas": area_dicts, "yards": yard_dicts}
+    return {"locations": area_dicts, "yards": yard_dicts}
 
 
 @router.get("/operations")

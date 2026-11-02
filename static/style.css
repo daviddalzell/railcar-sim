@@ -617,6 +617,88 @@ header nav a.active {
   flex-shrink: 0;
 }
 
+/* ── Location Tree ───────────────────────────────────────────────────────── */
+.tree-group {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--card-radius);
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+}
+
+.tree-group-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--pico-card-background-color, #fafafa);
+}
+
+.tree-group-name {
+  font-weight: 600;
+  cursor: text;
+  flex: 1;
+}
+
+.tree-group-row .tree-actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.tree-group-body {
+  padding: 0.25rem 0.6rem 0.4rem 1.5rem;
+}
+
+.tree-track {
+  border-top: 1px solid var(--border-subtle);
+  padding: 0.3rem 0;
+}
+
+.tree-track:first-child {
+  border-top: none;
+}
+
+.tree-track-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.tree-track-name {
+  cursor: text;
+  font-weight: 500;
+}
+
+.tree-track-row .tree-actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.tree-industries {
+  padding: 0.2rem 0 0.2rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tree-industry-row {
+  font-size: 0.82rem;
+  color: var(--pico-muted-color);
+}
+
+.inline-rename-input {
+  font: inherit;
+  font-weight: inherit;
+  padding: 0.1rem 0.3rem;
+  margin: 0;
+  width: auto;
+  min-width: 6rem;
+}
+
 /* ── Waybill pool ────────────────────────────────────────────────────────── */
 .pool-item {
   display: grid;
@@ -1759,4 +1841,31 @@ body { padding-bottom: 3.5rem; }
 #btn-demo-welcome-continue:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* ── Layout tab: touch bottom-sheet forms (phone + iPad, single breakpoint) ── */
+@media (max-width: 1024px) {
+  #tab-layout #lg-form,
+  #tab-layout #track-form,
+  #tab-layout #industry-form {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 200;
+    margin: 0;
+    border-radius: 12px 12px 0 0;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.2);
+  }
+
+  #tab-layout #lg-form.hidden,
+  #tab-layout #track-form.hidden,
+  #tab-layout #industry-form.hidden {
+    display: none;
+  }
+
+  .tree-group-row,
+  .tree-track-row {
+    flex-wrap: wrap;
+  }
 }

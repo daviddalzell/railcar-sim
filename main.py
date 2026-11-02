@@ -70,6 +70,14 @@ _Path("uploads").mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 templates = Jinja2Templates(directory="templates")
 
+import subprocess as _sp
+try:
+    _ASSET_VERSION = _sp.check_output(
+        ["git", "rev-parse", "--short", "HEAD"], stderr=_sp.DEVNULL
+    ).decode().strip()
+except Exception:
+    _ASSET_VERSION = os.environ.get("FLY_IMAGE_REF", "1").split(":")[-1][:12]
+
 
 @app.on_event("startup")
 async def on_startup():
@@ -379,6 +387,7 @@ def index(request: Request):
             "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", ""),
             "auth_disabled": bool(os.environ.get("AUTH_DISABLED")),
             "is_demo": is_demo,
+            "asset_version": _ASSET_VERSION,
         }
     )
 

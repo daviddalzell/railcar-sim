@@ -38,54 +38,68 @@ def admin_client(db_session):
     app.dependency_overrides.clear()
 
 
-# ── Locations: operators read-only ────────────────────────────────────────────
+# ── Location groups (/api/locations): operators read-only ──────────────────────
 
-def test_operator_can_list_locations(operator_client):
+def test_operator_can_list_location_groups(operator_client):
     r = operator_client.get("/api/locations")
     assert r.status_code == 200
 
 
-def test_operator_cannot_create_location(operator_client):
-    r = operator_client.post("/api/locations", json={"name": "Yard", "location_type": "yard"})
+def test_operator_cannot_create_location_group(operator_client):
+    r = operator_client.post("/api/locations", json={"name": "Main Yard", "car_capacity": 20})
     assert r.status_code == 403
 
 
-def test_operator_cannot_update_location(operator_client, db_session):
-    loc = make_location(db_session, "Yard", "yard")
-    r = operator_client.put(f"/api/locations/{loc.id}", json={"name": "Yard2", "location_type": "yard"})
+def test_operator_cannot_update_location_group(operator_client, db_session):
+    from models import Location
+    area = Location(name="Yard", car_capacity=10)
+    db_session.add(area)
+    db_session.flush()
+    r = operator_client.put(f"/api/locations/{area.id}", json={"name": "Yard2", "car_capacity": 10})
     assert r.status_code == 403
 
 
-def test_operator_cannot_delete_location(operator_client, db_session):
-    loc = make_location(db_session, "Staging A", "staging")
-    r = operator_client.delete(f"/api/locations/{loc.id}")
-    assert r.status_code == 403
-
-
-def test_admin_can_create_location(admin_client):
-    r = admin_client.post("/api/locations", json={"name": "Yard", "location_type": "yard"})
-    assert r.status_code == 201
-
-
-# ── Switching areas: operators read-only ─────────────────────────────────────
-
-def test_operator_can_list_switching_areas(operator_client):
-    r = operator_client.get("/api/switching-areas")
-    assert r.status_code == 200
-
-
-def test_operator_cannot_create_switching_area(operator_client):
-    r = operator_client.post("/api/switching-areas", json={"name": "Main Yard", "car_capacity": 20})
-    assert r.status_code == 403
-
-
-def test_operator_cannot_delete_switching_area(operator_client, db_session):
+def test_operator_cannot_delete_location_group(operator_client, db_session):
     from models import Location
     area = Location(name="Test Yard", car_capacity=10)
     db_session.add(area)
     db_session.flush()
-    r = operator_client.delete(f"/api/switching-areas/{area.id}")
+    r = operator_client.delete(f"/api/locations/{area.id}")
     assert r.status_code == 403
+
+
+def test_admin_can_create_location_group(admin_client):
+    r = admin_client.post("/api/locations", json={"name": "Main Yard", "car_capacity": 20})
+    assert r.status_code == 201
+
+
+# ── Tracks (/api/tracks): operators read-only ──────────────────────────────────
+
+def test_operator_can_list_tracks(operator_client):
+    r = operator_client.get("/api/tracks")
+    assert r.status_code == 200
+
+
+def test_operator_cannot_create_track(operator_client):
+    r = operator_client.post("/api/tracks", json={"name": "Siding 1", "location_type": "yard"})
+    assert r.status_code == 403
+
+
+def test_operator_cannot_update_track(operator_client, db_session):
+    track = make_location(db_session, "Siding 1", "yard")
+    r = operator_client.put(f"/api/tracks/{track.id}", json={"name": "Siding 2", "location_type": "yard"})
+    assert r.status_code == 403
+
+
+def test_operator_cannot_delete_track(operator_client, db_session):
+    track = make_location(db_session, "Staging A", "staging")
+    r = operator_client.delete(f"/api/tracks/{track.id}")
+    assert r.status_code == 403
+
+
+def test_admin_can_create_track(admin_client):
+    r = admin_client.post("/api/tracks", json={"name": "Siding 1", "location_type": "yard"})
+    assert r.status_code == 201
 
 
 # ── Industries: operators read-only ──────────────────────────────────────────
@@ -165,7 +179,7 @@ def test_operator_cannot_build_dispatch_plan(operator_client, db_session):
     origin = make_location(db_session, "Staging", "staging")
     dest = make_location(db_session, "Yard", "yard")
     r = operator_client.post("/api/dispatcher/build-plan", json={
-        "switching_area_id": area.id,
+        "location_id": area.id,
         "origin_location_id": origin.id,
         "destination_location_id": dest.id,
     })

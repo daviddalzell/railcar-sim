@@ -207,9 +207,9 @@ Single file, ~4000 lines, vanilla JS. Major sections in order:
 | 1236 | **Waybill pool** — `loadWaybillPool()`, `renderWaybillPool()`, `openWaybillEditDialog()` |
 | 1396 | **Operations view** — `loadOperations()`, `renderPlanPreview()` |
 | 1591 | **Operating session** — `renderActiveSession()`, `detectSpottingConflicts()`, `handleEndSession()` |
-| 2047 | **Layout setup** — `loadLayout()`, `renderLocationList()`, `renderIndustryList()`, `renderCarTypeList()` |
+| 2047 | **Layout setup** — `loadLayout()`, `renderLocationTree()`, `renderIndustryList()`, `renderCarTypeList()` |
 | 2864 | **Export / Import** — backup download and ZIP restore |
-| 3107 | **Switching Areas** — `renderSwitchingAreaList()`, `populateSwitchingAreaSelect()` *(to be replaced in PR 2)* |
+| 3107 | **Location tree helpers** — `buildTrackOptgroups()`, `openCascadeDeleteDialog()`, inline rename |
 | 3218 | **Layout status strip** — `renderLayoutStatus()` |
 | 3284 | **Dispatcher** — `loadDispatcherPanel()`, `renderConsistCard()`, `wireConsistCard()` |
 | 3757 | **Settings tab** — `loadSettings()`, `loadMembers()` |
@@ -235,23 +235,22 @@ Car               (rolling stock — has current_location_id pointing to a Track
 DispatchPlan      (consist built by the virtual dispatcher)
 ```
 
-**Backward-compat aliases** kept for the old frontend (remove in PR 2):
-- `GET/POST /api/locations` → Track CRUD (was the old location endpoint)
-- `GET/POST /api/switching-areas` → Location CRUD (was the old switching area endpoint)
+**Endpoints** (PR 2 removed the old backward-compat aliases):
+- `GET/POST/PUT/DELETE /api/tracks` → Track CRUD
+- `GET/POST/PUT/DELETE /api/locations` → Location (group) CRUD
 
 ---
 
-## Pending work
+## Layout rename (PR 2 — complete)
 
-**PR 2 — `feature/layout-rename-frontend`** (not yet started)
-Branch off main after confirming production is stable post-PR-1. Scope:
-- Replace flat `renderSwitchingAreaList()` + `renderLocationList()` with a new `renderLocationTree()` — 3-level nested tree (Location → Track → Industries)
-- Mobile accordion + sticky breadcrumb + bottom-sheet forms
-- Update all API calls: `/api/switching-areas` → `/api/locations`, `/api/locations` → `/api/tracks`
-- Remove backward-compat response keys (`switching_area_id`, `switching_areas` in layout status)
-- Remove backward-compat endpoint aliases from `routers/locations.py`
-- Waybill industry `<select>` → `<optgroup>` grouped by Location
-- UX: undo toast on delete (5s), localStorage collapse state, inline rename for Location/Track names
+The Location/Track rename is applied on both backend and frontend:
+- `renderLocationTree()` replaces the old flat Location and Switching Area lists — a 3-level tree (Location → Track → Industry) with localStorage collapse state and click-to-edit inline rename.
+- API: `/api/tracks` is Track CRUD; `/api/locations` is Location (group) CRUD. The old `/api/switching-areas` alias is removed.
+- Backward-compat response keys (`switching_area_id`, `switching_areas`) are removed.
+- All track selects group tracks by Location via `<optgroup>` (`buildTrackOptgroups()`).
+- All layout deletes use a cascade-warning dialog (`openCascadeDeleteDialog()`).
+- `app.js` is cache-busted with the git SHA (`asset_version` in `main.py`).
+- Touch layout: accordion tree plus bottom-sheet forms at a single breakpoint (≤1024px). A desktop split is a future enhancement.
 
 ---
 
@@ -265,7 +264,7 @@ Branch off main after confirming production is stable post-PR-1. Scope:
 ### General
 - **No comments** unless the WHY is non-obvious
 - **No `create_all()` on Postgres** — see migration rules above
-- Response dicts keep both old and new key names during transition (e.g. `switching_area_id` + `location_id`) — remove old keys in PR 2
+- Response dicts use the current key names only (`location_id`, `tracks`); the old `switching_area_*` keys were removed in PR 2
 - The demo tenant bypasses Supabase auth; all other tenants validate JWTs
 - Tenant cache (`middleware/tenant.py`) is in-memory; call `invalidate_tenant_cache(slug)` after updating a tenant row
 - `fly ssh console -a waypoint-app` for production debugging; use `fly sftp shell` to upload scripts first
