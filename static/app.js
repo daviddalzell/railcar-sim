@@ -408,10 +408,11 @@ $$(".tab-link").forEach(link => {
     e.preventDefault();
     navTabList?.classList.remove("nav-open");
     const tab = link.dataset.tab;
+    if (!tab) return;  // non-tab links (e.g. "Send feedback") handle their own click
     $$(".tab-link").forEach(l => l.classList.remove("active"));
     $$(".tab-panel").forEach(p => p.classList.add("hidden"));
     link.classList.add("active");
-    $(`#tab-${tab}`).classList.remove("hidden");
+    $(`#tab-${tab}`)?.classList.remove("hidden");
     if (navCurrentTab) navCurrentTab.textContent = link.textContent.trim();
     if (tab === "operations") loadOperations();
     if (tab === "waybills") loadWaybillPool();
