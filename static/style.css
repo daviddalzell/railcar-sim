@@ -619,7 +619,8 @@ header nav a.active {
 
 /* ── Location Tree ───────────────────────────────────────────────────────── */
 .tree-group {
-  border: 1px solid var(--border-subtle);
+  /* Brighter slate boundary (~#798590): rail-dark lifted toward rail-light. */
+  border: 1px solid color-mix(in srgb, var(--rail-dark), var(--rail-light) 40%);
   border-radius: var(--card-radius);
   margin-bottom: 0.6rem;
   overflow: hidden;
@@ -630,13 +631,21 @@ header nav a.active {
   align-items: center;
   gap: 0.6rem;
   padding: 0.55rem 0.7rem;
-  background: var(--pico-card-background-color, #fafafa);
+  /* House slate header bar, like the app nav — readable in both themes. */
+  background: var(--rail-dark);
 }
 
 .tree-group-name {
   font-weight: 600;
   cursor: text;
   flex: 1;
+  color: var(--rail-light);
+}
+
+/* Keep the header caret legible on the slate bar. */
+#location-tree .tree-group-row .tree-caret {
+  color: var(--rail-light);
+  opacity: 0.8;
 }
 
 .tree-group-row .tree-actions,
@@ -709,11 +718,11 @@ header nav a.active {
 .tree-group-body {
   padding: 0.3rem 0.7rem 0.5rem 1.1rem;
   margin-left: 0.55rem;
-  border-left: 2px solid rgba(127, 127, 127, 0.18);
+  border-left: 2px solid var(--consist-card-border);
 }
 
 .tree-track {
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--consist-card-border);
   padding: 0.35rem 0 0.2rem;
 }
 
@@ -744,24 +753,24 @@ header nav a.active {
   border-radius: 4px;
   flex-shrink: 0;
 }
-.track-type-yard     { background: rgba(39, 174, 96, 0.18);  color: #4caf6a; }
-.track-type-industry { background: rgba(41, 128, 185, 0.20); color: #5aa3d8; }
-.track-type-staging  { background: rgba(142, 68, 173, 0.24); color: #b07cd0; }
-.track-type-storage  { background: rgba(197, 176, 55, 0.18); color: #cbb94a; }
+.track-type-yard     { background: color-mix(in srgb, var(--badge-green) 20%, transparent);  color: color-mix(in srgb, var(--badge-green), #fff 18%); }
+.track-type-industry { background: color-mix(in srgb, var(--badge-blue) 20%, transparent);   color: color-mix(in srgb, var(--badge-blue), #fff 18%); }
+.track-type-staging  { background: color-mix(in srgb, var(--badge-purple) 26%, transparent); color: color-mix(in srgb, var(--badge-purple), #fff 24%); }
+.track-type-storage  { background: color-mix(in srgb, var(--rail-green) 24%, transparent);   color: color-mix(in srgb, var(--rail-green), #fff 26%); }
 
-/* Car-count pill */
+/* Car-count pill — sits on the slate header bar */
 .car-count-pill {
   font-size: 0.72rem;
-  color: var(--pico-muted-color);
-  background: rgba(127, 127, 127, 0.16);
+  color: var(--rail-light);
+  background: rgba(255, 255, 255, 0.12);
   padding: 0.12rem 0.55rem;
   border-radius: 999px;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
 .car-count-pill.full {
-  background: rgba(214, 137, 16, 0.24);
-  color: #e0a53a;
+  background: color-mix(in srgb, var(--badge-orange) 34%, transparent);
+  color: color-mix(in srgb, var(--badge-orange), #fff 42%);
 }
 
 /* Industry rows with orange connector */
