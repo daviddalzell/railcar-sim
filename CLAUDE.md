@@ -7,6 +7,16 @@ Waypoint is a multi-tenant model railway operations web app. Operators build car
 **Stack:** FastAPI · SQLAlchemy · Alembic · Supabase (Postgres + Auth) · Fly.io · Vanilla JS frontend (single `static/app.js`) · Jinja2 templates
 
 ---
+### Standard instruction: use Simplified Technical English
+
+Before you write any direct response to me, ensure it is written in ASD-STE100 Simplified Technical English.
+• Use active voice and simple tenses.
+• Keep sentences short and direct (maximum 20–25 words per sentence).
+• State one clear idea or instruction per sentence.
+• Do not invent, infer, or use unmapped acronyms, metaphors, or marketing fluff.
+• Use the exact technical and domain nouns that already exist in the codebase or context.
+
+---
 
 ## Workflow
 
