@@ -140,7 +140,7 @@
 
       <!-- Power Pool (locomotives only) -->
       <section id="power-pool-section" class="hidden">
-        <div class="section-header" style="margin-top:0">
+        <div class="panel-head standalone">
           <div class="section-header-title">
             <button id="btn-toggle-power-pool" class="icon-btn caret">▶</button>
             <h3>Power Pool</h3>
@@ -153,7 +153,7 @@
       <hr id="power-pool-divider" class="hidden" />
 
       <!-- Freight car grid -->
-      <div class="section-header" style="margin-top:0">
+      <div class="panel-head standalone">
         <div class="section-header-title">
           <button id="btn-toggle-freight-cars" class="icon-btn caret">▼</button>
           <h3>Freight Cars</h3>
@@ -309,28 +309,28 @@
       </div>
 
       <!-- Layout Status strip — always visible -->
-      <article id="layout-status" style="margin-bottom:1rem">
-        <div class="section-header">
+      <article id="layout-status" class="panel-card" style="margin-bottom:1rem">
+        <div class="panel-head">
           <div class="section-header-title">
             <button id="btn-toggle-layout-status" class="icon-btn caret">▶</button>
             <h3 style="margin:0">Layout Status</h3>
           </div>
         </div>
-        <div id="layout-status-body" class="hidden" style="margin-top:0.5rem">
+        <div id="layout-status-body" class="hidden panel-body">
           <div id="layout-status-areas"></div>
           <div id="layout-status-yards"></div>
         </div>
       </article>
 
       <!-- Dispatcher panel -->
-      <article id="dispatcher-panel" class="hidden" style="margin-bottom:1rem">
-        <div class="section-header">
+      <article id="dispatcher-panel" class="hidden panel-card" style="margin-bottom:1rem">
+        <div class="panel-head">
           <div class="section-header-title">
             <button id="btn-toggle-dispatcher" class="icon-btn caret">▼</button>
             <h3 style="margin:0">Virtual Dispatcher</h3>
           </div>
         </div>
-        <div id="dispatcher-body">
+        <div id="dispatcher-body" class="panel-body">
           <div class="grid">
             <label>Origin (staging / yard)
               <select id="disp-origin"><option value="">— select origin —</option></select>
@@ -351,8 +351,8 @@
         </div><!-- /dispatcher-body -->
       </article>
 
-      <article id="ops-header" style="margin-bottom:1rem">
-        <div class="section-header">
+      <article id="ops-header" class="panel-card" style="margin-bottom:1rem">
+        <div class="panel-head">
           <div class="section-header-title">
             <button id="btn-toggle-ops" class="icon-btn caret">▼</button>
             <h3 id="ops-title" style="margin:0">Quick Op Session</h3>
@@ -361,7 +361,7 @@
             <!-- swapped by JS between idle and active session states -->
           </div>
         </div>
-        <div id="ops-body">
+        <div id="ops-body" class="panel-body">
           <div id="session-warnings" class="hidden session-warnings"></div>
           <div id="spotting-conflicts"></div>
           <div id="ops-list"></div>
@@ -451,12 +451,12 @@
       <!-- Industries -->
       <hr />
       <div>
-        <div class="section-header">
+        <div class="panel-head standalone">
           <div class="section-header-title">
             <button id="btn-toggle-industries" class="icon-btn caret">▼</button>
             <h3>Industries</h3>
           </div>
-          <button id="btn-add-industry" class="outline small">+</button>
+          <button id="btn-add-industry" class="btn-accent">+</button>
         </div>
         <div id="industries-body">
         <form id="industry-form" class="hidden inline-form">
@@ -509,14 +509,14 @@
 
       <!-- Commodity → Car Type mapping -->
       <hr />
-      <div class="section-header" style="margin-top:1rem">
+      <div class="panel-head standalone" style="margin-top:1rem">
         <div class="section-header-title">
           <button id="btn-toggle-commodity-map" class="icon-btn caret" title="Collapse / expand">▶</button>
           <h3>Commodity → Car Type</h3>
         </div>
         <div class="button-row">
-          <button id="btn-seed-commodity-map" class="outline small">⚙ Seed Defaults</button>
-          <button id="btn-add-commodity-map" class="outline small">+</button>
+          <button id="btn-seed-commodity-map" class="btn-muted">⚙ Seed Defaults</button>
+          <button id="btn-add-commodity-map" class="btn-accent">+</button>
         </div>
       </div>
       <div id="commodity-map-body" class="hidden">
@@ -543,12 +543,12 @@
 
       <hr />
       <div>
-        <div class="section-header">
+        <div class="panel-head standalone">
           <div class="section-header-title">
             <button id="btn-toggle-car-type" class="icon-btn caret" title="Collapse / expand">▶</button>
             <h3>Car Types</h3>
           </div>
-          <button id="btn-add-car-type" class="outline small">+ Add</button>
+          <button id="btn-add-car-type" class="btn-accent">+ Add</button>
         </div>
         <div id="car-type-body" class="hidden">
           <form id="car-type-form" class="hidden inline-form">

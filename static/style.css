@@ -206,10 +206,12 @@ button.btn-muted:hover { color: var(--accent); }
 .panel-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.6rem;
   padding: 0.5rem 0.7rem;
   background: var(--panel-header-bg);
   color: var(--panel-header-fg);
+  margin: 0;
 }
 .panel-head h2,
 .panel-head h3,
@@ -218,13 +220,35 @@ button.btn-muted:hover { color: var(--accent); }
   color: var(--panel-header-fg);
   font-size: 1rem;
 }
+/* Keep the header caret legible on the slate bar (mirrors .tree-group-row). */
+.panel-head .icon-btn.caret {
+  color: var(--panel-header-fg);
+  opacity: 0.8;
+}
+.panel-head .icon-btn.caret:hover { opacity: 1; color: var(--panel-header-fg); }
 
-/* Card with a slate header + brighter slate boundary. */
+/* Standalone slate bar for a flat sub-section header (not inside a bordered
+   panel-card) — e.g. Industries, Commodity-map, Car Types, Power Pool. */
+.panel-head.standalone {
+  border-radius: var(--card-radius);
+  margin-bottom: 0.6rem;
+}
+
+/* Card with a slate header + brighter slate boundary. Overrides any Pico
+   article/section defaults (background, padding) so panel-head/panel-body
+   sit flush against the border instead of inset by the tag's own padding. */
 .panel-card {
   border: 1px solid var(--panel-border);
   border-radius: var(--card-radius);
   overflow: hidden;
   margin-bottom: 0.6rem;
+  padding: 0;
+  background: var(--pico-card-background-color, #f9f9f9);
+}
+
+/* Standard inner padding for panel-card content below the panel-head. */
+.panel-body {
+  padding: 0.6rem 0.75rem;
 }
 
 /* Rounded pill (status / count / tag). */

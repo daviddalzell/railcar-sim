@@ -3612,23 +3612,26 @@ function renderConsistCard(plan) {
   if (pickups.length) carListHtml += `<p class="muted small" style="margin:0.5rem 0 0.25rem"><strong>Pick up</strong></p>` + pickups.map(carRow).join("");
   if (!total) carListHtml = '<p class="muted small">No cars in this consist.</p>';
 
+  const metaHtml = (crew || route || !hasPower) ? `
+    <div class="panel-body" style="padding-bottom:0.4rem">
+      ${crew ? `<div class="muted small" style="font-size:0.8rem">${crew}</div>` : ""}
+      ${route}
+      ${!hasPower ? `<div class="muted small consist-no-power-hint" style="font-size:0.75rem;color:var(--color-warning,#e07b00)">⚠ No locomotive assigned — open to assign power</div>` : ""}
+    </div>` : "";
+
   return `
-  <article class="consist-card" data-plan-id="${plan.id}" style="margin-bottom:0.75rem">
-    <div class="section-header">
+  <article class="consist-card panel-card" data-plan-id="${plan.id}" style="margin-bottom:0.75rem">
+    <div class="panel-head">
       <div class="section-header-title">
-        <button class="outline small consist-toggle" data-plan-id="${plan.id}">▶</button>
-        <div>
-          <div>${statusBadge} <strong>${trainTitle}${trainName}</strong>${depTime}</div>
-          ${crew ? `<div class="muted small" style="font-size:0.8rem">${crew}</div>` : ""}
-          ${route}
-          ${!hasPower ? `<div class="muted small consist-no-power-hint" style="font-size:0.75rem;color:var(--color-warning,#e07b00)">⚠ No locomotive assigned — open to assign power</div>` : ""}
-        </div>
+        <button class="icon-btn caret consist-toggle" data-plan-id="${plan.id}">▶</button>
+        <span class="panel-title">${statusBadge} <strong>${trainTitle}${trainName}</strong>${depTime}</span>
       </div>
       <div class="button-row">
         <button class="consist-start-session" data-plan-id="${plan.id}"${(total === 0 || !hasPower || !!session || plan.status === "complete") ? " disabled" : ""}>Start Session</button>
       </div>
     </div>
-    <div class="consist-body hidden" data-plan-id="${plan.id}">
+    ${metaHtml}
+    <div class="consist-body hidden panel-body" data-plan-id="${plan.id}" style="padding-top:${metaHtml ? "0" : "0.6rem"}">
 
       <details data-section="identity" data-plan-id="${plan.id}" style="margin-top:0.75rem">
         <summary class="muted small" style="cursor:pointer">Edit train identity &amp; crew</summary>
