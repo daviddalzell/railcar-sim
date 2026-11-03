@@ -123,6 +123,15 @@ body {
   --badge-orange:   #d68910;
 
   --rail-green: #5c7a3e;
+
+  /* UI primitives (shared by Layout Setup + other tabs) */
+  --panel-header-bg: var(--rail-dark);
+  --panel-header-fg: var(--rail-light);
+  --panel-border:    color-mix(in srgb, var(--rail-dark), var(--rail-light) 40%);
+  --accent:          var(--badge-orange);
+  --accent-tint:     color-mix(in srgb, var(--badge-orange) 14%, transparent);
+  --icon-btn-hover:  rgba(127, 127, 127, 0.15);
+  --pill-bg:         rgba(255, 255, 255, 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -141,6 +150,103 @@ body {
   --info-offer-bg:       var(--rail-dark);
   --car-img-bg:          #2a2a2a;
   --bg-muted:            #2a2a2a;
+}
+
+/* ── UI primitives — reusable across tabs (mirror the Layout Setup tree) ──── */
+
+/* Borderless icon button (edit / delete). Replaces boxed `.outline small [contrast]`. */
+button.icon-btn {
+  background: none;
+  border: none;
+  margin: 0;
+  width: auto;
+  padding: 0.12rem 0.3rem;
+  font-size: 0.82rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+  border-radius: 4px;
+  color: inherit;
+}
+button.icon-btn:hover { opacity: 1; background: var(--icon-btn-hover); }
+button.icon-btn:disabled { opacity: 0.22; cursor: default; }
+button.icon-btn:disabled:hover { background: none; }
+/* Smaller borderless caret for collapse toggles. */
+button.icon-btn.caret { font-size: 0.7rem; padding: 0.1rem 0.25rem; color: var(--pico-muted-color); opacity: 1; }
+button.icon-btn.caret:hover { color: var(--pico-contrast, #e8eaf0); background: none; }
+
+/* Outlined accent button (e.g. "+ Add"). */
+button.btn-accent {
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  color: var(--accent);
+  margin: 0;
+  width: auto;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+button.btn-accent:hover { background: var(--accent-tint); }
+
+/* Muted text button. */
+button.btn-muted {
+  background: none;
+  border: none;
+  color: var(--pico-muted-color);
+  margin: 0;
+  width: auto;
+  padding: 0.12rem 0.4rem;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+button.btn-muted:hover { color: var(--accent); }
+
+/* Slate card header bar. */
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--panel-header-bg);
+  color: var(--panel-header-fg);
+}
+.panel-head h2,
+.panel-head h3,
+.panel-head .panel-title {
+  margin: 0;
+  color: var(--panel-header-fg);
+  font-size: 1rem;
+}
+
+/* Card with a slate header + brighter slate boundary. */
+.panel-card {
+  border: 1px solid var(--panel-border);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  margin-bottom: 0.6rem;
+}
+
+/* Rounded pill (status / count / tag). */
+.pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Compact field height — opt-in for dialogs (mirrors .inline-form). */
+.compact-form input,
+.compact-form select,
+.compact-form textarea {
+  padding-top: 0.3rem !important;
+  padding-bottom: 0.3rem !important;
+  line-height: 1.25;
+  height: auto;
+  min-height: 0;
+  margin-bottom: 0.4rem;
 }
 
 main.container {
