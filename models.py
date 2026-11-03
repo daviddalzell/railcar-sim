@@ -93,6 +93,7 @@ class Location(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     car_capacity: Mapped[int] = mapped_column(Integer, default=10)
+    position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # manual order among Locations
 
     tracks: Mapped[List["Track"]] = relationship("Track", back_populates="location")
 

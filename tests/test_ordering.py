@@ -16,6 +16,25 @@ def _industry_order(client, track_id):
     return [r["name"] for r in rows if r["location_id"] == track_id]
 
 
+def _location_order(client):
+    return [r["name"] for r in client.get("/api/locations").json()]
+
+
+def test_move_location_reorders(client):
+    ids = {}
+    for name in ("L1", "L2", "L3"):
+        ids[name] = client.post("/api/locations", json={"name": name, "car_capacity": 10}).json()["id"]
+
+    assert _location_order(client) == ["L1", "L2", "L3"]
+
+    r = client.post(f"/api/locations/{ids['L3']}/move", json={"direction": "up"})
+    assert r.status_code == 200
+    assert _location_order(client) == ["L1", "L3", "L2"]
+
+    client.post(f"/api/locations/{ids['L1']}/move", json={"direction": "down"})
+    assert _location_order(client) == ["L3", "L1", "L2"]
+
+
 def test_create_track_sets_position(client):
     loc = client.post("/api/locations", json={"name": "Yard", "car_capacity": 10}).json()
     t = client.post("/api/tracks", json={

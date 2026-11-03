@@ -2343,7 +2343,7 @@ function renderLocationTree() {
       </div>`;
   };
 
-  const groupBlock = (group) => {
+  const groupBlock = (group, isFirst, isLast) => {
     const tracks = (group ? locations.filter(l => l.location_id === group.id) : locations.filter(l => !l.location_id)).sort(posSort);
     const key = group ? `group-${group.id}` : "ungrouped";
     const isCollapsed = !!collapsed[key];
@@ -2359,6 +2359,9 @@ function renderLocationTree() {
                <span class="car-count-pill${full ? " full" : ""}">${count}${cap != null ? " / " + cap : ""} cars</span>`
             : `<span class="tree-group-name muted"><em>Ungrouped tracks</em></span>`}
           <span class="tree-actions">
+            ${group ? `
+              <button class="tree-icon-btn move-group" data-id="${group.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
+              <button class="tree-icon-btn move-group" data-id="${group.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>` : ""}
             <button class="tree-add add-track-to-group" data-group-id="${group ? group.id : ""}">+ Track</button>
             ${group ? `
               <button class="tree-icon-btn edit-group" data-id="${group.id}" title="Edit">✏️</button>
@@ -2371,8 +2374,9 @@ function renderLocationTree() {
       </div>`;
   };
 
+  const sortedAreas = switchingAreas.slice().sort(posSort);
   const ungroupedTracks = locations.filter(l => !l.location_id);
-  root.innerHTML = switchingAreas.map(groupBlock).join("") +
+  root.innerHTML = sortedAreas.map((group, i) => groupBlock(group, i === 0, i === sortedAreas.length - 1)).join("") +
     (ungroupedTracks.length ? groupBlock(null) : "");
 
   if (!switchingAreas.length && !ungroupedTracks.length) {
@@ -2430,7 +2434,14 @@ function renderLocationTree() {
     });
   });
 
-  // Reorder tracks / industries (up/down)
+  // Reorder locations / tracks / industries (up/down)
+  root.querySelectorAll(".move-group").forEach(btn => {
+    btn.addEventListener("click", () => {
+      api("POST", `/api/locations/${btn.dataset.id}/move`, { direction: btn.dataset.dir })
+        .then(loadLayout)
+        .catch(err => showToast("Error: " + err.message, "error"));
+    });
+  });
   root.querySelectorAll(".move-track").forEach(btn => {
     btn.addEventListener("click", () => {
       api("POST", `/api/tracks/${btn.dataset.id}/move`, { direction: btn.dataset.dir })

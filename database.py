@@ -88,6 +88,12 @@ def init_db():
         except Exception:
             pass
         try:
+            conn.execute(text("ALTER TABLE locations ADD COLUMN position INTEGER"))
+            conn.execute(text("UPDATE locations SET position = id WHERE position IS NULL"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
             conn.execute(text("ALTER TABLE tracks ADD COLUMN position INTEGER"))
             conn.execute(text("UPDATE tracks SET position = id WHERE position IS NULL"))
             conn.commit()

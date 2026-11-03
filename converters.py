@@ -113,6 +113,7 @@ def location_group_to_dict(area: Location, db: Session) -> dict:
         "car_capacity": area.car_capacity,
         "current_car_count": current_count,
         "available_spots": available_spots,
+        "position": area.position,
         "tracks": [{"id": t.id, "name": t.name, "location_type": t.location_type} for t in area.tracks],
     }
 
