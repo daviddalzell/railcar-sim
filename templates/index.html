@@ -68,8 +68,11 @@
       </div>
 
       <!-- Add-car form (hidden by default) -->
-      <article id="add-car-form" class="hidden">
-        <h4>Add New Car</h4>
+      <article id="add-car-form" class="hidden compact-form">
+        <div class="section-header-title" style="justify-content:space-between;display:flex;">
+          <h4 style="margin:0">Add New Car</h4>
+          <button type="button" id="btn-cancel-car-top" class="btn-muted">Cancel</button>
+        </div>
         <div class="upload-zone" id="upload-zone">
           <input type="file" id="photo-input" accept="image/*" />
           <div class="upload-zone-actions">
@@ -165,7 +168,7 @@
 
       <!-- Move car dialog -->
       <dialog id="move-car-dialog">
-        <article>
+        <article class="compact-form">
           <header>
             <button aria-label="Close" rel="prev" id="close-move-dialog"></button>
             <h3>Move Car to Location</h3>
@@ -182,7 +185,7 @@
 
       <!-- Edit car dialog -->
       <dialog id="edit-car-dialog">
-        <article>
+        <article class="compact-form">
           <header>
             <button aria-label="Close" rel="prev" id="close-edit-car-dialog"></button>
             <h3>Edit Car</h3>
@@ -217,7 +220,7 @@
 
       <!-- Assign waybill slots dialog -->
       <dialog id="waybill-dialog">
-        <article>
+        <article class="compact-form">
           <header>
             <button aria-label="Close" rel="prev" id="close-waybill-dialog"></button>
             <h3 id="waybill-dialog-title">Assign Waybills</h3>
@@ -264,7 +267,7 @@
 
       <!-- Waybill create / edit dialog -->
       <dialog id="waybill-edit-dialog">
-        <article>
+        <article class="compact-form">
           <header>
             <button aria-label="Close" rel="prev" id="close-waybill-edit-dialog"></button>
             <h3 id="waybill-edit-title">New Waybill</h3>
@@ -330,7 +333,7 @@
             <h3 style="margin:0">Virtual Dispatcher</h3>
           </div>
         </div>
-        <div id="dispatcher-body" class="panel-body">
+        <div id="dispatcher-body" class="panel-body compact-form">
           <div class="grid">
             <label>Origin (staging / yard)
               <select id="disp-origin"><option value="">— select origin —</option></select>
@@ -534,7 +537,7 @@
           </div>
           <div class="button-row">
             <button type="submit" class="small">Save</button>
-            <button type="button" id="btn-cancel-commodity-map" class="outline secondary small">✕</button>
+            <button type="button" id="btn-cancel-commodity-map" class="outline secondary small">Cancel</button>
             <input type="hidden" id="cmap-edit-id" value="" />
           </div>
         </form>
@@ -552,9 +555,12 @@
         </div>
         <div id="car-type-body" class="hidden">
           <form id="car-type-form" class="hidden inline-form">
+            <label for="car-type-name">Car type name</label>
             <input id="car-type-name" type="text" placeholder="e.g. autorack" required />
-            <button type="submit" class="small">Save</button>
-            <button type="button" id="btn-cancel-car-type" class="outline secondary small">✕</button>
+            <div class="button-row">
+              <button type="submit" class="small">Save</button>
+              <button type="button" id="btn-cancel-car-type" class="outline secondary small">Cancel</button>
+            </div>
           </form>
           <div id="car-type-list"></div>
         </div>
@@ -806,7 +812,7 @@
 
     <section id="tab-settings" class="tab-panel hidden">
       <div class="section-header"><h2>Settings</h2></div>
-      <div id="settings-content" style="max-width:520px;">
+      <div id="settings-content" class="compact-form" style="max-width:520px;">
         <div id="settings-demo-notice" style="display:none;margin-bottom:1.25rem;padding:.75rem 1rem;border:1px solid var(--border,#2d3447);border-radius:6px;font-size:0.85rem;color:var(--muted,#9aa3b2)">
           Settings are view-only in the demo.
           <a href="https://www.patreon.com/waypoint_ops" target="_blank" rel="noopener">Subscribe to create your own layout →</a>
@@ -902,6 +908,8 @@
         </div>
         <div class="dialog-footer-secondary">
           <button id="btn-auto-assign-car" class="outline secondary">🔄 Auto-Assign</button>
+        </div>
+        <div class="dialog-footer-secondary">
           <button id="btn-edit-waybills" class="outline secondary">Edit Waybills</button>
           <button id="btn-edit-car" class="outline secondary">Edit Car…</button>
           <button id="btn-delete-car" class="outline contrast">Delete Car</button>
@@ -962,7 +970,7 @@
   </dialog>
 
   <dialog id="staging-merge-dialog">
-    <article>
+    <article class="compact-form">
       <header>
         <button aria-label="Close" rel="prev" id="btn-close-staging-merge"></button>
         <h3>Consolidate Staging Location</h3>

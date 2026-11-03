@@ -283,6 +283,13 @@ button.btn-muted:hover { color: var(--accent); }
   margin-bottom: 0.4rem;
 }
 
+/* A hint/status line right under a compact field needs its own breathing
+   room — margin-bottom on the input isn't enough once padding shrank. */
+.compact-form label > small {
+  display: block;
+  margin-top: 0.3rem;
+}
+
 main.container {
   max-width: 1024px;
 }
@@ -574,6 +581,7 @@ header nav a.active {
 
 .dialog-footer-primary {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
   justify-content: center;
@@ -581,8 +589,14 @@ header nav a.active {
 
 .dialog-footer-secondary {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.dialog-footer-secondary:last-child {
+  margin-bottom: 0;
 }
 
 .dialog-footer-primary button,
@@ -592,7 +606,8 @@ header nav a.active {
 }
 
 #btn-advance-waybill,
-#btn-edit-waybills {
+#btn-edit-waybills,
+#btn-auto-assign-car {
   max-width: 240px;
 }
 

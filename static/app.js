@@ -706,12 +706,14 @@ $("#btn-add-manual").addEventListener("click", () => {
   updateDefaultImageOffer();
 });
 
-$("#btn-cancel-car").addEventListener("click", async () => {
+async function cancelAddCar() {
   await discardStylized();
   hide($("#add-car-form"));
   hide($("#stylize-section"));
   hide($("#default-image-offer"));
-});
+}
+$("#btn-cancel-car").addEventListener("click", cancelAddCar);
+$("#btn-cancel-car-top").addEventListener("click", cancelAddCar);
 
 function applyAnalysis(result) {
   if (result.photo_path) photoPath = result.photo_path;
@@ -3631,7 +3633,7 @@ function renderConsistCard(plan) {
       </div>
     </div>
     ${metaHtml}
-    <div class="consist-body hidden panel-body" data-plan-id="${plan.id}" style="padding-top:${metaHtml ? "0" : "0.6rem"}">
+    <div class="consist-body hidden panel-body compact-form" data-plan-id="${plan.id}" style="padding-top:${metaHtml ? "0" : "0.6rem"}">
 
       <details data-section="identity" data-plan-id="${plan.id}" style="margin-top:0.75rem">
         <summary class="muted small" style="cursor:pointer">Edit train identity &amp; crew</summary>
