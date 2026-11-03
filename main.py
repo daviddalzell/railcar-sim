@@ -388,6 +388,7 @@ def index(request: Request):
             "auth_disabled": bool(os.environ.get("AUTH_DISABLED")),
             "is_demo": is_demo,
             "asset_version": _ASSET_VERSION,
+            "layout_name": getattr(tenant, "name", "") or "",
         }
     )
 

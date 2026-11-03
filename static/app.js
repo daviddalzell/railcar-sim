@@ -4047,12 +4047,18 @@ function _stopMembersRefresh() {
   if (_membersRefreshTimer) { clearInterval(_membersRefreshTimer); _membersRefreshTimer = null; }
 }
 
+function setLayoutTitle(name) {
+  const el = $("#layout-setup-title");
+  if (el) el.textContent = (name && name.trim()) || "My Layout";
+}
+
 async function loadSettings() {
   const data = await api("GET", "/api/tenant-settings");
   if (!data) return;
 
   const nameInput = $("#settings-tenant-name");
   if (nameInput && data.name !== undefined) nameInput.value = data.name;
+  setLayoutTitle(data.name);
 
   const providerSel = $("#settings-provider");
   if (providerSel) providerSel.value = data.vision_provider || "gemini";
