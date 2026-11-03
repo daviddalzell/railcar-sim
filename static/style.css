@@ -154,6 +154,16 @@ body {
 
 /* ── UI primitives — reusable across tabs (mirror the Layout Setup tree) ──── */
 
+/* Compact default button height — scoped to the button tag via custom
+   property, so it never touches input/select/textarea sizing (Pico shares
+   --pico-form-element-spacing-vertical across all form elements, but a
+   property redefined on `button` only inherits down into buttons). */
+button, [type="submit"], [type="reset"], [role="button"] {
+  --pico-form-element-spacing-vertical: 0.4rem;
+  --pico-form-element-spacing-horizontal: 1rem;
+  font-size: 0.85rem;
+}
+
 /* Borderless icon button (edit / delete). Replaces boxed `.outline small [contrast]`. */
 button.icon-btn {
   background: none;
@@ -550,6 +560,7 @@ header nav a.active {
 
 .button-row {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
@@ -1344,27 +1355,28 @@ button.small {
 }
 
 .help-section {
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--panel-border);
   border-radius: var(--card-radius);
   margin-bottom: 0.5rem;
   overflow: hidden;
 }
 
+/* Slate header bar, matching the Layout Setup tree / Operations cards. */
 .help-section-header {
   width: 100%;
   text-align: left;
-  background: var(--pico-card-background-color, #fafafa);
+  background: var(--panel-header-bg);
   border: none;
   padding: 0.6rem 0.9rem;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   cursor: pointer;
-  color: var(--badge-blue);
+  color: var(--panel-header-fg);
   margin-bottom: 0;
 }
 
 .help-section-header:hover {
-  background: var(--bg-muted);
+  background: color-mix(in srgb, var(--panel-header-bg), white 8%);
 }
 
 .help-section-body {
