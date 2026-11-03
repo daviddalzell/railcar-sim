@@ -32,8 +32,8 @@ Before you write any direct response to me, ensure it is written in ASD-STE100 S
 
 ### Deployment
 - Fly.io app: `waypoint-app`
-- **Auto-deploys at 4am Central time** on merge to `main`
-- Manual deploy: `fly deploy -a waypoint-app --strategy immediate`
+- **Auto-deploys nightly (~4am Central)**, triggered by an external HTTP cron calling `POST /admin/trigger-deploy` (guarded by `X-Sync-Secret`, same convention as `/admin/sync-patreon`). That endpoint (`admin/trigger_deploy.py`) dispatches `.github/workflows/deploy.yml` via GitHub's `workflow_dispatch` API, using a `GITHUB_DEPLOY_PAT` Fly secret that never leaves the app. GitHub's native `schedule:` cron trigger is deliberately **not** used — it has no delivery-time guarantee and was observed drifting by hours.
+- Manual deploy: `fly deploy -a waypoint-app --strategy immediate`, or `gh workflow run deploy.yml` to run the same CI/deploy pipeline on demand
 - Release command runs before new VMs start: `python -m admin.migrate_all_tenants`
 - If the release command fails, Fly aborts and keeps the previous version running
 
@@ -107,7 +107,8 @@ SQLite mode uses a local `railcar.db` file. `init_db()` creates the schema autom
 | `AUTH_DISABLED` | Set to any value to skip auth (local dev only) |
 | `DEFAULT_TENANT_SLUG` | Fallback tenant when subdomain doesn't match (e.g. during DNS setup) |
 | `ADMIN_PASSWORD` | Password for `/admin` routes |
-| `SYNC_SECRET` | Shared secret for Patreon webhook validation |
+| `SYNC_SECRET` | Shared secret for Patreon webhook validation (also guards `/admin/reset-demo`, `/admin/trigger-deploy`, etc.) |
+| `GITHUB_DEPLOY_PAT` | Fine-grained GitHub PAT (Actions: write) used by `/admin/trigger-deploy` to dispatch the nightly deploy workflow |
 | `PATREON_ACCESS_TOKEN` | Patreon API token for member sync |
 | `PATREON_CAMPAIGN_ID` | Patreon campaign to sync from |
 | `PATREON_WEBHOOK_SECRET` | Patreon webhook signature validation |
@@ -167,6 +168,7 @@ Test helpers live in `tests/conftest.py`: `make_car`, `make_location` (creates a
 | `reset_tenant.py` | `python -m admin.reset_tenant --slug=x` | Wipes all layout data for a tenant (keeps the tenant row and auth users) |
 | `clone_demo.py` | `python -m admin.clone_demo --slug=x` | Copies demo layout data into a tenant's schema |
 | `sync_patreon.py` | `python -m admin.sync_patreon` | Syncs Patreon members → tenant subscription status |
+| `trigger_deploy.py` | `python -m admin.trigger_deploy` | Dispatches the `deploy.yml` GitHub Actions workflow via the GitHub API; called by `/admin/trigger-deploy` (hit nightly by an external HTTP cron) |
 
 ---
 

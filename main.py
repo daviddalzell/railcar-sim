@@ -170,6 +170,16 @@ def admin_sync_patreon(request: Request):
     return result
 
 
+@app.post("/admin/trigger-deploy")
+def admin_trigger_deploy(request: Request):
+    from fastapi import HTTPException
+    secret = os.environ.get("SYNC_SECRET")
+    if not secret or request.headers.get("X-Sync-Secret") != secret:
+        raise HTTPException(403, "Forbidden")
+    from admin.trigger_deploy import trigger
+    return trigger()
+
+
 @app.post("/admin/reset-demo")
 def admin_reset_demo(request: Request):
     from fastapi import HTTPException

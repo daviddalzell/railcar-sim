@@ -8,8 +8,10 @@ on:
     branches: [feature/cloud-migration, main]   # runs CI (test + lint) only; deploy is gated separately
   pull_request:
     branches: [main]
-  schedule:
-    - cron: '0 10 * * *'   # 5am Chicago (UTC-5/UTC-6) — nightly deploy window
+  # Nightly deploy is fired by an external cron hitting /admin/trigger-deploy,
+  # which dispatches this workflow_dispatch trigger — see admin/trigger_deploy.py.
+  # GitHub's own `schedule:` trigger has no delivery-time guarantee (observed
+  # multi-hour drift), so it isn't used here.
   workflow_dispatch:
     inputs:
       reason:
@@ -58,13 +60,12 @@ jobs:
     name: Deploy to Fly.io
     needs: [test, lint]
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Skip if no new commits (schedule only)
+      - name: Skip if no new commits
         id: check
-        if: github.event_name == 'schedule'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
