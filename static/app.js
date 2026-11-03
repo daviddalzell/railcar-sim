@@ -204,6 +204,12 @@ async function api(method, path, body) {
 function hide(el) { el.classList.add("hidden"); }
 function show(el) { el.classList.remove("hidden"); }
 
+// Only one Layout Setup add/edit form (location / track / industry) open at a time.
+function showOnlyLayoutForm(formEl) {
+  ["#lg-form", "#track-form", "#industry-form"].forEach(sel => { const f = $(sel); if (f) hide(f); });
+  if (formEl) show(formEl);
+}
+
 // Guard: one delegated handler closes the nearest <dialog> for any close
 // control — a `rel="prev"` button (the header × convention) or a `.dialog-close`
 // element. Dialogs then dismiss even when a per-dialog handler is missing.
@@ -2465,7 +2471,7 @@ function renderLocationTree() {
       $("#tf-capacity").value = "";
       $("#tf-group-id").value = btn.dataset.groupId || "";
       $("#tf-edit-id").value = "";
-      show($("#track-form"));
+      showOnlyLayoutForm($("#track-form"));
     });
   });
 
@@ -2477,7 +2483,7 @@ function renderLocationTree() {
       $("#lg-name").value = group.name;
       $("#lg-capacity").value = group.car_capacity ?? "";
       $("#lg-edit-id").value = group.id;
-      show($("#lg-form"));
+      showOnlyLayoutForm($("#lg-form"));
     });
   });
 
@@ -2507,7 +2513,7 @@ function renderLocationTree() {
       $("#tf-capacity").value = t.car_capacity ?? "";
       $("#tf-group-id").value = t.location_id || "";
       $("#tf-edit-id").value = t.id;
-      show($("#track-form"));
+      showOnlyLayoutForm($("#track-form"));
     });
   });
 
@@ -2793,7 +2799,7 @@ $("#btn-add-location-group").addEventListener("click", () => {
   $("#lg-name").value = "";
   $("#lg-capacity").value = "";
   $("#lg-edit-id").value = "";
-  show($("#lg-form"));
+  showOnlyLayoutForm($("#lg-form"));
 });
 $("#btn-cancel-lg").addEventListener("click", () => hide($("#lg-form")));
 $("#lg-form").addEventListener("submit", async e => {
@@ -2859,7 +2865,7 @@ function openIndustryForm(trackId = null) {
     $("#ind-location").value = "";
     populateSpotPicker($("#ind-spot-numbers"), 0, "");
   }
-  show($("#industry-form"));
+  showOnlyLayoutForm($("#industry-form"));
   $("#industry-form").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
@@ -2876,7 +2882,7 @@ function openIndustryEdit(ind) {
   roleToCheckboxes(ind.industry_role || "consumer");
   hide($("#inbound-commodity-warn"));
   hide($("#outbound-commodity-warn"));
-  show($("#industry-form"));
+  showOnlyLayoutForm($("#industry-form"));
   $("#industry-form").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 

@@ -574,8 +574,15 @@ header nav a.active {
 }
 
 .inline-form input,
-.inline-form select {
+.inline-form select,
+.inline-form .ai-suggest-btn {
   margin-bottom: 0;
+  /* Compact fields (~60% height): cut the vertical padding directly; keep the font. */
+  padding-top: 0.3rem !important;
+  padding-bottom: 0.3rem !important;
+  line-height: 1.25;
+  height: auto;
+  min-height: 0;
 }
 
 .inline-form .grid {
