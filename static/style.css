@@ -476,8 +476,8 @@ header nav a.active {
   font-size: 0.75rem;
   background: var(--badge-blue);
   color: white;
-  border-radius: 4px;
-  padding: 2px 6px;
+  border-radius: 999px;
+  padding: 2px 8px;
   display: inline-block;
 }
 
@@ -611,8 +611,8 @@ header nav a.active {
   font-size: 0.75rem;
   background: var(--badge-green);
   color: white;
-  border-radius: 4px;
-  padding: 2px 6px;
+  border-radius: 999px;
+  padding: 2px 8px;
   min-width: 110px;
   text-align: center;
   white-space: nowrap;
@@ -1794,12 +1794,12 @@ button.small {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0.1rem 0.45rem;
-  border-radius: 4px;
+  border-radius: 999px;
   vertical-align: middle;
 }
-.status-draft    { background: #d4d4d4; color: #555; }
-.status-active   { background: #2a9d8f; color: #fff; }
-.status-complete { background: #457b9d; color: #fff; }
+.status-draft    { background: var(--badge-muted-bg); color: var(--badge-muted-fg); }
+.status-active   { background: color-mix(in srgb, var(--badge-green) 20%, transparent);  color: color-mix(in srgb, var(--badge-green), #fff 18%); }
+.status-complete { background: color-mix(in srgb, var(--badge-blue) 20%, transparent);   color: color-mix(in srgb, var(--badge-blue), #fff 18%); }
 
 /* Consist cards */
 .consist-card {
