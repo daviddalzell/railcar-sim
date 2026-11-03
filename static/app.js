@@ -1261,8 +1261,8 @@ function renderWaybillPool() {
         ${w.car_id ? `<span class="waybill-badge">${w.car_name || "Car"} · Slot ${w.slot_index + 1}</span>` : `<span class="waybill-badge muted">Unassigned</span>`}
       </div>
       <div class="pool-item-actions">
-        <button class="outline small edit-wb" data-id="${w.id}">✏️</button>
-        <button class="outline small contrast del-wb" data-id="${w.id}">🗑</button>
+        <button class="icon-btn edit-wb" data-id="${w.id}">✏️</button>
+        <button class="icon-btn del-wb" data-id="${w.id}">🗑</button>
       </div>
     </div>
   `).join("");
@@ -2159,7 +2159,7 @@ function renderCarTypeList() {
       <span style="flex:1">${ct.name}</span>
       <button class="outline small set-car-type-img" data-id="${ct.id}">Set image</button>
       ${ct.default_photo_path ? `<button class="outline small secondary clear-car-type-img" data-id="${ct.id}">Clear</button>` : ""}
-      <button class="outline small contrast del-car-type" data-id="${ct.id}" data-name="${ct.name}">🗑</button>
+      <button class="icon-btn del-car-type" data-id="${ct.id}" data-name="${ct.name}">🗑</button>
     </div>`;
   }).join("");
   list.querySelectorAll(".set-car-type-img").forEach(btn => {
@@ -2675,8 +2675,8 @@ function renderIndustryList() {
             ${allCommodities ? `<span class='muted'>${allCommodities}</span>` : ""}
           </span>
           <span>
-            <button class="outline small edit-ind" data-id="${i.id}">✏️</button>
-            <button class="outline small contrast del-ind" data-id="${i.id}">🗑</button>
+            <button class="icon-btn edit-ind" data-id="${i.id}">✏️</button>
+            <button class="icon-btn del-ind" data-id="${i.id}">🗑</button>
           </span>
         </div>
         ${unmappedChipsHtml(i.commodities, "inbound", i.id)}
@@ -3057,8 +3057,8 @@ function renderCommodityMapList() {
     <div class="layout-item">
       <span><strong>${m.commodity}</strong> <em>→ ${m.car_type}</em></span>
       <span>
-        <button class="outline small edit-cmap" data-id="${m.id}">✏️</button>
-        <button class="outline small contrast del-cmap" data-id="${m.id}">🗑</button>
+        <button class="icon-btn edit-cmap" data-id="${m.id}">✏️</button>
+        <button class="icon-btn del-cmap" data-id="${m.id}">🗑</button>
       </span>
     </div>
   `).join("");
