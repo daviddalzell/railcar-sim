@@ -73,6 +73,7 @@ def industry_to_dict(i: Industry) -> dict:
         "outbound_car_types": i.outbound_car_types,
         "spot_numbers": i.spot_numbers or "",
         "spot_count": len([s for s in (i.spot_numbers or "").split(",") if s.strip()]),
+        "position": i.position,
     }
 
 
@@ -83,6 +84,7 @@ def track_to_dict(t: Track) -> dict:
         "location_type": t.location_type,
         "location_id": t.location_id,
         "car_capacity": t.car_capacity,
+        "position": t.position,
     }
 
 
@@ -111,6 +113,7 @@ def location_group_to_dict(area: Location, db: Session) -> dict:
         "car_capacity": area.car_capacity,
         "current_car_count": current_count,
         "available_spots": available_spots,
+        "position": area.position,
         "tracks": [{"id": t.id, "name": t.name, "location_type": t.location_type} for t in area.tracks],
     }
 

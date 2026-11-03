@@ -64,7 +64,7 @@ def test_list_tracks_shape(client, db_session):
     r = client.get("/api/tracks")
     assert r.status_code == 200
     row = r.json()[0]
-    assert set(row.keys()) == {"id", "name", "location_type", "location_id", "car_capacity"}
+    assert set(row.keys()) == {"id", "name", "location_type", "location_id", "car_capacity", "position"}
 
 
 # ── Location-group CRUD on /api/locations ───────────────────────────────────────

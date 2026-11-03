@@ -93,6 +93,7 @@ class Location(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     car_capacity: Mapped[int] = mapped_column(Integer, default=10)
+    position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # manual order among Locations
 
     tracks: Mapped[List["Track"]] = relationship("Track", back_populates="location")
 
@@ -107,6 +108,7 @@ class Track(Base):
     location_type: Mapped[str] = mapped_column(String, default="yard")  # yard / industry / staging
     location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("locations.id"), nullable=True)
     car_capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # manual order within its Location
 
     location: Mapped[Optional["Location"]] = relationship("Location", back_populates="tracks")
     cars: Mapped[List["Car"]] = relationship("Car", back_populates="current_location")
@@ -128,6 +130,7 @@ class Industry(Base):
     outbound_commodities: Mapped[str] = mapped_column(String, default="")
     outbound_car_types: Mapped[str] = mapped_column(String, default="")
     spot_numbers: Mapped[str] = mapped_column(String, default="")
+    position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # manual order within its Track
 
     location: Mapped[Optional["Track"]] = relationship("Track", back_populates="industries")
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="industry")

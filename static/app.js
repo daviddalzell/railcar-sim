@@ -204,6 +204,12 @@ async function api(method, path, body) {
 function hide(el) { el.classList.add("hidden"); }
 function show(el) { el.classList.remove("hidden"); }
 
+// Only one Layout Setup add/edit form (location / track / industry) open at a time.
+function showOnlyLayoutForm(formEl) {
+  ["#lg-form", "#track-form", "#industry-form"].forEach(sel => { const f = $(sel); if (f) hide(f); });
+  if (formEl) show(formEl);
+}
+
 // Guard: one delegated handler closes the nearest <dialog> for any close
 // control — a `rel="prev"` button (the header × convention) or a `.dialog-close`
 // element. Dialogs then dismiss even when a per-dialog handler is missing.
@@ -700,12 +706,14 @@ $("#btn-add-manual").addEventListener("click", () => {
   updateDefaultImageOffer();
 });
 
-$("#btn-cancel-car").addEventListener("click", async () => {
+async function cancelAddCar() {
   await discardStylized();
   hide($("#add-car-form"));
   hide($("#stylize-section"));
   hide($("#default-image-offer"));
-});
+}
+$("#btn-cancel-car").addEventListener("click", cancelAddCar);
+$("#btn-cancel-car-top").addEventListener("click", cancelAddCar);
 
 function applyAnalysis(result) {
   if (result.photo_path) photoPath = result.photo_path;
@@ -1255,8 +1263,8 @@ function renderWaybillPool() {
         ${w.car_id ? `<span class="waybill-badge">${w.car_name || "Car"} · Slot ${w.slot_index + 1}</span>` : `<span class="waybill-badge muted">Unassigned</span>`}
       </div>
       <div class="pool-item-actions">
-        <button class="outline small edit-wb" data-id="${w.id}">✏️</button>
-        <button class="outline small contrast del-wb" data-id="${w.id}">🗑</button>
+        <button class="icon-btn edit-wb" data-id="${w.id}">✏️</button>
+        <button class="icon-btn del-wb" data-id="${w.id}">🗑</button>
       </div>
     </div>
   `).join("");
@@ -2153,7 +2161,7 @@ function renderCarTypeList() {
       <span style="flex:1">${ct.name}</span>
       <button class="outline small set-car-type-img" data-id="${ct.id}">Set image</button>
       ${ct.default_photo_path ? `<button class="outline small secondary clear-car-type-img" data-id="${ct.id}">Clear</button>` : ""}
-      <button class="outline small contrast del-car-type" data-id="${ct.id}" data-name="${ct.name}">🗑</button>
+      <button class="icon-btn del-car-type" data-id="${ct.id}" data-name="${ct.name}">🗑</button>
     </div>`;
   }).join("");
   list.querySelectorAll(".set-car-type-img").forEach(btn => {
@@ -2305,65 +2313,87 @@ function renderLocationTree() {
   if (!root) return;
   const collapsed = getTreeCollapseState();
 
-  const trackRow = (t) => {
-    const inds = industries.filter(i => i.location_id === t.id);
-    const indRows = inds.map(i => `
-      <div class="tree-industry-row">
-        <span>🏭 ${i.name}</span>
-      </div>`).join("");
+  const posSort = (a, b) => (a.position ?? a.id) - (b.position ?? b.id);
+
+  const trackRow = (t, isFirst, isLast) => {
+    const inds = industries.filter(i => i.location_id === t.id).sort(posSort);
+    const type = t.location_type || "yard";
+    const tkey = `track-${t.id}`;
+    const tCollapsed = !!collapsed[tkey];
+    const indRows = inds.length
+      ? inds.map((i, j) => `
+        <div class="tree-industry-row" data-ind-id="${i.id}">
+          <span class="ind-bullet">•</span>
+          <span class="ind-name">${i.name}</span>
+          <span class="tree-actions">
+            <button class="tree-icon-btn move-ind" data-id="${i.id}" data-dir="up" title="Move up"${j === 0 ? " disabled" : ""}>↑</button>
+            <button class="tree-icon-btn move-ind" data-id="${i.id}" data-dir="down" title="Move down"${j === inds.length - 1 ? " disabled" : ""}>↓</button>
+            <button class="tree-icon-btn edit-ind-tree" data-id="${i.id}" title="Edit">✏️</button>
+            <button class="tree-icon-btn del-ind-tree" data-id="${i.id}" title="Delete">🗑</button>
+          </span>
+        </div>`).join("")
+      : `<div class="tree-industry-empty"><em>No industries on this track</em></div>`;
     return `
       <div class="tree-track" data-track-id="${t.id}">
         <div class="tree-track-row">
+          <button class="tree-caret track-caret" data-tkey="${tkey}" aria-label="Toggle">${tCollapsed ? "▶" : "▼"}</button>
           <span class="tree-track-name" data-id="${t.id}">${t.name}</span>
-          <em class="muted small">${t.location_type}</em>
-          <span class="muted small">${t.current_car_count ?? 0}${t.car_capacity ? "/" + t.car_capacity : ""} cars</span>
+          <span class="track-type-badge track-type-${type}">${type}</span>
           <span class="tree-actions">
-            <button class="outline small edit-track" data-id="${t.id}">✏️</button>
-            <button class="outline small contrast del-track" data-id="${t.id}">🗑</button>
+            <button class="tree-icon-btn move-track" data-id="${t.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
+            <button class="tree-icon-btn move-track" data-id="${t.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>
+            <button class="tree-add-muted add-industry-to-track" data-id="${t.id}">+ Industry</button>
+            <button class="tree-icon-btn edit-track" data-id="${t.id}" title="Edit">✏️</button>
+            <button class="tree-icon-btn del-track" data-id="${t.id}" title="Delete">🗑</button>
           </span>
         </div>
-        ${inds.length ? `<div class="tree-industries">${indRows}</div>` : ""}
+        <div class="tree-industries ${tCollapsed ? "hidden" : ""}" data-tkey="${tkey}">${indRows}</div>
       </div>`;
   };
 
-  const groupBlock = (group) => {
-    const tracks = group ? locations.filter(l => l.location_id === group.id) : locations.filter(l => !l.location_id);
+  const groupBlock = (group, isFirst, isLast) => {
+    const tracks = (group ? locations.filter(l => l.location_id === group.id) : locations.filter(l => !l.location_id)).sort(posSort);
     const key = group ? `group-${group.id}` : "ungrouped";
     const isCollapsed = !!collapsed[key];
     const count = group ? (group.current_car_count ?? 0) : null;
     const cap = group ? (group.car_capacity ?? null) : null;
+    const full = group && cap != null && count >= cap;
     return `
       <div class="tree-group" data-group-key="${key}">
         <div class="tree-group-row">
-          <button class="outline small tree-toggle" data-key="${key}">${isCollapsed ? "▶" : "▼"}</button>
+          <button class="tree-caret group-caret" data-key="${key}" aria-label="Toggle">${isCollapsed ? "▶" : "▼"}</button>
           ${group
             ? `<span class="tree-group-name" data-id="${group.id}">${group.name}</span>
-               <span class="muted small">${count}${cap ? "/" + cap : ""} cars</span>`
-            : `<span class="muted"><em>Ungrouped tracks</em></span>`}
+               <span class="car-count-pill${full ? " full" : ""}">${count}${cap != null ? " / " + cap : ""} cars</span>`
+            : `<span class="tree-group-name muted"><em>Ungrouped tracks</em></span>`}
           <span class="tree-actions">
-            <button class="outline small add-track-to-group" data-group-id="${group ? group.id : ""}">+ Track</button>
             ${group ? `
-              <button class="outline small edit-group" data-id="${group.id}">✏️</button>
-              <button class="outline small contrast del-group" data-id="${group.id}">🗑</button>` : ""}
+              <button class="tree-icon-btn move-group" data-id="${group.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
+              <button class="tree-icon-btn move-group" data-id="${group.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>` : ""}
+            <button class="tree-add add-track-to-group" data-group-id="${group ? group.id : ""}">+ Track</button>
+            ${group ? `
+              <button class="tree-icon-btn edit-group" data-id="${group.id}" title="Edit">✏️</button>
+              <button class="tree-icon-btn del-group" data-id="${group.id}" title="Delete">🗑</button>` : ""}
           </span>
         </div>
         <div class="tree-group-body ${isCollapsed ? "hidden" : ""}" data-key="${key}">
-          ${tracks.length ? tracks.map(trackRow).join("") : '<p class="muted small">No tracks yet.</p>'}
+          ${tracks.length ? tracks.map((t, i) => trackRow(t, i === 0, i === tracks.length - 1)).join("") : '<p class="muted small tree-empty">No tracks yet.</p>'}
         </div>
       </div>`;
   };
 
+  const sortedAreas = switchingAreas.slice().sort(posSort);
   const ungroupedTracks = locations.filter(l => !l.location_id);
-  root.innerHTML = switchingAreas.map(groupBlock).join("") +
+  root.innerHTML = sortedAreas.map((group, i) => groupBlock(group, i === 0, i === sortedAreas.length - 1)).join("") +
     (ungroupedTracks.length ? groupBlock(null) : "");
 
   if (!switchingAreas.length && !ungroupedTracks.length) {
-    root.innerHTML = emptyState("📍", "No locations yet — add a group with the + Group button.");
+    root.innerHTML = emptyState("📍", "No locations yet — add a location with the + Location button.");
     return;
   }
 
-  // Collapse toggles
-  root.querySelectorAll(".tree-toggle").forEach(btn => {
+  // Location collapse
+  root.querySelectorAll(".group-caret").forEach(btn => {
     btn.addEventListener("click", () => {
       const key = btn.dataset.key;
       const body = root.querySelector(`.tree-group-body[data-key="${key}"]`);
@@ -2371,6 +2401,67 @@ function renderLocationTree() {
       body.classList.toggle("hidden", nowCollapsed);
       btn.textContent = nowCollapsed ? "▶" : "▼";
       setTreeCollapsed(key, nowCollapsed);
+    });
+  });
+
+  // Track collapse
+  root.querySelectorAll(".track-caret").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tkey = btn.dataset.tkey;
+      const body = root.querySelector(`.tree-industries[data-tkey="${tkey}"]`);
+      const nowCollapsed = !body.classList.contains("hidden");
+      body.classList.toggle("hidden", nowCollapsed);
+      btn.textContent = nowCollapsed ? "▶" : "▼";
+      setTreeCollapsed(tkey, nowCollapsed);
+    });
+  });
+
+  // Add industry to a track (opens the industry form pre-filled)
+  root.querySelectorAll(".add-industry-to-track").forEach(btn => {
+    btn.addEventListener("click", () => openIndustryForm(parseInt(btn.dataset.id)));
+  });
+
+  // Edit industry from the tree
+  root.querySelectorAll(".edit-ind-tree").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
+      if (ind) openIndustryEdit(ind);
+    });
+  });
+
+  // Delete industry from the tree
+  root.querySelectorAll(".del-ind-tree").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
+      if (!ind) return;
+      openCascadeDeleteDialog(
+        `Delete "${ind.name}"?`,
+        "Waybills that reference this industry are also removed or unassigned.",
+        () => api("DELETE", `/api/industries/${ind.id}`).then(loadLayout)
+      );
+    });
+  });
+
+  // Reorder locations / tracks / industries (up/down)
+  root.querySelectorAll(".move-group").forEach(btn => {
+    btn.addEventListener("click", () => {
+      api("POST", `/api/locations/${btn.dataset.id}/move`, { direction: btn.dataset.dir })
+        .then(loadLayout)
+        .catch(err => showToast("Error: " + err.message, "error"));
+    });
+  });
+  root.querySelectorAll(".move-track").forEach(btn => {
+    btn.addEventListener("click", () => {
+      api("POST", `/api/tracks/${btn.dataset.id}/move`, { direction: btn.dataset.dir })
+        .then(loadLayout)
+        .catch(err => showToast("Error: " + err.message, "error"));
+    });
+  });
+  root.querySelectorAll(".move-ind").forEach(btn => {
+    btn.addEventListener("click", () => {
+      api("POST", `/api/industries/${btn.dataset.id}/move`, { direction: btn.dataset.dir })
+        .then(loadLayout)
+        .catch(err => showToast("Error: " + err.message, "error"));
     });
   });
 
@@ -2382,7 +2473,7 @@ function renderLocationTree() {
       $("#tf-capacity").value = "";
       $("#tf-group-id").value = btn.dataset.groupId || "";
       $("#tf-edit-id").value = "";
-      show($("#track-form"));
+      showOnlyLayoutForm($("#track-form"));
     });
   });
 
@@ -2394,7 +2485,7 @@ function renderLocationTree() {
       $("#lg-name").value = group.name;
       $("#lg-capacity").value = group.car_capacity ?? "";
       $("#lg-edit-id").value = group.id;
-      show($("#lg-form"));
+      showOnlyLayoutForm($("#lg-form"));
     });
   });
 
@@ -2424,7 +2515,7 @@ function renderLocationTree() {
       $("#tf-capacity").value = t.car_capacity ?? "";
       $("#tf-group-id").value = t.location_id || "";
       $("#tf-edit-id").value = t.id;
-      show($("#track-form"));
+      showOnlyLayoutForm($("#track-form"));
     });
   });
 
@@ -2586,8 +2677,8 @@ function renderIndustryList() {
             ${allCommodities ? `<span class='muted'>${allCommodities}</span>` : ""}
           </span>
           <span>
-            <button class="outline small edit-ind" data-id="${i.id}">✏️</button>
-            <button class="outline small contrast del-ind" data-id="${i.id}">🗑</button>
+            <button class="icon-btn edit-ind" data-id="${i.id}">✏️</button>
+            <button class="icon-btn del-ind" data-id="${i.id}">🗑</button>
           </span>
         </div>
         ${unmappedChipsHtml(i.commodities, "inbound", i.id)}
@@ -2598,19 +2689,7 @@ function renderIndustryList() {
   $$(".edit-ind").forEach(btn => {
     btn.addEventListener("click", () => {
       const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
-      if (!ind) return;
-      $("#ind-name").value = ind.name;
-      $("#ind-location").value = ind.location_id || "";
-      refreshSpotPickerForLocation(ind.spot_numbers || "");
-      populateCarTypeMultiSelect($("#ind-inbound-car-types"), ind.inbound_car_types || ind.accepted_car_types || "");
-      $("#ind-inbound-commodities").value = ind.commodities || "";
-      populateCarTypeMultiSelect($("#ind-outbound-car-types"), ind.outbound_car_types || "");
-      $("#ind-outbound-commodities").value = ind.outbound_commodities || "";
-      $("#ind-edit-id").value = ind.id;
-      roleToCheckboxes(ind.industry_role || "consumer");
-      hide($("#inbound-commodity-warn"));
-      hide($("#outbound-commodity-warn"));
-      show($("#industry-form"));
+      if (ind) openIndustryEdit(ind);
     });
   });
 
@@ -2722,7 +2801,7 @@ $("#btn-add-location-group").addEventListener("click", () => {
   $("#lg-name").value = "";
   $("#lg-capacity").value = "";
   $("#lg-edit-id").value = "";
-  show($("#lg-form"));
+  showOnlyLayoutForm($("#lg-form"));
 });
 $("#btn-cancel-lg").addEventListener("click", () => hide($("#lg-form")));
 $("#lg-form").addEventListener("submit", async e => {
@@ -2770,20 +2849,46 @@ $("#track-form").addEventListener("submit", async e => {
   }
 });
 
-$("#btn-add-industry").addEventListener("click", () => {
+// Open the industry form for a new industry, optionally pre-attached to a track.
+function openIndustryForm(trackId = null) {
   $("#ind-name").value = "";
-  $("#ind-location").value = "";
   populateCarTypeMultiSelect($("#ind-inbound-car-types"), "");
   $("#ind-inbound-commodities").value = "";
   populateCarTypeMultiSelect($("#ind-outbound-car-types"), "");
   $("#ind-outbound-commodities").value = "";
-  populateSpotPicker($("#ind-spot-numbers"), 0, "");
   $("#ind-edit-id").value = "";
   roleToCheckboxes("consumer");
   hide($("#inbound-commodity-warn"));
   hide($("#outbound-commodity-warn"));
-  show($("#industry-form"));
-});
+  if (trackId) {
+    $("#ind-location").value = String(trackId);
+    refreshSpotPickerForLocation("");
+  } else {
+    $("#ind-location").value = "";
+    populateSpotPicker($("#ind-spot-numbers"), 0, "");
+  }
+  showOnlyLayoutForm($("#industry-form"));
+  $("#industry-form").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// Open the industry form to edit an existing industry.
+function openIndustryEdit(ind) {
+  $("#ind-name").value = ind.name;
+  $("#ind-location").value = ind.location_id || "";
+  refreshSpotPickerForLocation(ind.spot_numbers || "");
+  populateCarTypeMultiSelect($("#ind-inbound-car-types"), ind.inbound_car_types || ind.accepted_car_types || "");
+  $("#ind-inbound-commodities").value = ind.commodities || "";
+  populateCarTypeMultiSelect($("#ind-outbound-car-types"), ind.outbound_car_types || "");
+  $("#ind-outbound-commodities").value = ind.outbound_commodities || "";
+  $("#ind-edit-id").value = ind.id;
+  roleToCheckboxes(ind.industry_role || "consumer");
+  hide($("#inbound-commodity-warn"));
+  hide($("#outbound-commodity-warn"));
+  showOnlyLayoutForm($("#industry-form"));
+  $("#industry-form").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+$("#btn-add-industry").addEventListener("click", () => openIndustryForm());
 $("#btn-cancel-industry").addEventListener("click", () => hide($("#industry-form")));
 
 $("#btn-suggest-industry").addEventListener("click", async () => {
@@ -2954,8 +3059,8 @@ function renderCommodityMapList() {
     <div class="layout-item">
       <span><strong>${m.commodity}</strong> <em>→ ${m.car_type}</em></span>
       <span>
-        <button class="outline small edit-cmap" data-id="${m.id}">✏️</button>
-        <button class="outline small contrast del-cmap" data-id="${m.id}">🗑</button>
+        <button class="icon-btn edit-cmap" data-id="${m.id}">✏️</button>
+        <button class="icon-btn del-cmap" data-id="${m.id}">🗑</button>
       </span>
     </div>
   `).join("");
@@ -3509,23 +3614,26 @@ function renderConsistCard(plan) {
   if (pickups.length) carListHtml += `<p class="muted small" style="margin:0.5rem 0 0.25rem"><strong>Pick up</strong></p>` + pickups.map(carRow).join("");
   if (!total) carListHtml = '<p class="muted small">No cars in this consist.</p>';
 
+  const metaHtml = (crew || route || !hasPower) ? `
+    <div class="panel-body" style="padding-bottom:0.4rem">
+      ${crew ? `<div class="muted small" style="font-size:0.8rem">${crew}</div>` : ""}
+      ${route}
+      ${!hasPower ? `<div class="muted small consist-no-power-hint" style="font-size:0.75rem;color:var(--color-warning,#e07b00)">⚠ No locomotive assigned — open to assign power</div>` : ""}
+    </div>` : "";
+
   return `
-  <article class="consist-card" data-plan-id="${plan.id}" style="margin-bottom:0.75rem">
-    <div class="section-header">
+  <article class="consist-card panel-card" data-plan-id="${plan.id}" style="margin-bottom:0.75rem">
+    <div class="panel-head">
       <div class="section-header-title">
-        <button class="outline small consist-toggle" data-plan-id="${plan.id}">▶</button>
-        <div>
-          <div>${statusBadge} <strong>${trainTitle}${trainName}</strong>${depTime}</div>
-          ${crew ? `<div class="muted small" style="font-size:0.8rem">${crew}</div>` : ""}
-          ${route}
-          ${!hasPower ? `<div class="muted small consist-no-power-hint" style="font-size:0.75rem;color:var(--color-warning,#e07b00)">⚠ No locomotive assigned — open to assign power</div>` : ""}
-        </div>
+        <button class="icon-btn caret consist-toggle" data-plan-id="${plan.id}">▶</button>
+        <span class="panel-title">${statusBadge} <strong>${trainTitle}${trainName}</strong>${depTime}</span>
       </div>
       <div class="button-row">
         <button class="consist-start-session" data-plan-id="${plan.id}"${(total === 0 || !hasPower || !!session || plan.status === "complete") ? " disabled" : ""}>Start Session</button>
       </div>
     </div>
-    <div class="consist-body hidden" data-plan-id="${plan.id}">
+    ${metaHtml}
+    <div class="consist-body hidden panel-body compact-form" data-plan-id="${plan.id}" style="padding-top:${metaHtml ? "0" : "0.6rem"}">
 
       <details data-section="identity" data-plan-id="${plan.id}" style="margin-top:0.75rem">
         <summary class="muted small" style="cursor:pointer">Edit train identity &amp; crew</summary>
@@ -3950,12 +4058,18 @@ function _stopMembersRefresh() {
   if (_membersRefreshTimer) { clearInterval(_membersRefreshTimer); _membersRefreshTimer = null; }
 }
 
+function setLayoutTitle(name) {
+  const el = $("#layout-setup-title");
+  if (el) el.textContent = (name && name.trim()) || "My Layout";
+}
+
 async function loadSettings() {
   const data = await api("GET", "/api/tenant-settings");
   if (!data) return;
 
   const nameInput = $("#settings-tenant-name");
   if (nameInput && data.name !== undefined) nameInput.value = data.name;
+  setLayoutTitle(data.name);
 
   const providerSel = $("#settings-provider");
   if (providerSel) providerSel.value = data.vision_provider || "gemini";

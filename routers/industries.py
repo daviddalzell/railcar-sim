@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
@@ -9,7 +10,7 @@ from auth import require_admin
 from database import get_db
 from models import CommodityCarTypeMap, Industry, Waybill
 from converters import industry_to_dict
-from schemas import IndustryCreate, IndustrySuggestRequest
+from schemas import IndustryCreate, IndustrySuggestRequest, MoveRequest
 from vision import get_provider
 
 router = APIRouter(prefix="/api", tags=["industries"])
@@ -17,16 +18,39 @@ router = APIRouter(prefix="/api", tags=["industries"])
 
 @router.get("/industries")
 def list_industries(db: Session = Depends(get_db)):
-    return [industry_to_dict(i) for i in db.query(Industry).all()]
+    industries = db.query(Industry).order_by(
+        func.coalesce(Industry.position, Industry.id), Industry.id
+    ).all()
+    return [industry_to_dict(i) for i in industries]
 
 
 @router.post("/industries", status_code=201)
 def create_industry(data: IndustryCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     ind = Industry(**data.model_dump())
     db.add(ind)
+    db.flush()
+    ind.position = ind.id  # new industries append to the end of their track
     db.commit()
     db.refresh(ind)
     return industry_to_dict(ind)
+
+
+@router.post("/industries/{ind_id}/move")
+def move_industry(ind_id: int, data: MoveRequest, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+    ind = db.get(Industry, ind_id)
+    if not ind:
+        raise HTTPException(404, "Industry not found")
+    siblings = db.query(Industry).filter(
+        Industry.location_id == ind.location_id
+    ).order_by(func.coalesce(Industry.position, Industry.id), Industry.id).all()
+    idx = next(i for i, s in enumerate(siblings) if s.id == ind_id)
+    swap = idx - 1 if data.direction == "up" else idx + 1
+    if 0 <= swap < len(siblings):
+        siblings[idx], siblings[swap] = siblings[swap], siblings[idx]
+    for i, s in enumerate(siblings):  # normalise positions so NULLs are resolved
+        s.position = i
+    db.commit()
+    return {"ok": True}
 
 
 @router.put("/industries/{ind_id}")

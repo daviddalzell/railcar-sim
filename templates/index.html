@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Rose:wght@300;400;500;600;700&family=Montserrat+Alternates:wght@400;500;600;700;800;900&display=swap" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}" />
   <link rel="icon" type="image/png" href="/static/favicon.png">
   {% if supabase_url %}
   <meta name="supabase-url"      content="{{ supabase_url }}">
@@ -68,8 +68,11 @@
       </div>
 
       <!-- Add-car form (hidden by default) -->
-      <article id="add-car-form" class="hidden">
-        <h4>Add New Car</h4>
+      <article id="add-car-form" class="hidden compact-form">
+        <div class="section-header-title" style="justify-content:space-between;display:flex;">
+          <h4 style="margin:0">Add New Car</h4>
+          <button type="button" id="btn-cancel-car-top" class="btn-muted">Cancel</button>
+        </div>
         <div class="upload-zone" id="upload-zone">
           <input type="file" id="photo-input" accept="image/*" />
           <div class="upload-zone-actions">
@@ -140,9 +143,9 @@
 
       <!-- Power Pool (locomotives only) -->
       <section id="power-pool-section" class="hidden">
-        <div class="section-header" style="margin-top:0">
+        <div class="panel-head standalone">
           <div class="section-header-title">
-            <button id="btn-toggle-power-pool" class="outline small">▶</button>
+            <button id="btn-toggle-power-pool" class="icon-btn caret">▶</button>
             <h3>Power Pool</h3>
           </div>
         </div>
@@ -153,9 +156,9 @@
       <hr id="power-pool-divider" class="hidden" />
 
       <!-- Freight car grid -->
-      <div class="section-header" style="margin-top:0">
+      <div class="panel-head standalone">
         <div class="section-header-title">
-          <button id="btn-toggle-freight-cars" class="outline small">▼</button>
+          <button id="btn-toggle-freight-cars" class="icon-btn caret">▼</button>
           <h3>Freight Cars</h3>
         </div>
       </div>
@@ -165,7 +168,7 @@
 
       <!-- Move car dialog -->
       <dialog id="move-car-dialog">
-        <article>
+        <article class="compact-form">
           <header>
             <button aria-label="Close" rel="prev" id="close-move-dialog"></button>
             <h3>Move Car to Location</h3>
@@ -182,7 +185,7 @@
 
       <!-- Edit car dialog -->
       <dialog id="edit-car-dialog">
-        <article>
+        <article class="compact-form">
           <header>
             <button aria-label="Close" rel="prev" id="close-edit-car-dialog"></button>
             <h3>Edit Car</h3>
@@ -217,7 +220,7 @@
 
       <!-- Assign waybill slots dialog -->
       <dialog id="waybill-dialog">
-        <article>
+        <article class="compact-form">
           <header>
             <button aria-label="Close" rel="prev" id="close-waybill-dialog"></button>
             <h3 id="waybill-dialog-title">Assign Waybills</h3>
@@ -264,7 +267,7 @@
 
       <!-- Waybill create / edit dialog -->
       <dialog id="waybill-edit-dialog">
-        <article>
+        <article class="compact-form">
           <header>
             <button aria-label="Close" rel="prev" id="close-waybill-edit-dialog"></button>
             <h3 id="waybill-edit-title">New Waybill</h3>
@@ -309,28 +312,28 @@
       </div>
 
       <!-- Layout Status strip — always visible -->
-      <article id="layout-status" style="margin-bottom:1rem">
-        <div class="section-header">
+      <article id="layout-status" class="panel-card" style="margin-bottom:1rem">
+        <div class="panel-head">
           <div class="section-header-title">
-            <button id="btn-toggle-layout-status" class="outline small">▶</button>
+            <button id="btn-toggle-layout-status" class="icon-btn caret">▶</button>
             <h3 style="margin:0">Layout Status</h3>
           </div>
         </div>
-        <div id="layout-status-body" class="hidden" style="margin-top:0.5rem">
+        <div id="layout-status-body" class="hidden panel-body">
           <div id="layout-status-areas"></div>
           <div id="layout-status-yards"></div>
         </div>
       </article>
 
       <!-- Dispatcher panel -->
-      <article id="dispatcher-panel" class="hidden" style="margin-bottom:1rem">
-        <div class="section-header">
+      <article id="dispatcher-panel" class="hidden panel-card" style="margin-bottom:1rem">
+        <div class="panel-head">
           <div class="section-header-title">
-            <button id="btn-toggle-dispatcher" class="outline small">▼</button>
+            <button id="btn-toggle-dispatcher" class="icon-btn caret">▼</button>
             <h3 style="margin:0">Virtual Dispatcher</h3>
           </div>
         </div>
-        <div id="dispatcher-body">
+        <div id="dispatcher-body" class="panel-body compact-form">
           <div class="grid">
             <label>Origin (staging / yard)
               <select id="disp-origin"><option value="">— select origin —</option></select>
@@ -351,17 +354,17 @@
         </div><!-- /dispatcher-body -->
       </article>
 
-      <article id="ops-header" style="margin-bottom:1rem">
-        <div class="section-header">
+      <article id="ops-header" class="panel-card" style="margin-bottom:1rem">
+        <div class="panel-head">
           <div class="section-header-title">
-            <button id="btn-toggle-ops" class="outline small">▼</button>
+            <button id="btn-toggle-ops" class="icon-btn caret">▼</button>
             <h3 id="ops-title" style="margin:0">Quick Op Session</h3>
           </div>
           <div class="button-row" id="ops-header-buttons">
             <!-- swapped by JS between idle and active session states -->
           </div>
         </div>
-        <div id="ops-body">
+        <div id="ops-body" class="panel-body">
           <div id="session-warnings" class="hidden session-warnings"></div>
           <div id="spotting-conflicts"></div>
           <div id="ops-list"></div>
@@ -388,9 +391,9 @@
     <!-- ── LAYOUT SETUP ───────────────────────────────────────────────── -->
     <section id="tab-layout" class="tab-panel hidden">
 
-      <!-- Data export / import -->
+      <!-- Layout title + data export / import -->
       <div class="section-header mb-md">
-        <h3>Data</h3>
+        <h3 id="layout-setup-title">{{ layout_name or "My Layout" }}</h3>
         <div class="button-row">
           <button id="btn-export-backup" class="outline small">⬇ Export Backup</button>
           <button id="btn-import-trigger" class="outline small">⬆ Import Backup</button>
@@ -405,51 +408,67 @@
       <!-- Location Tree -->
       <div class="section-header">
         <div class="section-header-title">
-          <h3>Locations &amp; Tracks</h3>
+          <h3>Locations</h3>
         </div>
-        <button id="btn-add-location-group" class="outline small">+ Group</button>
+        <button id="btn-add-location-group" class="outline small">+ Location</button>
       </div>
       <!-- Location group create/edit form -->
       <form id="lg-form" class="hidden inline-form">
-        <input id="lg-name" type="text" placeholder="Group name (e.g. Millbrook Yard)" required />
-        <input id="lg-capacity" type="number" min="1" placeholder="Car capacity (optional)" style="width:14rem" />
-        <button type="submit" class="small">Save</button>
-        <button type="button" id="btn-cancel-lg" class="outline secondary small">✕</button>
+        <label>Location name
+          <input id="lg-name" type="text" placeholder="e.g. Millbrook Yard" required />
+        </label>
+        <label>Car capacity
+          <input id="lg-capacity" type="number" min="1" placeholder="Optional" />
+        </label>
         <input type="hidden" id="lg-edit-id" />
+        <div class="button-row">
+          <button type="submit" class="small">Save</button>
+          <button type="button" id="btn-cancel-lg" class="outline secondary small">Cancel</button>
+        </div>
       </form>
       <!-- Track create/edit form -->
       <form id="track-form" class="hidden inline-form">
-        <input id="tf-name" type="text" placeholder="Track name" required />
-        <select id="tf-type">
-          <option value="yard">Yard</option>
-          <option value="industry">Industry</option>
-          <option value="staging">Staging</option>
-          <option value="storage">Storage</option>
-        </select>
-        <input id="tf-capacity" type="number" min="1" placeholder="Capacity (optional)" style="width:14rem" />
+        <label>Track name
+          <input id="tf-name" type="text" placeholder="e.g. Yard Lead" required />
+        </label>
+        <label>Type
+          <select id="tf-type">
+            <option value="yard">Yard</option>
+            <option value="industry">Industry</option>
+            <option value="staging">Staging</option>
+            <option value="storage">Storage</option>
+          </select>
+        </label>
+        <label>Car capacity
+          <input id="tf-capacity" type="number" min="1" placeholder="Optional" />
+        </label>
         <input type="hidden" id="tf-group-id" />
-        <button type="submit" class="small">Save</button>
-        <button type="button" id="btn-cancel-track-form" class="outline secondary small">✕</button>
         <input type="hidden" id="tf-edit-id" />
+        <div class="button-row">
+          <button type="submit" class="small">Save</button>
+          <button type="button" id="btn-cancel-track-form" class="outline secondary small">Cancel</button>
+        </div>
       </form>
       <div id="location-tree"></div>
 
       <!-- Industries -->
       <hr />
       <div>
-        <div class="section-header">
+        <div class="panel-head standalone">
           <div class="section-header-title">
-            <button id="btn-toggle-industries" class="outline small">▼</button>
+            <button id="btn-toggle-industries" class="icon-btn caret">▼</button>
             <h3>Industries</h3>
           </div>
-          <button id="btn-add-industry" class="outline small">+</button>
+          <button id="btn-add-industry" class="btn-accent">+</button>
         </div>
         <div id="industries-body">
         <form id="industry-form" class="hidden inline-form">
+          <label for="ind-name">Industry name</label>
           <div class="suggest-row">
-            <input id="ind-name" type="text" placeholder="Industry name" required />
+            <input id="ind-name" type="text" placeholder="e.g. Riverside Grain" required />
             <button type="button" id="btn-suggest-industry" class="outline ai-suggest-btn">✨ AI Suggest</button>
           </div>
+          <label for="ind-location">Track</label>
           <select id="ind-location">
             <option value="">— no track —</option>
           </select>
@@ -457,9 +476,11 @@
             <input type="checkbox" id="ind-receiver" checked /> Receives loaded cars
           </label>
           <div id="ind-inbound-section">
+            <label>Inbound car types</label>
             <div id="ind-inbound-car-types" class="car-type-picker"></div>
+            <label for="ind-inbound-commodities">Inbound commodities</label>
             <div class="commodity-wrap">
-              <input id="ind-inbound-commodities" type="text" placeholder="Inbound commodities (comma-sep)" autocomplete="off" />
+              <input id="ind-inbound-commodities" type="text" placeholder="comma-separated" autocomplete="off" />
               <ul id="inbound-commodity-suggestions" class="suggestion-dropdown hidden"></ul>
             </div>
             <small id="inbound-commodity-warn" class="hidden error-msg"></small>
@@ -468,18 +489,22 @@
             <input type="checkbox" id="ind-shipper" /> Ships loaded cars
           </label>
           <div id="ind-outbound-section" class="hidden">
+            <label>Outbound car types</label>
             <div id="ind-outbound-car-types" class="car-type-picker"></div>
+            <label for="ind-outbound-commodities">Outbound commodities</label>
             <div class="commodity-wrap">
-              <input id="ind-outbound-commodities" type="text" placeholder="Outbound commodities (comma-sep)" autocomplete="off" />
+              <input id="ind-outbound-commodities" type="text" placeholder="comma-separated" autocomplete="off" />
               <ul id="outbound-commodity-suggestions" class="suggestion-dropdown hidden"></ul>
             </div>
             <small id="outbound-commodity-warn" class="hidden error-msg"></small>
           </div>
-          <label style="font-size:0.85rem;margin-bottom:0.2rem">Spot Number(s)</label>
+          <label>Spot number(s)</label>
           <div id="ind-spot-numbers" class="spot-picker"></div>
-          <button type="submit" class="small">Save</button>
-          <button type="button" id="btn-cancel-industry" class="outline secondary small">✕</button>
           <input type="hidden" id="ind-edit-id" value="" />
+          <div class="button-row">
+            <button type="submit" class="small">Save</button>
+            <button type="button" id="btn-cancel-industry" class="outline secondary small">Cancel</button>
+          </div>
         </form>
         <div id="industry-list"></div>
         </div><!-- /industries-body -->
@@ -487,14 +512,14 @@
 
       <!-- Commodity → Car Type mapping -->
       <hr />
-      <div class="section-header" style="margin-top:1rem">
+      <div class="panel-head standalone" style="margin-top:1rem">
         <div class="section-header-title">
-          <button id="btn-toggle-commodity-map" class="outline small" title="Collapse / expand">▶</button>
+          <button id="btn-toggle-commodity-map" class="icon-btn caret" title="Collapse / expand">▶</button>
           <h3>Commodity → Car Type</h3>
         </div>
         <div class="button-row">
-          <button id="btn-seed-commodity-map" class="outline small">⚙ Seed Defaults</button>
-          <button id="btn-add-commodity-map" class="outline small">+</button>
+          <button id="btn-seed-commodity-map" class="btn-muted">⚙ Seed Defaults</button>
+          <button id="btn-add-commodity-map" class="btn-accent">+</button>
         </div>
       </div>
       <div id="commodity-map-body" class="hidden">
@@ -512,7 +537,7 @@
           </div>
           <div class="button-row">
             <button type="submit" class="small">Save</button>
-            <button type="button" id="btn-cancel-commodity-map" class="outline secondary small">✕</button>
+            <button type="button" id="btn-cancel-commodity-map" class="outline secondary small">Cancel</button>
             <input type="hidden" id="cmap-edit-id" value="" />
           </div>
         </form>
@@ -521,18 +546,21 @@
 
       <hr />
       <div>
-        <div class="section-header">
+        <div class="panel-head standalone">
           <div class="section-header-title">
-            <button id="btn-toggle-car-type" class="outline small" title="Collapse / expand">▶</button>
+            <button id="btn-toggle-car-type" class="icon-btn caret" title="Collapse / expand">▶</button>
             <h3>Car Types</h3>
           </div>
-          <button id="btn-add-car-type" class="outline small">+ Add</button>
+          <button id="btn-add-car-type" class="btn-accent">+ Add</button>
         </div>
         <div id="car-type-body" class="hidden">
           <form id="car-type-form" class="hidden inline-form">
+            <label for="car-type-name">Car type name</label>
             <input id="car-type-name" type="text" placeholder="e.g. autorack" required />
-            <button type="submit" class="small">Save</button>
-            <button type="button" id="btn-cancel-car-type" class="outline secondary small">✕</button>
+            <div class="button-row">
+              <button type="submit" class="small">Save</button>
+              <button type="button" id="btn-cancel-car-type" class="outline secondary small">Cancel</button>
+            </div>
           </form>
           <div id="car-type-list"></div>
         </div>
@@ -784,7 +812,7 @@
 
     <section id="tab-settings" class="tab-panel hidden">
       <div class="section-header"><h2>Settings</h2></div>
-      <div id="settings-content" style="max-width:520px;">
+      <div id="settings-content" class="compact-form" style="max-width:520px;">
         <div id="settings-demo-notice" style="display:none;margin-bottom:1.25rem;padding:.75rem 1rem;border:1px solid var(--border,#2d3447);border-radius:6px;font-size:0.85rem;color:var(--muted,#9aa3b2)">
           Settings are view-only in the demo.
           <a href="https://www.patreon.com/waypoint_ops" target="_blank" rel="noopener">Subscribe to create your own layout →</a>
@@ -880,6 +908,8 @@
         </div>
         <div class="dialog-footer-secondary">
           <button id="btn-auto-assign-car" class="outline secondary">🔄 Auto-Assign</button>
+        </div>
+        <div class="dialog-footer-secondary">
           <button id="btn-edit-waybills" class="outline secondary">Edit Waybills</button>
           <button id="btn-edit-car" class="outline secondary">Edit Car…</button>
           <button id="btn-delete-car" class="outline contrast">Delete Car</button>
@@ -940,7 +970,7 @@
   </dialog>
 
   <dialog id="staging-merge-dialog">
-    <article>
+    <article class="compact-form">
       <header>
         <button aria-label="Close" rel="prev" id="btn-close-staging-merge"></button>
         <h3>Consolidate Staging Location</h3>

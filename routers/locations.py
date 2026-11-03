@@ -4,6 +4,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
@@ -11,7 +12,7 @@ from auth import require_admin
 from database import get_db
 from models import Car, Location, MovementLog, Track, Waybill
 from converters import location_group_to_dict, track_to_dict
-from schemas import LocationCreate, TrackCreate
+from schemas import LocationCreate, MoveRequest, TrackCreate
 
 router = APIRouter(prefix="/api", tags=["locations"])
 
@@ -20,7 +21,10 @@ router = APIRouter(prefix="/api", tags=["locations"])
 
 @router.get("/tracks")
 def list_tracks(db: Session = Depends(get_db)):
-    return [track_to_dict(t) for t in db.query(Track).all()]
+    tracks = db.query(Track).order_by(
+        func.coalesce(Track.position, Track.id), Track.id
+    ).all()
+    return [track_to_dict(t) for t in tracks]
 
 
 @router.post("/tracks", status_code=201)
@@ -32,9 +36,29 @@ def create_track(data: TrackCreate, db: Session = Depends(get_db), _: dict = Dep
         car_capacity=data.car_capacity,
     )
     db.add(track)
+    db.flush()
+    track.position = track.id  # new tracks append to the end of their Location
     db.commit()
     db.refresh(track)
     return track_to_dict(track)
+
+
+@router.post("/tracks/{track_id}/move")
+def move_track(track_id: int, data: MoveRequest, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(404, "Track not found")
+    siblings = db.query(Track).filter(
+        Track.location_id == track.location_id
+    ).order_by(func.coalesce(Track.position, Track.id), Track.id).all()
+    idx = next(i for i, s in enumerate(siblings) if s.id == track_id)
+    swap = idx - 1 if data.direction == "up" else idx + 1
+    if 0 <= swap < len(siblings):
+        siblings[idx], siblings[swap] = siblings[swap], siblings[idx]
+    for i, s in enumerate(siblings):  # normalise positions so NULLs are resolved
+        s.position = i
+    db.commit()
+    return {"ok": True}
 
 
 @router.put("/tracks/{track_id}")
@@ -97,7 +121,9 @@ def delete_track(request: Request, track_id: int, merge_into_id: Optional[int] =
 
 @router.get("/locations")
 def list_locations(db: Session = Depends(get_db)):
-    areas = db.query(Location).all()
+    areas = db.query(Location).order_by(
+        func.coalesce(Location.position, Location.id), Location.id
+    ).all()
     return [location_group_to_dict(a, db) for a in areas]
 
 
@@ -105,9 +131,29 @@ def list_locations(db: Session = Depends(get_db)):
 def create_location(data: LocationCreate, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     area = Location(name=data.name, car_capacity=data.car_capacity)
     db.add(area)
+    db.flush()
+    area.position = area.id  # new locations append to the end
     db.commit()
     db.refresh(area)
     return location_group_to_dict(area, db)
+
+
+@router.post("/locations/{area_id}/move")
+def move_location(area_id: int, data: MoveRequest, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+    area = db.get(Location, area_id)
+    if not area:
+        raise HTTPException(404, "Location not found")
+    siblings = db.query(Location).order_by(
+        func.coalesce(Location.position, Location.id), Location.id
+    ).all()
+    idx = next(i for i, s in enumerate(siblings) if s.id == area_id)
+    swap = idx - 1 if data.direction == "up" else idx + 1
+    if 0 <= swap < len(siblings):
+        siblings[idx], siblings[swap] = siblings[swap], siblings[idx]
+    for i, s in enumerate(siblings):  # normalise positions so NULLs are resolved
+        s.position = i
+    db.commit()
+    return {"ok": True}
 
 
 @router.put("/locations/{area_id}")

@@ -88,6 +88,24 @@ def init_db():
         except Exception:
             pass
         try:
+            conn.execute(text("ALTER TABLE locations ADD COLUMN position INTEGER"))
+            conn.execute(text("UPDATE locations SET position = id WHERE position IS NULL"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE tracks ADD COLUMN position INTEGER"))
+            conn.execute(text("UPDATE tracks SET position = id WHERE position IS NULL"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE industries ADD COLUMN position INTEGER"))
+            conn.execute(text("UPDATE industries SET position = id WHERE position IS NULL"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
             conn.execute(text("ALTER TABLE dispatch_plan ADD COLUMN spots_ids_json TEXT DEFAULT '[]'"))
             conn.commit()
         except Exception:

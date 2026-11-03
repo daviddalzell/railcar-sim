@@ -37,6 +37,11 @@ class LocationCreate(BaseModel):
     car_capacity: int = 10
 
 
+class MoveRequest(BaseModel):
+    """Reorder a track or industry within its parent."""
+    direction: str  # "up" | "down"
+
+
 class DispatchBuildRequest(BaseModel):
     origin_location_id: int
     location_id: int
