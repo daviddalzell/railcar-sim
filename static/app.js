@@ -2305,17 +2305,21 @@ function renderLocationTree() {
   if (!root) return;
   const collapsed = getTreeCollapseState();
 
-  const trackRow = (t) => {
-    const inds = industries.filter(i => i.location_id === t.id);
+  const posSort = (a, b) => (a.position ?? a.id) - (b.position ?? b.id);
+
+  const trackRow = (t, isFirst, isLast) => {
+    const inds = industries.filter(i => i.location_id === t.id).sort(posSort);
     const type = t.location_type || "yard";
     const tkey = `track-${t.id}`;
     const tCollapsed = !!collapsed[tkey];
     const indRows = inds.length
-      ? inds.map(i => `
+      ? inds.map((i, j) => `
         <div class="tree-industry-row" data-ind-id="${i.id}">
           <span class="ind-bullet">•</span>
           <span class="ind-name">${i.name}</span>
           <span class="tree-actions">
+            <button class="tree-icon-btn move-ind" data-id="${i.id}" data-dir="up" title="Move up"${j === 0 ? " disabled" : ""}>↑</button>
+            <button class="tree-icon-btn move-ind" data-id="${i.id}" data-dir="down" title="Move down"${j === inds.length - 1 ? " disabled" : ""}>↓</button>
             <button class="tree-icon-btn edit-ind-tree" data-id="${i.id}" title="Edit">✏️</button>
             <button class="tree-icon-btn del-ind-tree" data-id="${i.id}" title="Delete">🗑</button>
           </span>
@@ -2328,6 +2332,8 @@ function renderLocationTree() {
           <span class="tree-track-name" data-id="${t.id}">${t.name}</span>
           <span class="track-type-badge track-type-${type}">${type}</span>
           <span class="tree-actions">
+            <button class="tree-icon-btn move-track" data-id="${t.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
+            <button class="tree-icon-btn move-track" data-id="${t.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>
             <button class="tree-add-muted add-industry-to-track" data-id="${t.id}">+ Industry</button>
             <button class="tree-icon-btn edit-track" data-id="${t.id}" title="Edit">✏️</button>
             <button class="tree-icon-btn del-track" data-id="${t.id}" title="Delete">🗑</button>
@@ -2338,7 +2344,7 @@ function renderLocationTree() {
   };
 
   const groupBlock = (group) => {
-    const tracks = group ? locations.filter(l => l.location_id === group.id) : locations.filter(l => !l.location_id);
+    const tracks = (group ? locations.filter(l => l.location_id === group.id) : locations.filter(l => !l.location_id)).sort(posSort);
     const key = group ? `group-${group.id}` : "ungrouped";
     const isCollapsed = !!collapsed[key];
     const count = group ? (group.current_car_count ?? 0) : null;
@@ -2360,7 +2366,7 @@ function renderLocationTree() {
           </span>
         </div>
         <div class="tree-group-body ${isCollapsed ? "hidden" : ""}" data-key="${key}">
-          ${tracks.length ? tracks.map(trackRow).join("") : '<p class="muted small tree-empty">No tracks yet.</p>'}
+          ${tracks.length ? tracks.map((t, i) => trackRow(t, i === 0, i === tracks.length - 1)).join("") : '<p class="muted small tree-empty">No tracks yet.</p>'}
         </div>
       </div>`;
   };
@@ -2421,6 +2427,22 @@ function renderLocationTree() {
         "Waybills that reference this industry are also removed or unassigned.",
         () => api("DELETE", `/api/industries/${ind.id}`).then(loadLayout)
       );
+    });
+  });
+
+  // Reorder tracks / industries (up/down)
+  root.querySelectorAll(".move-track").forEach(btn => {
+    btn.addEventListener("click", () => {
+      api("POST", `/api/tracks/${btn.dataset.id}/move`, { direction: btn.dataset.dir })
+        .then(loadLayout)
+        .catch(err => showToast("Error: " + err.message, "error"));
+    });
+  });
+  root.querySelectorAll(".move-ind").forEach(btn => {
+    btn.addEventListener("click", () => {
+      api("POST", `/api/industries/${btn.dataset.id}/move`, { direction: btn.dataset.dir })
+        .then(loadLayout)
+        .catch(err => showToast("Error: " + err.message, "error"));
     });
   });
 

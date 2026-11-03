@@ -687,6 +687,8 @@ header nav a.active {
   border-radius: 4px;
 }
 #location-tree .tree-icon-btn:hover { opacity: 1; background: rgba(127, 127, 127, 0.15); }
+#location-tree .tree-icon-btn:disabled { opacity: 0.22; cursor: default; }
+#location-tree .tree-icon-btn:disabled:hover { background: none; }
 
 /* "+ Track" — outlined accent button */
 #location-tree .tree-add {
