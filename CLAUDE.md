@@ -4,7 +4,7 @@
 
 Waypoint is a multi-tenant model railway operations web app. Operators build car rosters, assign waybills, run operating sessions, and dispatch trains. Each tenant (club or individual) gets an isolated Postgres schema. A public demo tenant lives at `demo.waypoint-ops.com`.
 
-**Stack:** FastAPI · SQLAlchemy · Alembic · Supabase (Postgres + Auth) · Fly.io · Vanilla JS frontend (single `static/app.js`) · Jinja2 templates
+**Stack:** FastAPI · SQLAlchemy · Alembic · Supabase (Postgres + Auth) · Fly.io · Vanilla JS frontend (single `static/app.js`) · CSS split by feature under `static/css/` · Jinja2 templates
 
 ---
 ### Standard instruction: use Simplified Technical English
@@ -152,7 +152,8 @@ Test helpers live in `tests/conftest.py`: `make_car`, `make_location` (creates a
 | `auth.py` | Supabase JWT validation; `get_current_user` dependency |
 | `admin/migrate_all_tenants.py` | Runs Alembic across every tenant schema (Fly release command) |
 | `admin/seed_demo.py` | Seeds the demo tenant with sample data |
-| `static/app.js` | Entire frontend (~4000 lines, vanilla JS) |
+| `static/app.js` | Entire frontend (~4300 lines, vanilla JS) — see "Frontend" section below |
+| `static/css/` | Styling, split one file per tab/feature (`base.css` holds shared tokens/primitives); `templates/index.html` links each one |
 | `templates/index.html` | Main app shell (Jinja2) |
 
 ---
@@ -205,28 +206,27 @@ Check: tenant row exists in `public.tenants`, schema exists, table counts > 0, `
 
 ## Frontend (`static/app.js`)
 
-Single file, ~4000 lines, vanilla JS. Major sections in order:
+Single file, ~4300 lines, vanilla JS, no build step. `grep -n "^function <name>"` to jump straight to any function below — line numbers aren't tracked here since they drift on every edit; a planned follow-up splits this file into one module per section (mirroring the `static/css/` split already done), at which point this becomes a file-name table instead.
 
-| Line | Section |
-|---|---|
-| 6 | **State** — module-level arrays: `cars`, `locations` (Locations), `tracks`, `industries`, `waybills`, `switchingAreas` |
-| 143 | **Helpers** — `api()`, `showToast()`, `withLoading()`, `track()` (GA events) |
-| 242 | **Photo library** — `openPhotoLibrary()`, `refreshLibraryGrid()` |
-| 397 | **Tab navigation** — tab switching, URL hash handling |
-| 423 | **Roster** — `loadRoster()`, `renderCarGrid()`, `carCardHTML()` |
-| 624 | **Add car via photo** — `processPhotoFile()`, `runStylize()`, `applyAnalysis()` |
-| 891 | **Car detail dialog** — `openCarDetail()` |
-| 1236 | **Waybill pool** — `loadWaybillPool()`, `renderWaybillPool()`, `openWaybillEditDialog()` |
-| 1396 | **Operations view** — `loadOperations()`, `renderPlanPreview()` |
-| 1591 | **Operating session** — `renderActiveSession()`, `detectSpottingConflicts()`, `handleEndSession()` |
-| 2047 | **Layout setup** — `loadLayout()`, `renderLocationTree()`, `renderIndustryList()`, `renderCarTypeList()` |
-| 2864 | **Export / Import** — backup download and ZIP restore |
-| 3107 | **Location tree helpers** — `buildTrackOptgroups()`, `openCascadeDeleteDialog()`, inline rename |
-| 3218 | **Layout status strip** — `renderLayoutStatus()` |
-| 3284 | **Dispatcher** — `loadDispatcherPanel()`, `renderConsistCard()`, `wireConsistCard()` |
-| 3757 | **Settings tab** — `loadSettings()`, `loadMembers()` |
-| 3966 | **Bootstrap** — `init()` entry point; loads all tabs, wires event listeners, opens dialogs |
-| 4019 | **AI notice / Demo welcome** — dialog button handlers |
+Major sections, in file order, by their key functions:
+- **State** — module-level arrays at the top of the file: `cars`, `locations` (Locations), `tracks`, `industries`, `waybills`, `switchingAreas`
+- **Helpers** — `api()`, `showToast()`, `withLoading()`, `track()` (GA events)
+- **Photo library** — `openPhotoLibrary()`, `refreshLibraryGrid()`
+- **Tab navigation** — tab switching, URL hash handling
+- **Roster** — `loadRoster()`, `renderCarGrid()`, `carCardHTML()`
+- **Add car via photo** — `processPhotoFile()`, `runStylize()`, `applyAnalysis()`
+- **Car detail dialog** — `openCarDetail()`
+- **Waybill pool** — `loadWaybillPool()`, `renderWaybillPool()`, `openWaybillEditDialog()`
+- **Operations view** — `loadOperations()`, `renderPlanPreview()`
+- **Operating session** — `renderActiveSession()`, `detectSpottingConflicts()`, `handleEndSession()`
+- **Layout setup** — `loadLayout()`, `renderLocationTree()`, `renderIndustryList()`, `renderCarTypeList()`
+- **Export / Import** — backup download and ZIP restore
+- **Location tree helpers** — `buildTrackOptgroups()`, `openCascadeDeleteDialog()`, inline rename
+- **Layout status strip** — `renderLayoutStatus()`
+- **Dispatcher** — `loadDispatcherPanel()`, `renderConsistCard()`, `wireConsistCard()`
+- **Settings tab** — `loadSettings()`, `loadMembers()`
+- **Bootstrap** — `init()` entry point; loads all tabs, wires event listeners, opens dialogs
+- **AI notice / Demo welcome** — dialog button handlers
 
 Key patterns:
 - `api(method, path, body)` — all fetch calls go through this; throws on non-2xx
@@ -269,7 +269,7 @@ The Location/Track rename is applied on both backend and frontend:
 - Backward-compat response keys (`switching_area_id`, `switching_areas`) are removed.
 - All track selects group tracks by Location via `<optgroup>` (`buildTrackOptgroups()`).
 - All layout deletes use a cascade-warning dialog (`openCascadeDeleteDialog()`).
-- `app.js` is cache-busted with the git SHA (`asset_version` in `main.py`).
+- `app.js` and every file under `static/css/` are cache-busted with the git SHA (`asset_version` in `main.py`).
 - Touch layout: accordion tree plus bottom-sheet forms at a single breakpoint (≤1024px). A desktop split is a future enhancement.
 
 ---
