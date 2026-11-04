@@ -18,7 +18,18 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Rose:wght@300;400;500;600;700&family=Montserrat+Alternates:wght@400;500;600;700;800;900&display=swap" />
-  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}" />
+  <!-- base.css first — defines the :root tokens and shared primitives
+       (.icon-btn, .panel-card, .pill, etc.) every other file depends on. -->
+  <link rel="stylesheet" href="/static/css/base.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/static/css/roster.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/static/css/waybills.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/static/css/operations.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/static/css/session.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/static/css/dispatcher.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/static/css/layout-tree.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/static/css/settings.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/static/css/help.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/static/css/dialogs.css?v={{ asset_version }}" />
   <link rel="icon" type="image/png" href="/static/favicon.png">
   {% if supabase_url %}
   <meta name="supabase-url"      content="{{ supabase_url }}">

@@ -289,7 +289,7 @@ railcar-sim/
 
 ## UI design (Figma)
 
-The visual design is driven by CSS custom properties defined in `static/style.css`. All colours, border radii, and key surface values are named variables, making them directly mappable to Figma Variables for iterative design work.
+The visual design is driven by CSS custom properties defined in `static/css/base.css`'s `:root` block. All colours, border radii, and key surface values are named variables, making them directly mappable to Figma Variables for iterative design work. Feature-specific styling (per tab/component) lives in its own file under `static/css/` — see `templates/index.html` for the full list of stylesheets.
 
 ### Design token reference
 
@@ -328,10 +328,10 @@ The visual design is driven by CSS custom properties defined in `static/style.cs
 
 1. Adjust Variable values in Figma
 2. Open Dev Mode → Variables panel to read the updated hex values
-3. Update the matching `--variable-name` in `static/style.css :root`
+3. Update the matching `--variable-name` in `static/css/base.css :root`
 4. Commit
 
-For an automated token export, install the [Tokens Studio for Figma](https://tokens.studio) plugin — it can export a `tokens.json` that a small script can apply directly to `style.css`.
+For an automated token export, install the [Tokens Studio for Figma](https://tokens.studio) plugin — it can export a `tokens.json` that a small script can apply directly to `base.css`.
 
 ---
 

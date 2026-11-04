@@ -1,0 +1,250 @@
+/* SPDX-FileCopyrightText: 2026 David Dalzell */
+/* SPDX-License-Identifier: MIT */
+
+/* Active operating session — end-session dialog, session car rows (done /
+   CP states), power strip, and the persistent bottom session status bar. */
+
+/* ── End-session dialog ──────────────────────────────────────────────────── */
+#end-session-dialog article {
+  max-width: 560px;
+}
+
+.session-warnings {
+  background: #fef9e7;
+  border: 1px solid var(--badge-orange);
+  border-radius: var(--card-radius);
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: #7d6608;
+}
+
+.session-progress {
+  text-align: right;
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.session-progress-label {
+  font-size: 0.85rem;
+  align-self: center;
+}
+
+.session-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 0.75rem 0 0.4rem;
+}
+
+.session-car-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  background: var(--pico-card-background-color, #f9f9f9);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 0.4rem;
+  font-size: 0.875rem;
+  transition: opacity 0.2s;
+}
+
+.session-car-row.done {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.session-car-row.done button { display: none; }
+
+.session-car-row.cp {
+  border: 4px solid var(--badge-orange);
+  background: var(--rail-dark);
+}
+
+.session-car-row .session-btn-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.session-car-info  { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.session-car-marks { font-weight: 600; }
+.session-car-move  { color: var(--text-muted); font-size: 0.8rem; }
+
+.session-car-thumb {
+  width: 60px;
+  height: 48px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: var(--car-img-bg);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.session-car-thumb.clickable-thumb {
+  cursor: pointer;
+}
+.session-car-thumb.clickable-thumb:hover {
+  outline: 2px solid var(--rail-accent);
+  outline-offset: 1px;
+}
+
+.session-car-thumb img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.no-photo-thumb {
+  background: var(--bg-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2px;
+}
+
+.cp-car-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.875rem;
+}
+.cp-car-row:last-child { border-bottom: none; }
+.cp-car-label { flex: 1; font-weight: 600; }
+
+/* ── Power strip (session header / dispatcher consist) ───────────────────── */
+.session-power-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--pico-card-background-color, #f5f0e8);
+  border: 1px solid var(--pico-muted-border-color, #d9cfc4);
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.power-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.4rem;
+  background: var(--pico-secondary-background, #e8e0d5);
+  border-radius: 4px;
+}
+
+.power-chip img,
+.power-chip > span:first-child {
+  width: 60px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: var(--car-img-bg);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.power-chip-marks {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.power-strip-sep {
+  color: var(--pico-muted-color);
+  font-size: 0.8rem;
+}
+
+.power-strip-empty {
+  display: inline-flex;
+  align-items: center;
+  height: 52px;
+  color: var(--text-muted, #888);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.power-chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted, #888);
+  font-size: 0.65rem;
+  cursor: pointer;
+  padding: 0 0.15rem;
+  line-height: 1;
+  margin-left: 0.1rem;
+}
+.power-chip-remove:hover {
+  color: var(--rail-accent, #c0392b);
+}
+
+/* ── Session status bar (persistent, bottom of viewport) ─────────────────── */
+#session-status-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--pico-card-background-color, #fff);
+  border-top: 2px solid var(--pico-primary-background, #1a56a4);
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.12);
+}
+#session-status-bar.hidden { display: none; }
+.session-bar-progress {
+  color: var(--muted-color, #888);
+  font-weight: 400;
+  flex: 1;
+}
+
+/* ── Mobile (≤ 600px) ────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Session ops header — wrap controls, keep Cancel/End on own row */
+  #ops-header-buttons {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  #btn-cancel-session,
+  #btn-end-session {
+    flex: 1;
+  }
+
+  /* Session car rows — prevent text overflow and button spillage */
+  .session-car-info {
+    min-width: 0;
+  }
+  .session-car-marks,
+  .session-car-move {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .session-btn-row {
+    flex-shrink: 0;
+  }
+  .session-car-row .industry-tag {
+    flex-shrink: 0;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

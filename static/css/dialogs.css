@@ -1,0 +1,154 @@
+/* SPDX-FileCopyrightText: 2026 David Dalzell */
+/* SPDX-License-Identifier: MIT */
+
+/* Shared dialog chrome — the car-detail dialog (used from Roster/Operations)
+   and the edit-car-photo widget. Dialogs owned by a single feature (waybill
+   editor, end-session, etc.) live in that feature's own CSS file instead. */
+
+#car-detail-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#close-detail-dialog {
+  margin-left: auto;
+  width: auto;
+}
+
+/* ── Car detail dialog ───────────────────────────────────────────────────── */
+#car-detail-dialog article {
+  max-width: 680px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.dialog-footer-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  justify-content: center;
+}
+
+.dialog-footer-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.dialog-footer-secondary:last-child {
+  margin-bottom: 0;
+}
+
+.dialog-footer-primary button,
+.dialog-footer-secondary button {
+  flex: 1;
+  max-width: 160px;
+}
+
+#btn-advance-waybill,
+#btn-edit-waybills,
+#btn-auto-assign-car {
+  max-width: 240px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.detail-photo {
+  width: 270px;
+  height: 195px;
+  object-fit: contain;
+  background: var(--car-img-bg);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-light);
+}
+
+/* ── Edit car photo ──────────────────────────────────────────────────────── */
+.edit-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.edit-thumb {
+  width: 100px;
+  height: auto;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-light);
+  display: none;
+}
+
+.edit-photo-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.edit-photo-buttons .edit-photo-label,
+.edit-photo-buttons button {
+  width: 100%;
+  margin: 0;
+}
+
+.edit-photo-buttons .edit-photo-label span {
+  display: block;
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.edit-photo-label {
+  cursor: pointer;
+  align-self: center;
+}
+
+/* ── Mobile (≤ 600px) ────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* All dialogs — full-width bottom sheet */
+  dialog article {
+    max-width: 100% !important;
+    max-height: 90vh;
+    margin: 0;
+    border-radius: var(--card-radius) var(--card-radius) 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+
+  /* Car detail — stack photo above info */
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-photo {
+    width: 100%;
+    height: 180px;
+  }
+
+  /* Dialog footers — stack buttons vertically, full width */
+  .dialog-footer-primary,
+  .dialog-footer-secondary {
+    flex-direction: column;
+    justify-content: stretch;
+    align-items: stretch;
+  }
+
+  .dialog-footer-primary button,
+  .dialog-footer-secondary button,
+  #btn-advance-waybill,
+  #btn-edit-waybills {
+    width: 100%;
+    max-width: none;
+  }
+}

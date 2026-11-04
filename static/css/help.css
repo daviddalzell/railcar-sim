@@ -1,0 +1,50 @@
+/* SPDX-FileCopyrightText: 2026 David Dalzell */
+/* SPDX-License-Identifier: MIT */
+
+/* Help tab — collapsible topic accordion. */
+
+.help-section {
+  border: 1px solid var(--panel-border);
+  border-radius: var(--card-radius);
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+/* Slate header bar, matching the Layout Setup tree / Operations cards. */
+.help-section-header {
+  width: 100%;
+  text-align: left;
+  background: var(--panel-header-bg);
+  border: none;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--panel-header-fg);
+  margin-bottom: 0;
+}
+
+.help-section-header:hover {
+  background: color-mix(in srgb, var(--panel-header-bg), white 8%);
+}
+
+.help-section-body {
+  padding: 0.75rem 1rem 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  border-top: 1px solid var(--border-light);
+}
+
+.help-section-body p {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.help-section-body ul {
+  margin: 0 0 0.5rem 1.2rem;
+  padding: 0;
+}
+
+.help-section-body li {
+  margin-bottom: 0.25rem;
+}

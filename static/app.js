@@ -2335,12 +2335,12 @@ function renderLocationTree() {
           <span class="ind-bullet">•</span>
           <span class="ind-name">${i.name}</span>
           <span class="tree-actions">
-            <button class="tree-icon-btn move-ind" data-id="${i.id}" data-dir="up" title="Move up"${j === 0 ? " disabled" : ""}>↑</button>
-            <button class="tree-icon-btn move-ind" data-id="${i.id}" data-dir="down" title="Move down"${j === inds.length - 1 ? " disabled" : ""}>↓</button>
-            <button class="tree-icon-btn tree-kebab-btn" title="More actions" aria-label="More actions">⋮</button>
+            <button class="icon-btn move-ind" data-id="${i.id}" data-dir="up" title="Move up"${j === 0 ? " disabled" : ""}>↑</button>
+            <button class="icon-btn move-ind" data-id="${i.id}" data-dir="down" title="Move down"${j === inds.length - 1 ? " disabled" : ""}>↓</button>
+            <button class="icon-btn tree-kebab-btn" title="More actions" aria-label="More actions">⋮</button>
             <span class="tree-overflow-menu">
-              <button class="tree-icon-btn edit-ind-tree" data-id="${i.id}" title="Edit">✏️<span class="kebab-label">Edit</span></button>
-              <button class="tree-icon-btn del-ind-tree" data-id="${i.id}" title="Delete">🗑<span class="kebab-label">Delete</span></button>
+              <button class="icon-btn edit-ind-tree" data-id="${i.id}" title="Edit">✏️<span class="kebab-label">Edit</span></button>
+              <button class="icon-btn del-ind-tree" data-id="${i.id}" title="Delete">🗑<span class="kebab-label">Delete</span></button>
             </span>
           </span>
         </div>`).join("")
@@ -2348,17 +2348,17 @@ function renderLocationTree() {
     return `
       <div class="tree-track" data-track-id="${t.id}">
         <div class="tree-track-row">
-          <button class="tree-caret track-caret" data-tkey="${tkey}" aria-label="Toggle">${tCollapsed ? "▶" : "▼"}</button>
+          <button class="icon-btn caret track-caret" data-tkey="${tkey}" aria-label="Toggle">${tCollapsed ? "▶" : "▼"}</button>
           <span class="tree-track-name" data-id="${t.id}">${t.name}</span>
           <span class="track-type-badge track-type-${type}">${type}</span>
           <span class="tree-actions">
-            <button class="tree-icon-btn move-track" data-id="${t.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
-            <button class="tree-icon-btn move-track" data-id="${t.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>
-            <button class="tree-icon-btn tree-kebab-btn" title="More actions" aria-label="More actions">⋮</button>
+            <button class="icon-btn move-track" data-id="${t.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
+            <button class="icon-btn move-track" data-id="${t.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>
+            <button class="icon-btn tree-kebab-btn" title="More actions" aria-label="More actions">⋮</button>
             <span class="tree-overflow-menu">
-              <button class="tree-add-muted add-industry-to-track" data-id="${t.id}">+ Industry</button>
-              <button class="tree-icon-btn edit-track" data-id="${t.id}" title="Edit">✏️<span class="kebab-label">Edit</span></button>
-              <button class="tree-icon-btn del-track" data-id="${t.id}" title="Delete">🗑<span class="kebab-label">Delete</span></button>
+              <button class="btn-muted add-industry-to-track" data-id="${t.id}">+ Industry</button>
+              <button class="icon-btn edit-track" data-id="${t.id}" title="Edit">✏️<span class="kebab-label">Edit</span></button>
+              <button class="icon-btn del-track" data-id="${t.id}" title="Delete">🗑<span class="kebab-label">Delete</span></button>
             </span>
           </span>
         </div>
@@ -2376,21 +2376,21 @@ function renderLocationTree() {
     return `
       <div class="tree-group" data-group-key="${key}">
         <div class="tree-group-row">
-          <button class="tree-caret group-caret" data-key="${key}" aria-label="Toggle">${isCollapsed ? "▶" : "▼"}</button>
+          <button class="icon-btn caret group-caret" data-key="${key}" aria-label="Toggle">${isCollapsed ? "▶" : "▼"}</button>
           ${group
             ? `<span class="tree-group-name" data-id="${group.id}">${group.name}</span>
                <span class="car-count-pill${full ? " full" : ""}">${count}${cap != null ? " / " + cap : ""} cars</span>`
             : `<span class="tree-group-name muted"><em>Ungrouped tracks</em></span>`}
           <span class="tree-actions">
             ${group ? `
-              <button class="tree-icon-btn move-group" data-id="${group.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
-              <button class="tree-icon-btn move-group" data-id="${group.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>` : ""}
-            <button class="tree-icon-btn tree-kebab-btn" title="More actions" aria-label="More actions">⋮</button>
+              <button class="icon-btn move-group" data-id="${group.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
+              <button class="icon-btn move-group" data-id="${group.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>` : ""}
+            <button class="icon-btn tree-kebab-btn" title="More actions" aria-label="More actions">⋮</button>
             <span class="tree-overflow-menu">
-              <button class="tree-add add-track-to-group" data-group-id="${group ? group.id : ""}">+ Track</button>
+              <button class="btn-accent add-track-to-group" data-group-id="${group ? group.id : ""}">+ Track</button>
               ${group ? `
-                <button class="tree-icon-btn edit-group" data-id="${group.id}" title="Edit">✏️<span class="kebab-label">Edit</span></button>
-                <button class="tree-icon-btn del-group" data-id="${group.id}" title="Delete">🗑<span class="kebab-label">Delete</span></button>` : ""}
+                <button class="icon-btn edit-group" data-id="${group.id}" title="Edit">✏️<span class="kebab-label">Edit</span></button>
+                <button class="icon-btn del-group" data-id="${group.id}" title="Delete">🗑<span class="kebab-label">Delete</span></button>` : ""}
             </span>
           </span>
         </div>
