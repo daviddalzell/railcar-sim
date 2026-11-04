@@ -1,0 +1,345 @@
+/* SPDX-FileCopyrightText: 2026 David Dalzell */
+/* SPDX-License-Identifier: MIT */
+
+/* Car Roster tab — roster grid, add-car (photo upload / stylize / manual),
+   photo library, and the orphaned-cars / default-image-offer banners. */
+
+/* ── Car grid ────────────────────────────────────────────────────────────── */
+.car-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.car-card {
+  border: 1px solid var(--pico-muted-border-color, #ccc);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+.car-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.car-thumb {
+  height: 130px;
+  background: var(--car-img-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.car-thumb img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: transform 0.2s;
+}
+
+.car-card:hover .car-thumb img {
+  transform: scale(1.05);
+}
+
+.no-photo {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.no-photo.small {
+  font-size: 0.7rem;
+  padding: 0.25rem;
+}
+
+.default-car-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--car-img-bg);
+}
+
+.car-type-thumb {
+  width: 48px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #eee;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.car-info {
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.car-type     { color: var(--text-secondary); }
+.car-color    { color: var(--text-light); font-style: italic; }
+.car-location { font-weight: 600; }
+
+.waybill-badge {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  background: var(--badge-blue);
+  color: white;
+  border-radius: 999px;
+  padding: 2px 8px;
+  display: inline-block;
+}
+
+.waybill-badge.muted {
+  background: var(--badge-muted-bg);
+  color: var(--badge-muted-fg);
+}
+
+/* ── Upload zone ─────────────────────────────────────────────────────────── */
+.upload-zone {
+  border: 2px dashed var(--border-muted);
+  border-radius: var(--card-radius);
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  margin-bottom: 1rem;
+}
+
+.upload-zone input[type="file"] {
+  display: none;
+}
+
+.upload-zone label {
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--text-placeholder);
+}
+
+.upload-zone-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.upload-zone-sep {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+#upload-preview {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+#upload-preview img {
+  max-height: 200px;
+  max-width: 100%;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-light);
+}
+
+/* ── Stylize section ─────────────────────────────────────────────────────── */
+#stylize-section {
+  position: relative;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  padding-top: 1.6rem;
+  border: 1px solid var(--pico-form-element-border-color);
+  border-radius: var(--card-radius);
+  background: var(--pico-form-element-background-color);
+}
+
+.ai-badge {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: gold;
+  background: transparent;
+  border: none;
+  padding: 1px 6px;
+  line-height: 1.4;
+}
+
+#btn-stylize {
+  background: var(--badge-blue) !important;
+  color: gold !important;
+  border-color: gold !important;
+}
+
+#stylize-idle,
+#stylize-processing {
+  text-align: center;
+  padding: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.stylize-compare {
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+
+#stylize-preview {
+  max-height: 220px;
+  max-width: 100%;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-light);
+}
+
+/* ── Photo library ───────────────────────────────────────────────────────── */
+#photo-library-dialog article {
+  max-width: 720px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.photo-library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.lib-thumb {
+  position: relative;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  aspect-ratio: 4/3;
+  background: var(--bg-muted);
+}
+
+.lib-thumb:hover { border-color: var(--rail-accent); }
+
+.lib-thumb img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.lib-thumb.lib-assigned { opacity: 0.6; }
+
+.lib-thumb.lib-selected {
+  border-color: var(--rail-accent);
+  outline: 2px solid var(--rail-accent);
+}
+
+.lib-thumb.lib-selected::after {
+  content: "✓";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: var(--rail-accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: bold;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lib-badge {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  background: var(--badge-blue);
+  color: white;
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.lib-badge-default {
+  background: var(--rail-green);
+}
+
+.lib-actions {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.lib-thumb:hover .lib-actions { opacity: 1; }
+
+.lib-action-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 8px;
+  line-height: 1;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.lib-action-btn:hover { opacity: 0.75; }
+
+/* ── Needs-move highlight ────────────────────────────────────────────────── */
+.car-needs-move {
+  border: 2px solid var(--badge-orange);
+}
+
+.car-needs-move .waybill-badge {
+  background: var(--badge-orange);
+}
+
+/* ── Banners (orphaned-cars warning, default-image offer) ───────────────── */
+.info-offer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--info-offer-bg);
+  border-radius: 6px;
+  margin-top: 0.5rem;
+}
+
+.warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* ── Mobile (≤ 600px) ────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .car-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.65rem;
+  }
+
+  .upload-zone {
+    padding: 1rem;
+  }
+
+  /* Car Roster header — title on its own line, buttons wrap below */
+  #tab-roster > .section-header > h2 {
+    flex: 0 0 100%;
+  }
+}

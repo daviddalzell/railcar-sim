@@ -1,0 +1,38 @@
+/* SPDX-FileCopyrightText: 2026 David Dalzell */
+/* SPDX-License-Identifier: MIT */
+
+/* Settings tab, demo-mode banner, and the full-viewport onboarding/notice
+   dialogs (demo welcome, AI feature notice, AI region restriction). */
+
+#demo-banner {
+  background: #1a5fa8;
+  color: #fff;
+  text-align: center;
+  padding: .55rem 1rem;
+  font-size: .875rem;
+  font-weight: 500;
+}
+#demo-banner a {
+  color: #afd4ff;
+  margin-left: .5rem;
+  white-space: nowrap;
+}
+
+/* ── Full-viewport overlay dialogs (demo welcome, AI notices) ──────────────── */
+/* These centre their custom card via flex. The flex centring must apply ONLY
+   when open — setting display:flex inline overrides the UA
+   `dialog:not([open]) { display: none }` rule, which leaves the dialog painted
+   after .close() and makes its buttons appear unresponsive. */
+#demo-welcome-dialog[open],
+#ai-notice-dialog[open],
+#ai-region-dialog[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* "Continue to Demo" stays inactive until a valid email is entered. */
+#btn-demo-welcome-continue:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

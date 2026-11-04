@@ -1,0 +1,429 @@
+/* SPDX-FileCopyrightText: 2026 David Dalzell */
+/* SPDX-License-Identifier: MIT */
+
+/* Layout Setup tab — the location/track/industry tree, the inline
+   location/track/industry forms, commodity-map autocomplete, and the
+   industry form's car-type picker.
+
+   Note: the tree's move/edit/delete/collapse buttons use the shared
+   .icon-btn / .icon-btn.caret / .btn-accent / .btn-muted classes from
+   base.css, not tree-local copies — those used to be separate, byte-for-byte
+   duplicate rule sets (one generic, one `#location-tree`-scoped) and were
+   consolidated into the single shared definition. Only the color override
+   needed to stay tree-specific (the Location header row is a permanently
+   dark slate bar in both themes, so its icons need to stay light-colored
+   regardless of the page's adaptive text color). */
+
+.chip-group {
+  display: inline-flex;
+  margin: 0.15rem 0.2rem 0 0;
+  vertical-align: middle;
+}
+
+.cmap-add-chip,
+.cmap-dismiss-chip {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.chip-group .cmap-add-chip {
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+}
+
+.chip-group .cmap-dismiss-chip {
+  border-radius: 0 4px 4px 0;
+  padding: 0.1rem 0.4rem;
+}
+
+.layout-item.layout-item-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+}
+
+.layout-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+}
+
+.ind-unmapped-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.25rem 0.1rem;
+  border-top: 1px solid rgba(255,165,0,0.25);
+  background: rgba(255,165,0,0.06);
+}
+
+.ind-unmapped-label {
+  font-size: 0.75rem;
+  color: var(--badge-orange, #e67e22);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.layout-grid {
+  gap: 2rem;
+}
+
+.inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--card-radius);
+  margin-bottom: 0.75rem;
+  background: var(--pico-card-background-color, #fafafa);
+}
+
+.inline-form input,
+.inline-form select,
+.inline-form .ai-suggest-btn {
+  margin-bottom: 0;
+  /* Compact fields (~60% height): cut the vertical padding directly; keep the font. */
+  padding-top: 0.3rem !important;
+  padding-bottom: 0.3rem !important;
+  line-height: 1.25;
+  height: auto;
+  min-height: 0;
+}
+
+.inline-form .grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.suggest-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: stretch;
+}
+
+.suggest-row input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.ai-suggest-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+
+.layout-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.9rem;
+  gap: 0.5rem;
+}
+
+.layout-item span:last-child {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* ── Location Tree ───────────────────────────────────────────────────────── */
+.tree-group {
+  /* Brighter slate boundary (~#798590): rail-dark lifted toward rail-light. */
+  border: 1px solid color-mix(in srgb, var(--rail-dark), var(--rail-light) 40%);
+  border-radius: var(--card-radius);
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+}
+
+.tree-group-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  /* House slate header bar, like the app nav — readable in both themes. */
+  background: var(--rail-dark);
+}
+
+.tree-group-name {
+  font-weight: 600;
+  cursor: text;
+  flex: 1;
+  color: var(--rail-light);
+}
+
+/* Keep the header caret and move/edit/delete icons legible on the slate
+   bar in both themes — .icon-btn's color: inherit would otherwise pick up
+   the page's (theme-adaptive) text color here, not rail-light. */
+#location-tree .tree-group-row .icon-btn {
+  color: var(--rail-light);
+  opacity: 0.8;
+}
+
+.tree-group-row .tree-actions,
+.tree-track-row .tree-actions,
+.tree-industry-row .tree-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Mobile row overflow (kebab) menu. display:contents on the wrapper means
+   desktop sees the Add/Edit/Delete buttons as plain flex children of
+   .tree-actions — unchanged from today. Only the ≤600px block below hides
+   them from the inline row and pops them out into a dropdown instead. */
+#location-tree .tree-overflow-menu { display: contents; }
+#location-tree .tree-kebab-btn { display: none; }
+#location-tree .kebab-label { display: none; }
+
+@media (max-width: 600px) {
+  #location-tree .tree-actions { position: relative; }
+  #location-tree .tree-kebab-btn { display: inline-flex; align-items: center; justify-content: center; }
+  #location-tree .tree-overflow-menu { display: none; }
+  #location-tree .tree-actions.menu-open .tree-overflow-menu {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 50;
+    min-width: 150px;
+    background: var(--pico-card-background-color, #fff);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    padding: 0.25rem;
+  }
+  /* Reset each button's own desktop look (bordered accent, muted text, bare
+     icon) into a consistent list-item row, and force the normal adaptive
+     text color even inside the dark .tree-group-row. */
+  #location-tree .tree-actions.menu-open .tree-overflow-menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    justify-content: flex-start;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: var(--pico-color, inherit);
+    opacity: 1;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  #location-tree .tree-actions.menu-open .tree-overflow-menu button:hover {
+    background: var(--icon-btn-hover, rgba(127, 127, 127, 0.15));
+  }
+  #location-tree .tree-actions.menu-open .kebab-label { display: inline; }
+}
+
+.tree-group-body {
+  padding: 0.3rem 0.7rem 0.5rem 1.1rem;
+  margin-left: 0.55rem;
+  border-left: 2px solid var(--consist-card-border);
+}
+
+.tree-track {
+  border-top: 1px solid var(--consist-card-border);
+  padding: 0.35rem 0 0.2rem;
+}
+
+.tree-track:first-child {
+  border-top: none;
+}
+
+.tree-track-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.tree-track-name {
+  cursor: text;
+  font-weight: 500;
+}
+
+/* Track type badge */
+.track-type-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.42rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.track-type-yard     { background: color-mix(in srgb, var(--badge-green) 20%, transparent);  color: color-mix(in srgb, var(--badge-green), #fff 18%); }
+.track-type-industry { background: color-mix(in srgb, var(--badge-blue) 20%, transparent);   color: color-mix(in srgb, var(--badge-blue), #fff 18%); }
+.track-type-staging  { background: color-mix(in srgb, var(--badge-purple) 26%, transparent); color: color-mix(in srgb, var(--badge-purple), #fff 24%); }
+.track-type-storage  { background: color-mix(in srgb, var(--rail-green) 24%, transparent);   color: color-mix(in srgb, var(--rail-green), #fff 26%); }
+
+/* Car-count pill — sits on the slate header bar */
+.car-count-pill {
+  font-size: 0.72rem;
+  color: var(--rail-light);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.car-count-pill.full {
+  background: color-mix(in srgb, var(--badge-orange) 34%, transparent);
+  color: color-mix(in srgb, var(--badge-orange), #fff 42%);
+}
+
+/* Industry rows with orange connector */
+.tree-industries {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin: 0.15rem 0 0.2rem 0.35rem;
+  padding: 0.1rem 0 0.1rem 0.75rem;
+  border-left: 2px solid var(--badge-orange, #d68910);
+}
+
+.tree-industry-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+}
+
+.ind-bullet { color: var(--badge-orange, #d68910); line-height: 1; flex-shrink: 0; }
+.ind-name { color: var(--pico-muted-color); }
+
+.tree-industry-empty {
+  font-size: 0.8rem;
+  color: var(--pico-muted-color);
+  opacity: 0.6;
+  padding-left: 0.1rem;
+}
+
+.inline-rename-input {
+  font: inherit;
+  font-weight: inherit;
+  padding: 0.1rem 0.3rem;
+  margin: 0;
+  width: auto;
+  min-width: 6rem;
+}
+
+/* ── Commodity autocomplete ──────────────────────────────────────────────── */
+.commodity-wrap { position: relative; margin-bottom: 0; }
+
+.suggestion-dropdown {
+  position: absolute;
+  z-index: 200;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--pico-card-background-color, #fff);
+  border: 1px solid var(--pico-muted-border-color, #ccc);
+  border-radius: var(--card-radius);
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 0;
+  margin: 2px 0 0;
+  list-style: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.suggestion-item {
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.suggestion-item:hover {
+  background: var(--pico-secondary-background, #f4f4f4);
+}
+
+.suggestion-car-type {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Industry form: car-type picker ──────────────────────────────────────── */
+.car-type-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.4rem 0;
+}
+
+.ct-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--pico-muted-border-color, #ccc);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  transition: background 0.15s, border-color 0.15s;
+  margin: 0;
+}
+
+.ct-pill input[type="checkbox"] {
+  display: none;
+}
+
+.ct-pill:has(input:checked) {
+  background: var(--pico-primary-background, #1a6fb5);
+  border-color: var(--pico-primary-background, #1a6fb5);
+  color: #fff;
+}
+
+/* ── Mobile (≤ 600px) ────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .layout-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+}
+
+/* ── Touch bottom-sheet forms (phone + iPad, single breakpoint) ──────────── */
+@media (max-width: 1024px) {
+  #tab-layout #lg-form,
+  #tab-layout #track-form,
+  #tab-layout #industry-form {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 200;
+    margin: 0;
+    border-radius: 12px 12px 0 0;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.2);
+  }
+
+  #tab-layout #lg-form.hidden,
+  #tab-layout #track-form.hidden,
+  #tab-layout #industry-form.hidden {
+    display: none;
+  }
+
+  .tree-group-row,
+  .tree-track-row {
+    flex-wrap: wrap;
+  }
+}
