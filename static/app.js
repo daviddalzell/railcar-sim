@@ -218,6 +218,15 @@ document.addEventListener("click", e => {
   if (closer) closer.closest("dialog")?.close();
 });
 
+// Close any open Layout Setup tree-row overflow (kebab) menu on outside
+// click or Escape — the kebab's own click handler stops propagation, so
+// this only ever sees clicks that should close it.
+function closeAllTreeMenus() {
+  document.querySelectorAll("#location-tree .tree-actions.menu-open").forEach(el => el.classList.remove("menu-open"));
+}
+document.addEventListener("click", closeAllTreeMenus);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeAllTreeMenus(); });
+
 function showToast(message, type = "info", duration = 3500) {
   const openDialog = document.querySelector("dialog[open]");
   const container = openDialog
@@ -2328,8 +2337,11 @@ function renderLocationTree() {
           <span class="tree-actions">
             <button class="tree-icon-btn move-ind" data-id="${i.id}" data-dir="up" title="Move up"${j === 0 ? " disabled" : ""}>↑</button>
             <button class="tree-icon-btn move-ind" data-id="${i.id}" data-dir="down" title="Move down"${j === inds.length - 1 ? " disabled" : ""}>↓</button>
-            <button class="tree-icon-btn edit-ind-tree" data-id="${i.id}" title="Edit">✏️</button>
-            <button class="tree-icon-btn del-ind-tree" data-id="${i.id}" title="Delete">🗑</button>
+            <button class="tree-icon-btn tree-kebab-btn" title="More actions" aria-label="More actions">⋮</button>
+            <span class="tree-overflow-menu">
+              <button class="tree-icon-btn edit-ind-tree" data-id="${i.id}" title="Edit">✏️<span class="kebab-label">Edit</span></button>
+              <button class="tree-icon-btn del-ind-tree" data-id="${i.id}" title="Delete">🗑<span class="kebab-label">Delete</span></button>
+            </span>
           </span>
         </div>`).join("")
       : `<div class="tree-industry-empty"><em>No industries on this track</em></div>`;
@@ -2342,9 +2354,12 @@ function renderLocationTree() {
           <span class="tree-actions">
             <button class="tree-icon-btn move-track" data-id="${t.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
             <button class="tree-icon-btn move-track" data-id="${t.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>
-            <button class="tree-add-muted add-industry-to-track" data-id="${t.id}">+ Industry</button>
-            <button class="tree-icon-btn edit-track" data-id="${t.id}" title="Edit">✏️</button>
-            <button class="tree-icon-btn del-track" data-id="${t.id}" title="Delete">🗑</button>
+            <button class="tree-icon-btn tree-kebab-btn" title="More actions" aria-label="More actions">⋮</button>
+            <span class="tree-overflow-menu">
+              <button class="tree-add-muted add-industry-to-track" data-id="${t.id}">+ Industry</button>
+              <button class="tree-icon-btn edit-track" data-id="${t.id}" title="Edit">✏️<span class="kebab-label">Edit</span></button>
+              <button class="tree-icon-btn del-track" data-id="${t.id}" title="Delete">🗑<span class="kebab-label">Delete</span></button>
+            </span>
           </span>
         </div>
         <div class="tree-industries ${tCollapsed ? "hidden" : ""}" data-tkey="${tkey}">${indRows}</div>
@@ -2370,10 +2385,13 @@ function renderLocationTree() {
             ${group ? `
               <button class="tree-icon-btn move-group" data-id="${group.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
               <button class="tree-icon-btn move-group" data-id="${group.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>` : ""}
-            <button class="tree-add add-track-to-group" data-group-id="${group ? group.id : ""}">+ Track</button>
-            ${group ? `
-              <button class="tree-icon-btn edit-group" data-id="${group.id}" title="Edit">✏️</button>
-              <button class="tree-icon-btn del-group" data-id="${group.id}" title="Delete">🗑</button>` : ""}
+            <button class="tree-icon-btn tree-kebab-btn" title="More actions" aria-label="More actions">⋮</button>
+            <span class="tree-overflow-menu">
+              <button class="tree-add add-track-to-group" data-group-id="${group ? group.id : ""}">+ Track</button>
+              ${group ? `
+                <button class="tree-icon-btn edit-group" data-id="${group.id}" title="Edit">✏️<span class="kebab-label">Edit</span></button>
+                <button class="tree-icon-btn del-group" data-id="${group.id}" title="Delete">🗑<span class="kebab-label">Delete</span></button>` : ""}
+            </span>
           </span>
         </div>
         <div class="tree-group-body ${isCollapsed ? "hidden" : ""}" data-key="${key}">
@@ -2414,6 +2432,21 @@ function renderLocationTree() {
       btn.textContent = nowCollapsed ? "▶" : "▼";
       setTreeCollapsed(tkey, nowCollapsed);
     });
+  });
+
+  // Mobile overflow menu (kebab) — Add/Edit/Delete fold behind it under 600px;
+  // move up/down arrows stay inline since reordering is the primary action.
+  root.querySelectorAll(".tree-kebab-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const actions = btn.closest(".tree-actions");
+      const wasOpen = actions.classList.contains("menu-open");
+      root.querySelectorAll(".tree-actions.menu-open").forEach(el => el.classList.remove("menu-open"));
+      if (!wasOpen) actions.classList.add("menu-open");
+    });
+  });
+  root.querySelectorAll(".tree-overflow-menu button").forEach(btn => {
+    btn.addEventListener("click", () => btn.closest(".tree-actions")?.classList.remove("menu-open"));
   });
 
   // Add industry to a track (opens the industry form pre-filled)

@@ -805,8 +805,11 @@ header nav a.active {
   color: var(--rail-light);
 }
 
-/* Keep the header caret legible on the slate bar. */
-#location-tree .tree-group-row .tree-caret {
+/* Keep the header caret and move/edit/delete icons legible on the slate
+   bar in both themes — .tree-icon-btn's color: inherit would otherwise
+   pick up the page's (theme-adaptive) text color here, not rail-light. */
+#location-tree .tree-group-row .tree-caret,
+#location-tree .tree-group-row .tree-icon-btn {
   color: var(--rail-light);
   opacity: 0.8;
 }
@@ -836,7 +839,10 @@ header nav a.active {
 }
 #location-tree .tree-caret:hover { color: var(--pico-contrast, #e8eaf0); }
 
-/* Edit / delete — borderless icon buttons */
+/* Edit / delete / move — borderless icon buttons.
+   color: inherit overrides Pico's default filled-button text color (white,
+   meant for solid-background buttons) — without it these are invisible on
+   a light background once border/background are stripped. */
 #location-tree .tree-icon-btn {
   background: none;
   border: none;
@@ -848,10 +854,61 @@ header nav a.active {
   cursor: pointer;
   opacity: 0.7;
   border-radius: 4px;
+  color: inherit;
 }
 #location-tree .tree-icon-btn:hover { opacity: 1; background: rgba(127, 127, 127, 0.15); }
 #location-tree .tree-icon-btn:disabled { opacity: 0.22; cursor: default; }
 #location-tree .tree-icon-btn:disabled:hover { background: none; }
+
+/* Mobile row overflow (kebab) menu. display:contents on the wrapper means
+   desktop sees the Add/Edit/Delete buttons as plain flex children of
+   .tree-actions — unchanged from today. Only the ≤600px block below hides
+   them from the inline row and pops them out into a dropdown instead. */
+#location-tree .tree-overflow-menu { display: contents; }
+#location-tree .tree-kebab-btn { display: none; }
+#location-tree .kebab-label { display: none; }
+
+@media (max-width: 600px) {
+  #location-tree .tree-actions { position: relative; }
+  #location-tree .tree-kebab-btn { display: inline-flex; align-items: center; justify-content: center; }
+  #location-tree .tree-overflow-menu { display: none; }
+  #location-tree .tree-actions.menu-open .tree-overflow-menu {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 50;
+    min-width: 150px;
+    background: var(--pico-card-background-color, #fff);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    padding: 0.25rem;
+  }
+  /* Reset each button's own desktop look (bordered accent, muted text, bare
+     icon) into a consistent list-item row, and force the normal adaptive
+     text color even inside the dark .tree-group-row. */
+  #location-tree .tree-actions.menu-open .tree-overflow-menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    justify-content: flex-start;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: var(--pico-color, inherit);
+    opacity: 1;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  #location-tree .tree-actions.menu-open .tree-overflow-menu button:hover {
+    background: var(--icon-btn-hover, rgba(127, 127, 127, 0.15));
+  }
+  #location-tree .tree-actions.menu-open .kebab-label { display: inline; }
+}
 
 /* "+ Track" — outlined accent button */
 #location-tree .tree-add {
