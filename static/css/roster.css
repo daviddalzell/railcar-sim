@@ -33,14 +33,23 @@
   overflow: hidden;
 }
 
-.car-thumb img {
+.car-thumb-img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  /* Fit by width, never crop — letterbox onto .car-thumb's background instead.
+     Was previously `.car-thumb img` (height:auto), which collided with
+     .default-car-img's own height:100%/object-fit:contain rule whenever a
+     default car-type image rendered inside this box — higher specificity
+     silently won, so .default-car-img's intended sizing never actually
+     applied here. Unifying both image cases under this one class removes
+     the collision; .default-car-img itself is now used only by the Car
+     Detail dialog, where it still applies correctly on its own. */
+  object-fit: contain;
   display: block;
   transition: transform 0.2s;
 }
 
-.car-card:hover .car-thumb img {
+.car-card:hover .car-thumb-img {
   transform: scale(1.05);
 }
 

@@ -263,14 +263,14 @@ function carCardHTML(car) {
     && car.active_waybill.destination_id != null
     && car.current_location_id !== car.active_waybill.destination_id;
   const defImg = defaultCarImage(car.car_type);
+  const imgSrc = car.photo_path ? photoSrc(car.photo_path, car.photo_url) : defImg;
+  const imgAlt = car.photo_path ? `${car.reporting_marks} ${car.car_number}` : car.car_type;
   return `
     <div class="car-card${needsMove ? ' car-needs-move' : ''}" data-id="${car.id}">
       <div class="car-thumb">
-        ${car.photo_path
-          ? `<img src="${photoSrc(car.photo_path, car.photo_url)}" alt="${car.reporting_marks} ${car.car_number}" />`
-          : defImg
-            ? `<img src="${defImg}" alt="${car.car_type}" class="default-car-img" />`
-            : `<div class="no-photo">${car.car_type}</div>`}
+        ${imgSrc
+          ? `<img src="${imgSrc}" alt="${imgAlt}" loading="lazy" width="200" height="130" class="car-thumb-img" />`
+          : `<div class="no-photo">${car.car_type}</div>`}
       </div>
       <div class="car-info">
         <strong>${car.reporting_marks || "—"} ${car.car_number || ""}</strong>

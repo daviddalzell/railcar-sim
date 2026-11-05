@@ -34,7 +34,9 @@ body {
   --consist-card-bg:     #f0f2f4;
   --consist-card-border: #d0d5db;
   --info-offer-bg:       #f0f2f4;
-  --car-img-bg:          #FAF0E6;
+  /* Flat, non-theme-adaptive — this is a letterbox/pad color behind car
+     photos, like paper under a print; it shouldn't invert with the theme. */
+  --car-img-bg:          #f6ece2;
 
   --rail-blue:      #2980b9;
   --badge-blue:     #2980b9;
@@ -61,7 +63,6 @@ body {
     --consist-card-bg:     var(--rail-darker);
     --consist-card-border: var(--rail-dark);
     --info-offer-bg:       var(--rail-dark);
-    --car-img-bg:          #2a2a2a;
     --bg-muted:            #2a2a2a;
   }
 }
@@ -70,7 +71,6 @@ body {
   --consist-card-bg:     var(--rail-darker);
   --consist-card-border: var(--rail-dark);
   --info-offer-bg:       var(--rail-dark);
-  --car-img-bg:          #2a2a2a;
   --bg-muted:            #2a2a2a;
 }
 
