@@ -619,7 +619,7 @@ async function handleEndSession() {
 
 async function commitEndSession(cpCars) {
   const payload = [
-    ...session.cars.filter(c => c.status === "done").map(c => ({ car_id: c.id, status: "done" })),
+    ...appState.session.cars.filter(c => c.status === "done").map(c => ({ car_id: c.id, status: "done" })),
     ...cpCars,
   ];
   const btn = $("#btn-confirm-end-session");

@@ -288,8 +288,8 @@ def session_end(request: Request, req: SessionEndRequest, db: Session = Depends(
     from routers import ops_events
     from routers.automation import auto_assign_one_car
     operator_email = (user or {}).get("email", "local")
-    staging_ids = {l.id for l in db.query(Location).filter(
-        Location.location_type.in_(["staging", "yard"])
+    staging_ids = {l.id for l in db.query(Track).filter(
+        Track.location_type.in_(["staging", "yard"])
     ).all()}
 
     updated = []
