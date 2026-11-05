@@ -140,7 +140,10 @@
   border: 1px solid color-mix(in srgb, var(--rail-dark), var(--rail-light) 40%);
   border-radius: var(--card-radius);
   margin-bottom: 0.6rem;
-  overflow: hidden;
+  /* No overflow:hidden here (unlike .panel-card's identical pattern) — the
+     row's mobile kebab popover (.tree-overflow-menu) is absolutely positioned
+     and must escape this card, not get clipped by it. The header bar rounds
+     its own top corners below instead, so the card still reads as rounded. */
 }
 
 .tree-group-row {
@@ -148,6 +151,7 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.55rem 0.7rem;
+  border-radius: calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px) 0 0;
   /* House slate header bar, like the app nav — readable in both themes. */
   background: var(--rail-dark);
 }
@@ -205,7 +209,12 @@
   }
   /* Reset each button's own desktop look (bordered accent, muted text, bare
      icon) into a consistent list-item row, and force the normal adaptive
-     text color even inside the dark .tree-group-row. */
+     text color even inside the dark .tree-group-row. Plain `inherit` (not
+     `var(--pico-color, inherit)`): Pico sets --pico-color directly on every
+     <button> element (for its default filled-button text color), which wins
+     over the inherited value regardless of the `inherit` fallback — so
+     reading --pico-color here always resolved to Pico's button-white,
+     invisible on this menu's light-theme white background. */
   #location-tree .tree-actions.menu-open .tree-overflow-menu button {
     display: flex;
     align-items: center;
@@ -215,7 +224,7 @@
     background: none;
     border: none;
     border-radius: 4px;
-    color: var(--pico-color, inherit);
+    color: inherit;
     opacity: 1;
     padding: 0.5rem 0.65rem;
     font-size: 0.85rem;
@@ -247,6 +256,13 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
+  /* Tonal bar so a Track reads as its own grouping level under the Location
+     header — without it, the row's background matched the card body's
+     background exactly in light mode, flattening the tree's hierarchy. */
+  background: var(--bg-muted);
+  border-radius: 5px;
+  padding: 0.3rem 0.5rem;
+  margin: 0 -0.5rem;
 }
 
 .tree-track-name {
