@@ -4,24 +4,11 @@
 /* Rail Car Movement Simulator — frontend */
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let locations = [];
-let industries = [];
-let cars = [];
-let waybillPool = [];
 let commodityMap = [];
-let carTypes = [];
 let selectedCarId = null;
 let editingWaybillId = null;
-let photoPath = null;
 let stagingMergeDeleteId = null;
-let switchingAreas = [];
 let dispatchPlans = [];
-let opsMode = "free";
-let settings = null;
-
-// ── Subscriber identity ───────────────────────────────────────────────────────
-// Unique ID for this browser tab, used to suppress self-notifications.
-const _subscriberId = crypto.randomUUID();
 
 // ── Fast clock ────────────────────────────────────────────────────────────────
 let clockInterval = null;
@@ -141,70 +128,10 @@ async function toggleClockPause() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const $ = (sel, ctx = document) => ctx.querySelector(sel);
-const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
+// $, $$, api, show, hide, showToast, emptyState, withLoading, track,
+// photoSrc, _authToken, _subscriberId now live in static/js/helpers.js,
+// loaded before this file as a shared classic-script global.
 
-function track(eventName, params = {}) {
-  if (typeof gtag === "undefined") return;
-  gtag("event", eventName, {
-    is_demo: !!document.getElementById("demo-banner"),
-    ...params,
-  });
-}
-
-function _authToken() {
-  return sessionStorage.getItem("waypoint_token") || "";
-}
-
-// Returns a usable <img src> value from a photo_path (local path or CDN URL)
-// and optional pre-computed photo_url from the API.
-function photoSrc(path, url) {
-  if (url) return url;
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  return "/" + path;
-}
-
-async function api(method, path, body) {
-  const opts = { method, headers: {} };
-  const token = _authToken();
-  if (token) opts.headers["Authorization"] = `Bearer ${token}`;
-  opts.headers["X-Subscriber-Id"] = _subscriberId;
-  if (body && !(body instanceof FormData)) {
-    opts.headers["Content-Type"] = "application/json";
-    opts.body = JSON.stringify(body);
-  } else if (body) {
-    opts.body = body;
-  }
-  const res = await fetch(path, opts);
-  if (res.status === 401) {
-    // Token missing or expired — redirect to login if a Supabase login URL is configured
-    const loginUrl = document.querySelector("meta[name=supabase-login-url]")?.content;
-    if (loginUrl) { window.location.href = loginUrl; return; }
-  }
-  if (res.status === 451) {
-    const d = await res.json().catch(() => ({}));
-    const err = new Error(d.detail || "AI features unavailable in your region");
-    err.status = 451;
-    const dlg = document.getElementById("ai-region-dialog");
-    if (dlg && !dlg.open) dlg.showModal();
-    throw err;
-  }
-  if (res.status === 204) return null;
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error(`Server error (${res.status})`);
-  }
-  if (!res.ok) { const err = new Error(data.detail || "Request failed"); err.status = res.status; throw err; }
-  return data;
-}
-
-function hide(el) { el.classList.add("hidden"); }
-function show(el) { el.classList.remove("hidden"); }
-
-// Only one Layout Setup add/edit form (location / track / industry) open at a time.
 function showOnlyLayoutForm(formEl) {
   ["#lg-form", "#track-form", "#industry-form"].forEach(sel => { const f = $(sel); if (f) hide(f); });
   if (formEl) show(formEl);
@@ -446,12 +373,12 @@ $$(".tab-link").forEach(link => {
 
 // ── Roster ────────────────────────────────────────────────────────────────────
 async function loadRoster() {
-  cars = await api("GET", "/api/cars");
+  appState.cars = await api("GET", "/api/cars");
   renderCarGrid();
 }
 
 function defaultCarImage(carTypeName) {
-  const ct = carTypes.find(t => t.name === carTypeName);
+  const ct = appState.carTypes.find(t => t.name === carTypeName);
   return ct?.default_photo_path ? `/${ct.default_photo_path}` : null;
 }
 
@@ -512,8 +439,8 @@ function renderPowerStrip(power, caboose, editable = false) {
 }
 
 function renderCarGrid() {
-  const locos   = cars.filter(c => c.car_type === "locomotive");
-  const freight = cars.filter(c => c.car_type !== "locomotive");
+  const locos   = appState.cars.filter(c => c.car_type === "locomotive");
+  const freight = appState.cars.filter(c => c.car_type !== "locomotive");
 
   const poolSection  = $("#power-pool-section");
   const poolBody     = $("#power-pool-body");
@@ -546,7 +473,7 @@ function renderCarGrid() {
 }
 
 function checkOrphanedCars() {
-  const orphaned = cars.filter(c => c.current_location_id && !c.current_location_name);
+  const orphaned = appState.cars.filter(c => c.current_location_id && !c.current_location_name);
   const banner = $("#orphaned-cars-banner");
   const badge  = $("#roster-badge");
   const msg    = $("#orphaned-cars-msg");
@@ -565,7 +492,7 @@ function checkOrphanedCars() {
 $("#btn-repair-cars").addEventListener("click", async () => {
   try {
     const result = await api("POST", "/api/cars/repair");
-    cars = await api("GET", "/api/cars");
+    appState.cars = await api("GET", "/api/cars");
     renderCarGrid();
     showToast(`Repaired ${result.repaired} car${result.repaired !== 1 ? "s" : ""}.`, "success");
   } catch (err) {
@@ -660,7 +587,7 @@ async function runStylize() {
   hide($("#stylize-error"));
   show($("#stylize-processing"));
   try {
-    const result = await api("POST", "/api/cars/stylize", { photo_path: photoPath });
+    const result = await api("POST", "/api/cars/stylize", { photo_path: appState.photoPath });
     stylizedPath = result.stylized_path;
     $("#stylize-preview").src = result.url;
     hide($("#stylize-processing"));
@@ -691,7 +618,7 @@ $("#btn-add-car").addEventListener("click", () => {
   hide($("#vision-error"));
   hide($("#stylize-section"));
   stylizedPath = null;
-  photoPath = null;
+  appState.photoPath = null;
   $("#photo-input").value = "";
   $("#upload-label").textContent = "📷 Click or drop a photo of the car";
 });
@@ -705,7 +632,7 @@ $("#btn-add-manual").addEventListener("click", () => {
   hide($("#vision-error"));
   hide($("#default-image-offer"));
   show($("#car-fields"));
-  photoPath = null;
+  appState.photoPath = null;
   $("#photo-input").value = "";
   $("#upload-label").textContent = "📷 Click or drop a photo (optional)";
   $("#field-marks").value = "";
@@ -725,7 +652,7 @@ $("#btn-cancel-car").addEventListener("click", cancelAddCar);
 $("#btn-cancel-car-top").addEventListener("click", cancelAddCar);
 
 function applyAnalysis(result) {
-  if (result.photo_path) photoPath = result.photo_path;
+  if (result.photo_path) appState.photoPath = result.photo_path;
   $("#field-marks").value = result.reporting_marks || "";
   $("#field-number").value = result.car_number || "";
   $("#field-type").value  = result.car_type || "other";
@@ -764,7 +691,7 @@ $("#btn-regenerate").addEventListener("click", async () => {
 
 $("#btn-use-stylized").addEventListener("click", () => {
   if (stylizedPath) {
-    photoPath = stylizedPath;
+    appState.photoPath = stylizedPath;
     $("#preview-img").src = $("#stylize-preview").src;
   }
   stylizedPath = null;
@@ -781,7 +708,7 @@ $("#btn-library-add").addEventListener("click", () => {
   if (addMode === "manual") {
     // Manual mode: just set photo, no analysis
     openPhotoLibrary(({ path, url }) => {
-      photoPath = path;
+      appState.photoPath = path;
       $("#preview-img").src = url;
       show($("#upload-preview"));
       hide($("#default-image-offer"));
@@ -794,7 +721,7 @@ $("#btn-library-add").addEventListener("click", () => {
       hide($("#car-fields"));
       show($("#analyzing-msg"));
       hide($("#vision-error"));
-      photoPath = path;
+      appState.photoPath = path;
       try {
         const result = await api("POST", "/api/cars/analyze-photo", { photo_path: path });
         applyAnalysis(result);
@@ -832,7 +759,7 @@ async function processPhotoFile(file) {
     try {
       const result = await api("POST", "/api/cars/upload", form);
       if (result.photo_path) {
-        photoPath = result.photo_path;
+        appState.photoPath = result.photo_path;
         $("#preview-img").src = photoSrc(result.photo_path);
         show($("#upload-preview"));
       }
@@ -871,7 +798,7 @@ $("#btn-retry-vision").addEventListener("click", async () => {
   hide($("#car-fields"));
   show($("#analyzing-msg"));
   try {
-    const result = await api("POST", "/api/cars/analyze-photo", { photo_path: photoPath });
+    const result = await api("POST", "/api/cars/analyze-photo", { photo_path: appState.photoPath });
     applyAnalysis(result);
   } catch (err) {
     $("#vision-error-msg").textContent = "Retry failed: " + err.message;
@@ -887,7 +814,7 @@ $("#btn-save-car").addEventListener("click", async () => {
     color: $("#field-color").value.trim(),
     car_number: $("#field-number").value.trim(),
     reporting_marks: $("#field-marks").value.trim(),
-    photo_path: photoPath || "",
+    photo_path: appState.photoPath || "",
   };
   const btn = $("#btn-save-car");
   try {
@@ -905,7 +832,7 @@ $("#btn-save-car").addEventListener("click", async () => {
 // ── Car detail dialog ─────────────────────────────────────────────────────────
 async function openCarDetail(carId) {
   selectedCarId = carId;
-  const car = cars.find(c => c.id === carId);
+  const car = appState.cars.find(c => c.id === carId);
   if (!car) return;
 
   $("#detail-title").textContent = `${car.reporting_marks || "—"} ${car.car_number || ""}  (${car.car_type})`;
@@ -955,8 +882,8 @@ $("#btn-advance-waybill").addEventListener("click", async () => {
   try {
     await withLoading(btn, "Advancing…", async () => {
       const updated = await api("POST", `/api/cars/${selectedCarId}/advance`);
-      const idx = cars.findIndex(c => c.id === selectedCarId);
-      if (idx !== -1) cars[idx] = updated;
+      const idx = appState.cars.findIndex(c => c.id === selectedCarId);
+      if (idx !== -1) appState.cars[idx] = updated;
       renderCarGrid();
       await openCarDetail(selectedCarId);
     });
@@ -993,7 +920,7 @@ $("#btn-delete-car").addEventListener("click", async () => {
 
 // ── Edit car dialog ───────────────────────────────────────────────────────────
 $("#btn-edit-car").addEventListener("click", () => {
-  const car = cars.find(c => c.id === selectedCarId);
+  const car = appState.cars.find(c => c.id === selectedCarId);
   if (!car) return;
   $("#edit-field-marks").value = car.reporting_marks || "";
   $("#edit-field-number").value = car.car_number || "";
@@ -1082,8 +1009,8 @@ $("#btn-save-edit-car").addEventListener("click", async () => {
 $("#btn-move-car").addEventListener("click", () => {
   const sel = $("#move-location-select");
   sel.innerHTML = '<option value="">— unassigned —</option>' +
-    locations.map(l => `<option value="${l.id}">${l.name} (${l.location_type})</option>`).join("");
-  const car = cars.find(c => c.id === selectedCarId);
+    appState.locations.map(l => `<option value="${l.id}">${l.name} (${l.location_type})</option>`).join("");
+  const car = appState.cars.find(c => c.id === selectedCarId);
   if (car?.current_location_id) sel.value = car.current_location_id;
   $("#move-car-dialog").showModal();
 });
@@ -1097,8 +1024,8 @@ $("#btn-confirm-move").addEventListener("click", async () => {
     const updated = await api("PUT", `/api/cars/${selectedCarId}/location`, {
       location_id: locId ? parseInt(locId) : null,
     });
-    const idx = cars.findIndex(c => c.id === selectedCarId);
-    if (idx !== -1) cars[idx] = updated;
+    const idx = appState.cars.findIndex(c => c.id === selectedCarId);
+    if (idx !== -1) appState.cars[idx] = updated;
     renderCarGrid();
     await openCarDetail(selectedCarId);
     $("#move-car-dialog").close();
@@ -1160,10 +1087,10 @@ function buildSlotOptions(expectedOriginId, carType, currentWaybillId) {
     return `${w.name || w.id}${w.origin_name ? ` (${w.origin_name} → ${w.destination_name || "?"})` : ""}`;
   }
 
-  const current = waybillPool.filter(w => w.id === currentWaybillId);
-  const primary  = waybillPool.filter(w => w.id !== currentWaybillId && typeMatches(w) && originMatches(w));
+  const current = appState.waybillPool.filter(w => w.id === currentWaybillId);
+  const primary  = appState.waybillPool.filter(w => w.id !== currentWaybillId && typeMatches(w) && originMatches(w));
   const fallback = primary.length === 0
-    ? waybillPool.filter(w => w.id !== currentWaybillId && typeMatches(w))
+    ? appState.waybillPool.filter(w => w.id !== currentWaybillId && typeMatches(w))
     : [];
 
   const opts = list => list.map(w => `<option value="${w.id}">${label(w)}</option>`).join("");
@@ -1176,7 +1103,7 @@ function buildSlotOptions(expectedOriginId, carType, currentWaybillId) {
 
 function getSelectedSlotWaybill(slotIndex) {
   const sel = $(`[data-slot="${slotIndex}"].slot-picker`, $("#waybill-slots"));
-  return sel?.value ? waybillPool.find(w => w.id === parseInt(sel.value)) : null;
+  return sel?.value ? appState.waybillPool.find(w => w.id === parseInt(sel.value)) : null;
 }
 
 function refreshSlot(slotIndex, carType) {
@@ -1185,7 +1112,7 @@ function refreshSlot(slotIndex, carType) {
   const currentVal = sel.value ? parseInt(sel.value) : null;
   const prevWb = slotIndex > 0 ? getSelectedSlotWaybill(slotIndex - 1) : null;
   const expectedOriginId = slotIndex === 0
-    ? (cars.find(c => c.id === selectedCarId)?.current_location_id ?? null)
+    ? (appState.cars.find(c => c.id === selectedCarId)?.current_location_id ?? null)
     : (prevWb?.destination_id ?? null);
   sel.innerHTML = buildSlotOptions(expectedOriginId, carType, currentVal);
   sel.value = currentVal || "";
@@ -1193,7 +1120,7 @@ function refreshSlot(slotIndex, carType) {
 
 $("#btn-edit-waybills").addEventListener("click", async () => {
   if (!selectedCarId) return;
-  const car = cars.find(c => c.id === selectedCarId);
+  const car = appState.cars.find(c => c.id === selectedCarId);
   const assigned = await api("GET", `/api/cars/${selectedCarId}/waybills`);
   const bySlot = {};
   assigned.forEach(w => { bySlot[w.slot_index] = w; });
@@ -1238,7 +1165,7 @@ $("#btn-save-waybills").addEventListener("click", async () => {
   try {
     await api("PUT", `/api/cars/${selectedCarId}/slots`, { slots });
     const updated = await api("GET", "/api/cars");
-    cars = updated;
+    appState.cars = updated;
     renderCarGrid();
     $("#waybill-dialog").close();
     await openCarDetail(selectedCarId);
@@ -1249,17 +1176,17 @@ $("#btn-save-waybills").addEventListener("click", async () => {
 
 // ── Waybill pool ──────────────────────────────────────────────────────────────
 async function loadWaybillPool() {
-  waybillPool = await api("GET", "/api/waybills");
+  appState.waybillPool = await api("GET", "/api/waybills");
   renderWaybillPool();
 }
 
 function renderWaybillPool() {
   const list = $("#waybill-pool-list");
-  if (!waybillPool.length) {
+  if (!appState.waybillPool.length) {
     list.innerHTML = emptyState("➡️", "No waybills yet — generate from industries or add one manually.");
     return;
   }
-  list.innerHTML = waybillPool.map(w => `
+  list.innerHTML = appState.waybillPool.map(w => `
     <div class="pool-item">
       <div class="pool-item-info">
         <strong>${w.name || "(unnamed)"}</strong>
@@ -1306,19 +1233,19 @@ function renderWaybillPool() {
 // Build track <option> markup grouped by Location group via <optgroup>.
 // placeholderHtml is the leading empty option. filterFn selects which tracks appear.
 function buildTrackOptgroups(placeholderHtml, filterFn = () => true) {
-  const grouped = switchingAreas.map(g => {
-    const tracks = locations.filter(l => l.location_id === g.id && filterFn(l));
+  const grouped = appState.switchingAreas.map(g => {
+    const tracks = appState.locations.filter(l => l.location_id === g.id && filterFn(l));
     if (!tracks.length) return "";
     return `<optgroup label="${g.name}">${tracks.map(l => `<option value="${l.id}">${l.name}</option>`).join("")}</optgroup>`;
   }).join("");
-  const ungrouped = locations.filter(l => !l.location_id && filterFn(l))
+  const ungrouped = appState.locations.filter(l => !l.location_id && filterFn(l))
     .map(l => `<option value="${l.id}">${l.name}</option>`).join("");
   return placeholderHtml + grouped + ungrouped;
 }
 
 function openWaybillEditDialog(waybillId = null) {
   editingWaybillId = waybillId;
-  const w = waybillId ? waybillPool.find(x => x.id === waybillId) : null;
+  const w = waybillId ? appState.waybillPool.find(x => x.id === waybillId) : null;
   $("#waybill-edit-title").textContent = w ? "Edit Waybill" : "New Waybill";
 
   $("#we-name").value = w?.name || "";
@@ -1327,14 +1254,14 @@ function openWaybillEditDialog(waybillId = null) {
 
   const buildTrackOptions = () => buildTrackOptgroups('<option value="">—</option>');
   const buildIndOptions = () => {
-    const grouped = switchingAreas.map(g => {
-      const tracks = locations.filter(l => l.location_id === g.id);
-      const inds = industries.filter(i => tracks.some(t => t.id === i.location_id));
+    const grouped = appState.switchingAreas.map(g => {
+      const tracks = appState.locations.filter(l => l.location_id === g.id);
+      const inds = appState.industries.filter(i => tracks.some(t => t.id === i.location_id));
       if (!inds.length) return "";
       return `<optgroup label="${g.name}">${inds.map(i => `<option value="${i.id}">${i.name}</option>`).join("")}</optgroup>`;
     }).join("");
-    const ungroupedInds = industries.filter(i => {
-      const track = locations.find(l => l.id === i.location_id);
+    const ungroupedInds = appState.industries.filter(i => {
+      const track = appState.locations.find(l => l.id === i.location_id);
       return !track?.location_id;
     }).map(i => `<option value="${i.id}">${i.name}</option>`).join("");
     return '<option value="">—</option>' + grouped + ungroupedInds;
@@ -1396,7 +1323,7 @@ $("#btn-auto-assign").addEventListener("click", async () => {
     await withLoading(btn, "Assigning…", async () => {
       const result = await api("POST", "/api/auto-assign-waybills");
       showToast(`Assigned ${result.assigned} waybill${result.assigned !== 1 ? "s" : ""} to cars.`, "success");
-      cars = result.cars_updated;
+      appState.cars = result.cars_updated;
       renderCarGrid();
       await loadWaybillPool();
     });
@@ -1437,22 +1364,22 @@ async function loadOperations() {
   await renderLayoutStatus();
 
   // Dispatcher always visible
-  if (!locations.length || !switchingAreas.length) {
-    [locations, switchingAreas] = await Promise.all([
+  if (!appState.locations.length || !appState.switchingAreas.length) {
+    [appState.locations, appState.switchingAreas] = await Promise.all([
       api("GET", "/api/tracks"),
       api("GET", "/api/locations"),
     ]);
   }
-  if (!settings) {
-    settings = await api("GET", "/api/settings");
-    opsMode = settings?.ops_mode || "free";
+  if (!appState.settings) {
+    appState.settings = await api("GET", "/api/settings");
+    appState.opsMode = appState.settings?.ops_mode || "free";
   }
   await loadDispatcherPanel();
   show($("#dispatcher-panel"));
 
   fetchAndStartClock();
 
-  if (session) {
+  if (appState.session) {
     $("#ops-header-buttons").innerHTML = ""; // cleared by renderActiveSession
     renderActiveSession();
     return;
@@ -1511,7 +1438,7 @@ async function loadOperations() {
 }
 
 function _startSessionFromPlan(plan) {
-  session = {
+  appState.session = {
     warnings: plan.warnings || [],
     cars: [
       ...plan.arrivals.map(c => ({
@@ -1565,7 +1492,7 @@ function _startSessionFromPlan(plan) {
       })),
     ],
   };
-  track("session_started", { source: "quick_op", car_count: session.cars.length });
+  track("session_started", { source: "quick_op", car_count: appState.session.cars.length });
   saveSession();
   renderActiveSession();
   collapseDispatcher();
@@ -1625,25 +1552,24 @@ function renderPlanPreview(plan) {
 }
 
 // ── Operating Session ─────────────────────────────────────────────────────────
-let session = null;
 // session = { cars: [{id, marks, carType, fromLocation, toLocation, status}], warnings: [] }
 // status: 'pending' | 'done' | 'cp'
 
 function saveSession() {
-  localStorage.setItem("railcar-session", session ? JSON.stringify(session) : "");
+  localStorage.setItem("railcar-session", appState.session ? JSON.stringify(appState.session) : "");
 }
 
 function loadSessionFromStorage() {
-  try { session = JSON.parse(localStorage.getItem("railcar-session") || "null"); }
-  catch { session = null; }
+  try { appState.session = JSON.parse(localStorage.getItem("railcar-session") || "null"); }
+  catch { appState.session = null; }
 }
 
 function detectSpottingConflicts() {
-  if (!session) return;
+  if (!appState.session) return;
   // Clear stale conflictDecision on all cars first; re-seed below for active conflicts
-  session.cars.forEach(c => { c.conflictDecision = null; });
+  appState.session.cars.forEach(c => { c.conflictDecision = null; });
 
-  const relevant = session.cars.filter(c =>
+  const relevant = appState.session.cars.filter(c =>
     (c.group === "arrivals" || c.group === "spots") && c.toIndustryId && c.status !== "cp"
   );
   const byIndustry = {};
@@ -1652,11 +1578,11 @@ function detectSpottingConflicts() {
   }
   const conflicts = [];
   for (const [indId, incoming] of Object.entries(byIndustry)) {
-    const ind = industries.find(i => i.id === parseInt(indId));
+    const ind = appState.industries.find(i => i.id === parseInt(indId));
     const spotNums = (ind?.spot_numbers || "").split(",").filter(s => s.trim());
     if (!spotNums.length) continue;
     const industryCapacity = spotNums.length;
-    const currentCount = cars.filter(c =>
+    const currentCount = appState.cars.filter(c =>
       c.current_location_id === ind.location_id &&
       c.active_waybill?.industry_id === ind.id
     ).length;
@@ -1674,14 +1600,14 @@ function detectSpottingConflicts() {
         return a.priority - b.priority;
       });
       sorted.forEach((car, i) => {
-        const sc = session.cars.find(c => c.id === car.id);
+        const sc = appState.session.cars.find(c => c.id === car.id);
         if (sc && sc.conflictDecision == null) {
           sc.conflictDecision = i < available ? "spot" : "hold";
         }
       });
     }
   }
-  session.conflicts = conflicts;
+  appState.session.conflicts = conflicts;
 }
 
 function carTypeMatchesIndustry(car, ind) {
@@ -1692,7 +1618,7 @@ function carTypeMatchesIndustry(car, ind) {
 
 function _commitConflictDecisions(conflict) {
   conflict.cars.forEach(car => {
-    const sc = session.cars.find(c => c.id === car.id);
+    const sc = appState.session.cars.find(c => c.id === car.id);
     if (sc && sc.conflictDecision === "hold") sc.status = "cp";
   });
   saveSession();
@@ -1704,7 +1630,7 @@ function _commitConflictDecisions(conflict) {
 function renderSpottingConflicts() {
   const el = document.getElementById("spotting-conflicts");
   if (!el) return;
-  const conflicts = session?.conflicts || [];
+  const conflicts = appState.session?.conflicts || [];
   if (!conflicts.length) { el.innerHTML = ""; return; }
 
   el.innerHTML = `
@@ -1713,7 +1639,7 @@ function renderSpottingConflicts() {
       ${conflicts.map(({ ind, capacity, spotNums, current, cars: incoming }) => {
         const available = capacity - current;
         const spotCount = incoming.filter(c => {
-          const sc = session.cars.find(x => x.id === c.id);
+          const sc = appState.session.cars.find(x => x.id === c.id);
           return sc?.conflictDecision === "spot";
         }).length;
         const spotsLeft = available - spotCount;
@@ -1732,7 +1658,7 @@ function renderSpottingConflicts() {
             <button class="outline small conflict-accept-suggestion" data-ind-id="${ind.id}">Accept suggestion</button>
           </div>
           ${incoming.map(car => {
-            const sc = session.cars.find(x => x.id === car.id);
+            const sc = appState.session.cars.find(x => x.id === car.id);
             const decision = sc?.conflictDecision || null;
             const isHeld = decision === "hold";
             const isSpot = decision === "spot";
@@ -1762,8 +1688,8 @@ function renderSpottingConflicts() {
     btn.addEventListener("click", () => {
       const carId = parseInt(btn.dataset.carId);
       const indId = parseInt(btn.dataset.indId);
-      const conflict = (session.conflicts || []).find(c => c.ind.id === indId);
-      const sc = session.cars.find(c => c.id === carId);
+      const conflict = (appState.session.conflicts || []).find(c => c.ind.id === indId);
+      const sc = appState.session.cars.find(c => c.id === carId);
       if (!conflict || !sc) return;
       const available = conflict.capacity - conflict.current;
 
@@ -1775,7 +1701,7 @@ function renderSpottingConflicts() {
         return;
       }
       const spotCount = conflict.cars.filter(c => {
-        const x = session.cars.find(s => s.id === c.id);
+        const x = appState.session.cars.find(s => s.id === c.id);
         return x?.conflictDecision === "spot";
       }).length;
       if (spotCount >= available) return; // defensive guard
@@ -1783,7 +1709,7 @@ function renderSpottingConflicts() {
       if (spotCount + 1 >= available) {
         // All spots claimed — auto-commit undecided cars as hold
         conflict.cars.forEach(car => {
-          const x = session.cars.find(s => s.id === car.id);
+          const x = appState.session.cars.find(s => s.id === car.id);
           if (x && x.conflictDecision !== "spot") x.conflictDecision = "hold";
         });
         _commitConflictDecisions(conflict);
@@ -1799,8 +1725,8 @@ function renderSpottingConflicts() {
     btn.addEventListener("click", () => {
       const carId = parseInt(btn.dataset.carId);
       const indId = parseInt(btn.dataset.indId);
-      const conflict = (session.conflicts || []).find(c => c.ind.id === indId);
-      const sc = session.cars.find(c => c.id === carId);
+      const conflict = (appState.session.conflicts || []).find(c => c.ind.id === indId);
+      const sc = appState.session.cars.find(c => c.id === carId);
       if (!conflict || !sc) return;
 
       if (sc.conflictDecision === "hold" && sc.status === "cp") {
@@ -1826,7 +1752,7 @@ function renderSpottingConflicts() {
   el.querySelectorAll(".conflict-accept-suggestion").forEach(btn => {
     btn.addEventListener("click", () => {
       const indId = parseInt(btn.dataset.indId);
-      const conflict = (session.conflicts || []).find(c => c.ind.id === indId);
+      const conflict = (appState.session.conflicts || []).find(c => c.ind.id === indId);
       if (!conflict) return;
       _commitConflictDecisions(conflict);
     });
@@ -1834,16 +1760,16 @@ function renderSpottingConflicts() {
 }
 
 function sessionProgress() {
-  if (!session) return { total: 0, done: 0, cp: 0, pending: 0 };
-  const total   = session.cars.length;
-  const done    = session.cars.filter(c => c.status === "done").length;
-  const cp      = session.cars.filter(c => c.status === "cp").length;
-  const pending = session.cars.filter(c => c.status === "pending").length;
+  if (!appState.session) return { total: 0, done: 0, cp: 0, pending: 0 };
+  const total   = appState.session.cars.length;
+  const done    = appState.session.cars.filter(c => c.status === "done").length;
+  const cp      = appState.session.cars.filter(c => c.status === "cp").length;
+  const pending = appState.session.cars.filter(c => c.status === "pending").length;
   return { total, done, cp, pending };
 }
 
 function markCar(carId, status) {
-  const car = session && session.cars.find(c => c.id === carId);
+  const car = appState.session && appState.session.cars.find(c => c.id === carId);
   if (!car) return;
   // toggle: clicking the same status again resets to pending
   car.status = car.status === status ? "pending" : status;
@@ -1859,12 +1785,12 @@ function markCar(carId, status) {
 function updateSessionBar() {
   const bar = document.getElementById("session-status-bar");
   if (!bar) return;
-  if (!session) { bar.classList.add("hidden"); return; }
+  if (!appState.session) { bar.classList.add("hidden"); return; }
   bar.classList.remove("hidden");
   const { total, done, cp, pending } = sessionProgress();
-  const label = session.trainNumber
-    ? `Train #${session.trainNumber}`
-    : (session.trainName || "Active Session");
+  const label = appState.session.trainNumber
+    ? `Train #${appState.session.trainNumber}`
+    : (appState.session.trainName || "Active Session");
   document.getElementById("session-bar-label").textContent = label;
   document.getElementById("session-bar-progress").textContent =
     `${done + cp} / ${total} worked${pending === 0 ? " — ready to end" : ""}`;
@@ -1900,13 +1826,13 @@ function renderActiveSession() {
   renderSpottingConflicts();
 
   const titleParts = [];
-  if (session.trainNumber) titleParts.push(`Train #${session.trainNumber}`);
-  if (session.trainName) titleParts.push(`"${session.trainName}"`);
+  if (appState.session.trainNumber) titleParts.push(`Train #${appState.session.trainNumber}`);
+  if (appState.session.trainName) titleParts.push(`"${appState.session.trainName}"`);
   $("#ops-title").textContent = titleParts.length ? titleParts.join(" ") : "Active Session";
 
   const warnEl = $("#session-warnings");
-  if (session.warnings?.length) {
-    warnEl.innerHTML = session.warnings.map(w => `<p style="margin:0.2rem 0">⚠ ${w}</p>`).join("");
+  if (appState.session.warnings?.length) {
+    warnEl.innerHTML = appState.session.warnings.map(w => `<p style="margin:0.2rem 0">⚠ ${w}</p>`).join("");
     show(warnEl);
   } else {
     hide(warnEl);
@@ -1935,8 +1861,8 @@ function renderActiveSession() {
     btn.classList.remove("btn-confirming");
     stopClock();
     track("session_cancelled");
-    const cancelledPlanId = session?.planId;
-    session = null;
+    const cancelledPlanId = appState.session?.planId;
+    appState.session = null;
     saveSession();
     updateSessionBar();
     restoreDispatcher();
@@ -1946,9 +1872,9 @@ function renderActiveSession() {
     loadOperations();
   });
 
-  const arrivals   = session.cars.filter(c => c.group === "arrivals");
-  const departures = session.cars.filter(c => c.group === "departures");
-  const spots      = session.cars.filter(c => c.group === "spots");
+  const arrivals   = appState.session.cars.filter(c => c.group === "arrivals");
+  const departures = appState.session.cars.filter(c => c.group === "departures");
+  const spots      = appState.session.cars.filter(c => c.group === "spots");
 
   function carRow(car) {
     const statusClass = car.status === "done" ? " done" : car.status === "cp" ? " cp" : "";
@@ -1974,7 +1900,7 @@ function renderActiveSession() {
   }
 
   // Power strip (non-interactive)
-  const powerHtml = renderPowerStrip(session.power, session.caboose);
+  const powerHtml = renderPowerStrip(appState.session.power, appState.session.caboose);
 
   const noWork = !arrivals.length && !departures.length && !spots.length;
   let html = powerHtml;
@@ -2006,8 +1932,8 @@ function renderActiveSession() {
 }
 
 async function handleEndSession() {
-  const cpCars = session.cars.filter(c => c.status === "cp");
-  const doneCars = session.cars.filter(c => c.status === "done");
+  const cpCars = appState.session.cars.filter(c => c.status === "cp");
+  const doneCars = appState.session.cars.filter(c => c.status === "done");
 
   if (!doneCars.length && !cpCars.length) {
     showToast("No cars have been marked — work some cars first.", "warn");
@@ -2016,7 +1942,7 @@ async function handleEndSession() {
 
   if (cpCars.length) {
     // Show CP resolution dialog
-    const locOptions = locations.map(l => `<option value="${l.id}">${l.name} (${l.location_type})</option>`).join("");
+    const locOptions = appState.locations.map(l => `<option value="${l.id}">${l.name} (${l.location_type})</option>`).join("");
     $("#cp-car-list").innerHTML = cpCars.map(car => `
       <div class="cp-car-row">
         <span class="cp-car-label">${car.marks} <span class="muted">${car.carType}</span></span>
@@ -2043,16 +1969,16 @@ async function commitEndSession(cpCars) {
       const result = await api("POST", "/api/session/end", { cars: payload });
       stopClock();
       track("session_completed", { moves_completed: result.updated.length });
-      if (session?.planId) {
-        try { await api("PATCH", `/api/dispatcher/plan/${session.planId}/status`, { status: "complete" }); } catch {}
+      if (appState.session?.planId) {
+        try { await api("PATCH", `/api/dispatcher/plan/${appState.session.planId}/status`, { status: "complete" }); } catch {}
       }
-      session = null;
+      appState.session = null;
       saveSession();
       updateSessionBar();
       restoreDispatcher();
       result.updated.forEach(updated => {
-        const idx = cars.findIndex(c => c.id === updated.id);
-        if (idx !== -1) cars[idx] = updated;
+        const idx = appState.cars.findIndex(c => c.id === updated.id);
+        if (idx !== -1) appState.cars[idx] = updated;
       });
       renderCarGrid();
       if (btn) $("#end-session-dialog").close();
@@ -2082,7 +2008,7 @@ $("#btn-confirm-end-session").addEventListener("click", async () => {
 
 // ── Layout setup ──────────────────────────────────────────────────────────────
 async function loadLayout() {
-  [[locations, industries, commodityMap, carTypes, switchingAreas], settings] = await Promise.all([
+  [[appState.locations, appState.industries, commodityMap, appState.carTypes, appState.switchingAreas], appState.settings] = await Promise.all([
     Promise.all([
       api("GET", "/api/tracks"),
       api("GET", "/api/industries"),
@@ -2098,17 +2024,17 @@ async function loadLayout() {
   renderCommodityMapList();
   populateCarTypeSelects();
   renderCarTypeList();
-  if (settings) {
-    $("#clock-start-time").value = settings.clock_start_time;
-    $("#clock-speed").value = String(settings.clock_speed);
-    opsMode = settings.ops_mode || "free";
-    $("#setting-ops-mode").value = opsMode;
+  if (appState.settings) {
+    $("#clock-start-time").value = appState.settings.clock_start_time;
+    $("#clock-speed").value = String(appState.settings.clock_speed);
+    appState.opsMode = appState.settings.ops_mode || "free";
+    $("#setting-ops-mode").value = appState.opsMode;
   }
 }
 
 function populateCarTypeSelect(sel, includeAny) {
   const prev = sel.value;
-  const names = carTypes.map(ct => ct.name);
+  const names = appState.carTypes.map(ct => ct.name);
   sel.innerHTML = (includeAny ? '<option value="">— any —</option>' : "") +
     names.map(n => `<option value="${n}">${n}</option>`).join("");
   if (names.includes(prev)) sel.value = prev;
@@ -2122,12 +2048,12 @@ function populateCarTypeSelects() {
 }
 
 function updateDefaultImageOffer() {
-  if (addMode !== "manual" || photoPath) {
+  if (addMode !== "manual" || appState.photoPath) {
     hide($("#default-image-offer"));
     return;
   }
   const typeName = $("#field-type").value;
-  const ct = carTypes.find(t => t.name === typeName);
+  const ct = appState.carTypes.find(t => t.name === typeName);
   if (ct?.default_photo_path) {
     $("#default-offer-thumb").src = `/${ct.default_photo_path}`;
     $("#default-offer-label").textContent = `A default image is available for "${typeName}".`;
@@ -2141,10 +2067,10 @@ $("#field-type").addEventListener("change", updateDefaultImageOffer);
 
 $("#btn-use-default-image").addEventListener("click", () => {
   const typeName = $("#field-type").value;
-  const ct = carTypes.find(t => t.name === typeName);
+  const ct = appState.carTypes.find(t => t.name === typeName);
   if (!ct?.default_photo_path) return;
-  photoPath = ct.default_photo_path;
-  $("#preview-img").src = `/${photoPath}`;
+  appState.photoPath = ct.default_photo_path;
+  $("#preview-img").src = `/${appState.photoPath}`;
   show($("#upload-preview"));
   hide($("#upload-zone"));
   hide($("#default-image-offer"));
@@ -2156,11 +2082,11 @@ $("#btn-dismiss-default-offer").addEventListener("click", () => {
 
 function renderCarTypeList() {
   const list = $("#car-type-list");
-  if (!carTypes.length) {
+  if (!appState.carTypes.length) {
     list.innerHTML = '<p class="muted small">No car types defined.</p>';
     return;
   }
-  list.innerHTML = carTypes.map(ct => {
+  list.innerHTML = appState.carTypes.map(ct => {
     const thumb = ct.default_photo_path
       ? `<img src="/${ct.default_photo_path}" class="car-type-thumb" />`
       : `<div class="car-type-thumb no-photo" style="font-size:0.55rem;">none</div>`;
@@ -2226,10 +2152,10 @@ $("#car-type-form").addEventListener("submit", async e => {
 
 $("#clock-settings-form").addEventListener("submit", async e => {
   e.preventDefault();
-  settings = await api("PUT", "/api/settings", {
+  appState.settings = await api("PUT", "/api/settings", {
     clock_start_time: $("#clock-start-time").value,
     clock_speed: parseInt($("#clock-speed").value),
-    ops_mode: settings?.ops_mode || "free",
+    ops_mode: appState.settings?.ops_mode || "free",
   });
   showToast("Clock settings saved.", "success");
 });
@@ -2237,12 +2163,12 @@ $("#clock-settings-form").addEventListener("submit", async e => {
 $("#ops-mode-form").addEventListener("submit", async e => {
   e.preventDefault();
   const newMode = $("#setting-ops-mode").value;
-  settings = await api("PUT", "/api/settings", {
-    clock_start_time: settings?.clock_start_time || "08:00",
-    clock_speed: settings?.clock_speed || 4,
+  appState.settings = await api("PUT", "/api/settings", {
+    clock_start_time: appState.settings?.clock_start_time || "08:00",
+    clock_speed: appState.settings?.clock_speed || 4,
     ops_mode: newMode,
   });
-  opsMode = newMode;
+  appState.opsMode = newMode;
   showToast("Operations mode saved.", "success");
 });
 
@@ -2325,7 +2251,7 @@ function renderLocationTree() {
   const posSort = (a, b) => (a.position ?? a.id) - (b.position ?? b.id);
 
   const trackRow = (t, isFirst, isLast) => {
-    const inds = industries.filter(i => i.location_id === t.id).sort(posSort);
+    const inds = appState.industries.filter(i => i.location_id === t.id).sort(posSort);
     const type = t.location_type || "yard";
     const tkey = `track-${t.id}`;
     const tCollapsed = !!collapsed[tkey];
@@ -2367,7 +2293,7 @@ function renderLocationTree() {
   };
 
   const groupBlock = (group, isFirst, isLast) => {
-    const tracks = (group ? locations.filter(l => l.location_id === group.id) : locations.filter(l => !l.location_id)).sort(posSort);
+    const tracks = (group ? appState.locations.filter(l => l.location_id === group.id) : appState.locations.filter(l => !l.location_id)).sort(posSort);
     const key = group ? `group-${group.id}` : "ungrouped";
     const isCollapsed = !!collapsed[key];
     const count = group ? (group.current_car_count ?? 0) : null;
@@ -2400,12 +2326,12 @@ function renderLocationTree() {
       </div>`;
   };
 
-  const sortedAreas = switchingAreas.slice().sort(posSort);
-  const ungroupedTracks = locations.filter(l => !l.location_id);
+  const sortedAreas = appState.switchingAreas.slice().sort(posSort);
+  const ungroupedTracks = appState.locations.filter(l => !l.location_id);
   root.innerHTML = sortedAreas.map((group, i) => groupBlock(group, i === 0, i === sortedAreas.length - 1)).join("") +
     (ungroupedTracks.length ? groupBlock(null) : "");
 
-  if (!switchingAreas.length && !ungroupedTracks.length) {
+  if (!appState.switchingAreas.length && !ungroupedTracks.length) {
     root.innerHTML = emptyState("📍", "No locations yet — add a location with the + Location button.");
     return;
   }
@@ -2457,7 +2383,7 @@ function renderLocationTree() {
   // Edit industry from the tree
   root.querySelectorAll(".edit-ind-tree").forEach(btn => {
     btn.addEventListener("click", () => {
-      const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
+      const ind = appState.industries.find(i => i.id === parseInt(btn.dataset.id));
       if (ind) openIndustryEdit(ind);
     });
   });
@@ -2465,7 +2391,7 @@ function renderLocationTree() {
   // Delete industry from the tree
   root.querySelectorAll(".del-ind-tree").forEach(btn => {
     btn.addEventListener("click", () => {
-      const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
+      const ind = appState.industries.find(i => i.id === parseInt(btn.dataset.id));
       if (!ind) return;
       openCascadeDeleteDialog(
         `Delete "${ind.name}"?`,
@@ -2513,7 +2439,7 @@ function renderLocationTree() {
   // Edit group
   root.querySelectorAll(".edit-group").forEach(btn => {
     btn.addEventListener("click", () => {
-      const group = switchingAreas.find(a => a.id === parseInt(btn.dataset.id));
+      const group = appState.switchingAreas.find(a => a.id === parseInt(btn.dataset.id));
       if (!group) return;
       $("#lg-name").value = group.name;
       $("#lg-capacity").value = group.car_capacity ?? "";
@@ -2525,9 +2451,9 @@ function renderLocationTree() {
   // Delete group (cascade warning)
   root.querySelectorAll(".del-group").forEach(btn => {
     btn.addEventListener("click", () => {
-      const group = switchingAreas.find(a => a.id === parseInt(btn.dataset.id));
+      const group = appState.switchingAreas.find(a => a.id === parseInt(btn.dataset.id));
       if (!group) return;
-      const tracks = locations.filter(l => l.location_id === group.id);
+      const tracks = appState.locations.filter(l => l.location_id === group.id);
       openCascadeDeleteDialog(
         `Delete "${group.name}"?`,
         tracks.length
@@ -2541,7 +2467,7 @@ function renderLocationTree() {
   // Edit track
   root.querySelectorAll(".edit-track").forEach(btn => {
     btn.addEventListener("click", () => {
-      const t = locations.find(l => l.id === parseInt(btn.dataset.id));
+      const t = appState.locations.find(l => l.id === parseInt(btn.dataset.id));
       if (!t) return;
       $("#tf-name").value = t.name;
       $("#tf-type").value = t.location_type;
@@ -2556,18 +2482,18 @@ function renderLocationTree() {
   root.querySelectorAll(".del-track").forEach(btn => {
     btn.addEventListener("click", () => {
       const locId = parseInt(btn.dataset.id);
-      const loc = locations.find(l => l.id === locId);
+      const loc = appState.locations.find(l => l.id === locId);
       if (!loc) return;
       if (loc.location_type === "staging") {
         openStagingMergeDialog(loc);
         return;
       }
-      const blocking = cars.filter(c => c.current_location_id === locId);
+      const blocking = appState.cars.filter(c => c.current_location_id === locId);
       if (blocking.length) {
         openLocationBlockDialog(loc, blocking);
         return;
       }
-      const indCount = industries.filter(i => i.location_id === locId).length;
+      const indCount = appState.industries.filter(i => i.location_id === locId).length;
       openCascadeDeleteDialog(
         `Delete "${loc.name}"?`,
         indCount ? `This will also remove ${indCount} industr${indCount === 1 ? "y" : "ies"}.` : "This cannot be undone.",
@@ -2579,7 +2505,7 @@ function renderLocationTree() {
   // Inline rename — group names (PUT /api/locations is a full replace)
   root.querySelectorAll(".tree-group-name").forEach(nameEl => {
     makeInlineRenameHandler(nameEl, (newVal) => {
-      const group = switchingAreas.find(a => a.id === parseInt(nameEl.dataset.id));
+      const group = appState.switchingAreas.find(a => a.id === parseInt(nameEl.dataset.id));
       return api("PUT", `/api/locations/${nameEl.dataset.id}`, {
         name: newVal,
         car_capacity: group?.car_capacity ?? 10,
@@ -2590,7 +2516,7 @@ function renderLocationTree() {
   // Inline rename — track names (PUT /api/tracks is a full replace)
   root.querySelectorAll(".tree-track-name").forEach(nameEl => {
     makeInlineRenameHandler(nameEl, (newVal) => {
-      const track = locations.find(l => l.id === parseInt(nameEl.dataset.id));
+      const track = appState.locations.find(l => l.id === parseInt(nameEl.dataset.id));
       return api("PUT", `/api/tracks/${nameEl.dataset.id}`, {
         name: newVal,
         location_type: track?.location_type || "yard",
@@ -2602,7 +2528,7 @@ function renderLocationTree() {
 }
 
 function openStagingMergeDialog(loc) {
-  const otherStaging = locations.filter(l => l.location_type === "staging" && l.id !== loc.id);
+  const otherStaging = appState.locations.filter(l => l.location_type === "staging" && l.id !== loc.id);
   if (!otherStaging.length) {
     showToast("No other staging locations to merge into — add one first.", "warning");
     return;
@@ -2634,7 +2560,7 @@ $("#btn-staging-merge-confirm").addEventListener("click", async () => {
     $("#staging-merge-dialog").close();
     showToast("Staging location merged and deleted.", "success");
     await loadLayout();
-    cars = await api("GET", "/api/cars");
+    appState.cars = await api("GET", "/api/cars");
     renderCarGrid();
   } catch (err) {
     showToast("Error: " + err.message, "error");
@@ -2677,7 +2603,7 @@ $("#ind-shipper").addEventListener("change", syncDirectionSections);
 
 function renderIndustryList() {
   const list = $("#industry-list");
-  if (!industries.length) {
+  if (!appState.industries.length) {
     list.innerHTML = emptyState("🏭", "No industries yet — add one with the + button.");
     return;
   }
@@ -2698,7 +2624,7 @@ function renderIndustryList() {
     </div>`;
   }
 
-  list.innerHTML = industries.map(i => {
+  list.innerHTML = appState.industries.map(i => {
     const allCommodities = [i.commodities, i.outbound_commodities].filter(Boolean).join(", ");
     return `
       <div class="layout-item layout-item-stack">
@@ -2721,14 +2647,14 @@ function renderIndustryList() {
 
   $$(".edit-ind").forEach(btn => {
     btn.addEventListener("click", () => {
-      const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
+      const ind = appState.industries.find(i => i.id === parseInt(btn.dataset.id));
       if (ind) openIndustryEdit(ind);
     });
   });
 
   $$(".del-ind").forEach(btn => {
     btn.addEventListener("click", () => {
-      const ind = industries.find(i => i.id === parseInt(btn.dataset.id));
+      const ind = appState.industries.find(i => i.id === parseInt(btn.dataset.id));
       if (!ind) return;
       openCascadeDeleteDialog(
         `Delete "${ind.name}"?`,
@@ -2741,7 +2667,7 @@ function renderIndustryList() {
   // Inline unmapped chip handlers
   list.addEventListener("click", async e => {
     const indId = parseInt(e.target.closest("[data-ind-id]")?.dataset.indId);
-    const ind = industries.find(i => i.id === indId);
+    const ind = appState.industries.find(i => i.id === indId);
     if (!ind) return;
 
     const dismiss = e.target.closest(".cmap-dismiss-chip");
@@ -2784,11 +2710,11 @@ function renderIndustryList() {
 
 function populateCarTypeMultiSelect(el, selectedStr) {
   const selected = new Set((selectedStr || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean));
-  if (!carTypes.length) {
+  if (!appState.carTypes.length) {
     el.innerHTML = '<span class="muted" style="font-size:0.8rem">No car types defined</span>';
     return;
   }
-  el.innerHTML = carTypes.map(ct => {
+  el.innerHTML = appState.carTypes.map(ct => {
     const checked = selected.has(ct.name.toLowerCase()) ? " checked" : "";
     const id = `ct-pick-${el.id}-${ct.name.replace(/\s+/g, "-")}`;
     return `<label class="ct-pill"><input type="checkbox" value="${ct.name}"${checked} id="${id}"><span>${ct.name}</span></label>`;
@@ -2823,7 +2749,7 @@ function populateIndustryLocationSelect() {
 
 function refreshSpotPickerForLocation(selectedStr = "") {
   const locId = parseInt($("#ind-location").value);
-  const loc = locations.find(l => l.id === locId);
+  const loc = appState.locations.find(l => l.id === locId);
   populateSpotPicker($("#ind-spot-numbers"), loc?.car_capacity ?? 0, selectedStr);
 }
 
@@ -3469,9 +3395,9 @@ async function renderLayoutStatus() {
     return;
   }
 
-  function carListHtml(cars) {
-    if (!cars.length) return '<p class="muted small" style="margin:0.25rem 0.5rem">No cars here.</p>';
-    return cars.map(c =>
+  function carListHtml(carList) {
+    if (!carList.length) return '<p class="muted small" style="margin:0.25rem 0.5rem">No cars here.</p>';
+    return carList.map(c =>
       `<div class="layout-item" style="padding:0.2rem 0.5rem;font-size:0.8rem">
          <span><strong>${c.reporting_marks || "—"} ${c.car_number || ""}</strong> <em>${c.car_type}</em></span>
          <span class="muted">${c.destination_name ? "→ " + c.destination_name : "—"}</span>
@@ -3535,7 +3461,7 @@ async function loadDispatcherPanel() {
   originSel.innerHTML = yardOptions;
   destSel.innerHTML = yardOptions;
   areaSel.innerHTML = '<option value="">— select area —</option>' +
-    switchingAreas.map(a => `<option value="${a.id}">${a.name} (${a.current_car_count ?? 0}/${a.car_capacity})</option>`).join("");
+    appState.switchingAreas.map(a => `<option value="${a.id}">${a.name} (${a.current_car_count ?? 0}/${a.car_capacity})</option>`).join("");
 
   // Default destination to origin (turn) when origin changes, unless user has set it explicitly
   originSel.addEventListener("change", () => {
@@ -3600,7 +3526,7 @@ function renderConsistCard(plan) {
   ].filter(Boolean);
   const crew = crewParts.join("  ·  ");
 
-  const instrLabel = { free: "Notes", timetable_train_order: "Train Order", track_warrant: "Track Warrant" }[opsMode] || "Notes";
+  const instrLabel = { free: "Notes", timetable_train_order: "Train Order", track_warrant: "Track Warrant" }[appState.opsMode] || "Notes";
 
   const route = plan.origin_name && plan.destination_name
     ? `<div class="muted small consist-route">${plan.origin_name}${plan.location_name ? ` → ${plan.location_name}` : ""} → ${plan.destination_name}</div>`
@@ -3612,8 +3538,8 @@ function renderConsistCard(plan) {
   const caboosesElsewhere = new Set(
     dispatchPlans.filter(p => p.id !== plan.id && p.caboose).map(p => p.caboose.id)
   );
-  const locos    = cars.filter(c => c.car_type === "locomotive" && !assignedElsewhere.has(c.id));
-  const cabooses = cars.filter(c => c.car_type === "caboose"    && !caboosesElsewhere.has(c.id));
+  const locos    = appState.cars.filter(c => c.car_type === "locomotive" && !assignedElsewhere.has(c.id));
+  const cabooses = appState.cars.filter(c => c.car_type === "caboose"    && !caboosesElsewhere.has(c.id));
   const assignedPowerIds  = (plan.power || []).map(c => c.id);
   const assignedCabooseId = plan.caboose?.id ?? null;
   const hasPower = assignedPowerIds.length > 0;
@@ -3662,7 +3588,7 @@ function renderConsistCard(plan) {
         <span class="panel-title">${statusBadge} <strong>${trainTitle}${trainName}</strong>${depTime}</span>
       </div>
       <div class="button-row">
-        <button class="consist-start-session" data-plan-id="${plan.id}"${(total === 0 || !hasPower || !!session || plan.status === "complete") ? " disabled" : ""}>Start Session</button>
+        <button class="consist-start-session" data-plan-id="${plan.id}"${(total === 0 || !hasPower || !!appState.session || plan.status === "complete") ? " disabled" : ""}>Start Session</button>
       </div>
     </div>
     ${metaHtml}
@@ -3737,8 +3663,8 @@ function wireConsistCard(planId) {
   function liveCardPowerStrip() {
     const powerIds  = [...(powerSel?.selectedOptions || [])].map(o => parseInt(o.value)).filter(v => !isNaN(v));
     const cabooseId = cabooseSel?.value ? parseInt(cabooseSel.value) : null;
-    const powerCars  = powerIds.map(id => cars.find(c => c.id === id)).filter(Boolean);
-    const cabooseCar = cabooseId ? cars.find(c => c.id === cabooseId) : null;
+    const powerCars  = powerIds.map(id => appState.cars.find(c => c.id === id)).filter(Boolean);
+    const cabooseCar = cabooseId ? appState.cars.find(c => c.id === cabooseId) : null;
     const stripEl = document.getElementById(`consist-power-strip-${planId}`);
     if (stripEl) stripEl.innerHTML = renderPowerStrip(powerCars, cabooseCar);
   }
@@ -3812,7 +3738,7 @@ function wireConsistCard(planId) {
     if (!plan) return;
     const btn = card.querySelector(`.consist-start-session[data-plan-id="${planId}"]`);
 
-    if (session) {
+    if (appState.session) {
       if (!btn.dataset.confirm) {
         btn.dataset.confirm = "1";
         btn.classList.add("btn-confirming");
@@ -3853,7 +3779,7 @@ function wireConsistCard(planId) {
         ? `${firstLoco.reporting_marks || ""}${firstLoco.car_number ? " " + firstLoco.car_number : ""}`.trim()
         : "";
 
-      session = {
+      appState.session = {
         planId:              plan.id,
         trainNumber:         plan.train_number || locoLabel || "",
         trainName:           plan.train_name           || "",
@@ -3870,7 +3796,7 @@ function wireConsistCard(planId) {
           ...(plan.pickups || []).map(c => toSessionCar(c, "departures")),
         ],
       };
-      track("session_started", { source: "dispatcher", car_count: session.cars.length });
+      track("session_started", { source: "dispatcher", car_count: appState.session.cars.length });
       saveSession();
       renderActiveSession();
       document.querySelector('[data-tab="operations"]').click();
@@ -3967,7 +3893,7 @@ document.getElementById("account-btn")?.addEventListener("click", () => {
   const dlg = document.getElementById("account-dialog");
   if (!dlg) return;
   document.getElementById("account-email").textContent = window._currentUserEmail || "";
-  const tenantName = settings?.name || document.querySelector("title")?.textContent || "";
+  const tenantName = appState.settings?.name || document.querySelector("title")?.textContent || "";
   document.getElementById("account-tenant").textContent = tenantName;
   document.getElementById("account-pw-sent").style.display = "none";
   dlg.showModal();
@@ -4225,7 +4151,7 @@ $("#invite-send-btn")?.addEventListener("click", async () => {
   await Promise.all([
     loadRoster(),
     (async () => {
-      [[locations, industries, waybillPool, carTypes, switchingAreas], settings] = await Promise.all([
+      [[appState.locations, appState.industries, appState.waybillPool, appState.carTypes, appState.switchingAreas], appState.settings] = await Promise.all([
         Promise.all([
           api("GET", "/api/tracks"),
           api("GET", "/api/industries"),
@@ -4235,7 +4161,7 @@ $("#invite-send-btn")?.addEventListener("click", async () => {
         ]),
         api("GET", "/api/settings"),
       ]);
-      opsMode = settings?.ops_mode || "free";
+      appState.opsMode = appState.settings?.ops_mode || "free";
       populateCarTypeSelects();
     })(),
   ]);
