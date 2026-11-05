@@ -738,7 +738,7 @@ function populateSpotPicker(el, capacity, selectedStr) {
   el.innerHTML = Array.from({ length: total }, (_, i) => {
     const n = String(i + 1);
     const checked = selected.has(n) ? " checked" : "";
-    return `<label class="ct-pill"><input type="checkbox" value="${n}"${checked}><span>${n}</span></label>`;
+    return `<label class="ct-pill"><input type="checkbox" id="spot-${n}" value="${n}"${checked}><span>${n}</span></label>`;
   }).join("");
 }
 

@@ -880,16 +880,16 @@ function renderConsistCard(plan) {
       <details data-section="identity" data-plan-id="${plan.id}" style="margin-top:0.75rem">
         <summary class="muted small" style="cursor:pointer">Edit train identity &amp; crew</summary>
         <div class="grid" style="margin-top:0.5rem">
-          <label>Train Number <input type="text" class="consist-train-number" data-plan-id="${plan.id}" value="${plan.train_number || ""}" placeholder="e.g. 42" /></label>
-          <label>Train Name <input type="text" class="consist-train-name" data-plan-id="${plan.id}" value="${plan.train_name || ""}" placeholder='e.g. "The Limited"' /></label>
+          <label>Train Number <input type="text" id="consist-train-number-${plan.id}" class="consist-train-number" data-plan-id="${plan.id}" value="${plan.train_number || ""}" placeholder="e.g. 42" /></label>
+          <label>Train Name <input type="text" id="consist-train-name-${plan.id}" class="consist-train-name" data-plan-id="${plan.id}" value="${plan.train_name || ""}" placeholder='e.g. "The Limited"' /></label>
         </div>
         <div class="grid">
-          <label>Departure Time <input type="time" class="consist-departure-time" data-plan-id="${plan.id}" value="${plan.departure_time || ""}" /></label>
-          <label>Engineer <input type="text" class="consist-engineer" data-plan-id="${plan.id}" value="${plan.engineer || ""}" placeholder="Engineer name" /></label>
+          <label>Departure Time <input type="time" id="consist-departure-time-${plan.id}" class="consist-departure-time" data-plan-id="${plan.id}" value="${plan.departure_time || ""}" /></label>
+          <label>Engineer <input type="text" id="consist-engineer-${plan.id}" class="consist-engineer" data-plan-id="${plan.id}" value="${plan.engineer || ""}" placeholder="Engineer name" /></label>
         </div>
-        <label>Conductor <input type="text" class="consist-conductor" data-plan-id="${plan.id}" value="${plan.conductor || ""}" placeholder="Conductor name" /></label>
+        <label>Conductor <input type="text" id="consist-conductor-${plan.id}" class="consist-conductor" data-plan-id="${plan.id}" value="${plan.conductor || ""}" placeholder="Conductor name" /></label>
         <label>${instrLabel}
-          <textarea class="consist-special-instructions" data-plan-id="${plan.id}" rows="3" placeholder="Special instructions…">${plan.special_instructions || ""}</textarea>
+          <textarea id="consist-special-instructions-${plan.id}" class="consist-special-instructions" data-plan-id="${plan.id}" rows="3" placeholder="Special instructions…">${plan.special_instructions || ""}</textarea>
         </label>
         <div class="button-row">
           <button class="outline small consist-save-identity" data-plan-id="${plan.id}">Save Identity</button>
@@ -900,14 +900,14 @@ function renderConsistCard(plan) {
         <summary class="muted small" style="cursor:pointer">Assign power</summary>
         <div class="grid" style="margin-top:0.5rem">
           <label>Locomotive(s)
-            <select multiple size="3" class="consist-power-select" data-plan-id="${plan.id}">
+            <select multiple size="3" id="consist-power-select-${plan.id}" class="consist-power-select" data-plan-id="${plan.id}">
               ${locos.length
                 ? locos.map(c => `<option value="${c.id}"${assignedPowerIds.includes(c.id) ? " selected" : ""}>${c.reporting_marks || "—"} ${c.car_number || ""}</option>`).join("")
                 : `<option value="" disabled>— no locomotives —</option>`}
             </select>
           </label>
           <label>Caboose
-            <select class="consist-caboose-select" data-plan-id="${plan.id}">
+            <select id="consist-caboose-select-${plan.id}" class="consist-caboose-select" data-plan-id="${plan.id}">
               <option value="">— none —</option>
               ${cabooses.map(c => `<option value="${c.id}"${assignedCabooseId === c.id ? " selected" : ""}>${c.reporting_marks || "—"} ${c.car_number || ""}</option>`).join("")}
             </select>
