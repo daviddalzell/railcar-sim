@@ -1432,6 +1432,11 @@
     </article>
   </dialog>
 
+  <!-- state.js and helpers.js must load first — app.js (and later, other
+       feature modules) depend on the shared appState object and helper
+       functions (api, $, showToast, etc.) they declare as globals. -->
+  <script src="/static/js/state.js?v={{ asset_version }}"></script>
+  <script src="/static/js/helpers.js?v={{ asset_version }}"></script>
   <script src="/static/app.js?v={{ asset_version }}"></script>
   <script>
     // Feedback modal
