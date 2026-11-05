@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 David Dalzell
 # SPDX-License-Identifier: MIT
 
+import importlib.util
 import os
 import pytest
 from fastapi.testclient import TestClient
@@ -9,6 +10,13 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("AUTH_DISABLED", "true")
+
+# The e2e suite imports Playwright. Skip collecting it entirely when Playwright
+# is not installed (the unit-test CI job and the local pre-commit hook install
+# only requirements.txt), so `pytest tests/` never fails on an import error.
+# The e2e CI job installs requirements-dev.txt, so Playwright is present there.
+if importlib.util.find_spec("playwright") is None:
+    collect_ignore_glob = ["e2e/*"]
 
 from database import Base, get_db
 from main import app
