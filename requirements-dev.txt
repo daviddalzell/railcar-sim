@@ -1,0 +1,6 @@
+# Dev/test-only dependencies — NOT installed into the Fly production image
+# (the Dockerfile builds from requirements.txt). Used by the e2e suite in
+# tests/e2e/ and CI's `e2e` job. Run `playwright install chromium` after
+# installing these.
+pytest-playwright==0.10.0
+playwright==1.64.1

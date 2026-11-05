@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class CarCreate(BaseModel):
@@ -34,7 +34,13 @@ class TrackCreate(BaseModel):
 class LocationCreate(BaseModel):
     """Create/update a Location (formerly SwitchingArea)."""
     name: str
-    car_capacity: int = 10
+    # Optional in the UI (blank field sends null); fall back to the model default.
+    car_capacity: Optional[int] = 10
+
+    @field_validator("car_capacity")
+    @classmethod
+    def _default_capacity(cls, v):
+        return 10 if v is None else v
 
 
 class MoveRequest(BaseModel):
