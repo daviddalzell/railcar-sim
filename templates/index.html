@@ -1432,11 +1432,19 @@
     </article>
   </dialog>
 
-  <!-- state.js and helpers.js must load first — app.js (and later, other
-       feature modules) depend on the shared appState object and helper
-       functions (api, $, showToast, etc.) they declare as globals. -->
+  <!-- Load order (classic scripts, shared globals):
+       1. state.js / helpers.js — the shared appState object + helper funcs
+          (api, $, showToast, …) that everything else references.
+       2. Feature modules — register their own event handlers; any app.js
+          functions they call run at click/SSE time, never at parse time.
+       3. app.js LAST — its init() runs synchronously at parse-end and calls
+          into feature modules (e.g. _openOpsEventSource), so they must
+          already be defined. -->
   <script src="/static/js/state.js?v={{ asset_version }}"></script>
   <script src="/static/js/helpers.js?v={{ asset_version }}"></script>
+  <script src="/static/js/clock.js?v={{ asset_version }}"></script>
+  <script src="/static/js/export-import.js?v={{ asset_version }}"></script>
+  <script src="/static/js/settings.js?v={{ asset_version }}"></script>
   <script src="/static/app.js?v={{ asset_version }}"></script>
   <script>
     // Feedback modal
