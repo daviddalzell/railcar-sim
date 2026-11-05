@@ -487,7 +487,7 @@
             <input type="checkbox" id="ind-receiver" checked /> Receives loaded cars
           </label>
           <div id="ind-inbound-section">
-            <label>Inbound car types</label>
+            <div class="field-label">Inbound car types</div>
             <div id="ind-inbound-car-types" class="car-type-picker"></div>
             <label for="ind-inbound-commodities">Inbound commodities</label>
             <div class="commodity-wrap">
@@ -500,7 +500,7 @@
             <input type="checkbox" id="ind-shipper" /> Ships loaded cars
           </label>
           <div id="ind-outbound-section" class="hidden">
-            <label>Outbound car types</label>
+            <div class="field-label">Outbound car types</div>
             <div id="ind-outbound-car-types" class="car-type-picker"></div>
             <label for="ind-outbound-commodities">Outbound commodities</label>
             <div class="commodity-wrap">
@@ -509,7 +509,7 @@
             </div>
             <small id="outbound-commodity-warn" class="hidden error-msg"></small>
           </div>
-          <label>Spot number(s)</label>
+          <div class="field-label">Spot number(s)</div>
           <div id="ind-spot-numbers" class="spot-picker"></div>
           <input type="hidden" id="ind-edit-id" value="" />
           <div class="button-row">
@@ -823,7 +823,7 @@
 
     <section id="tab-settings" class="tab-panel hidden">
       <div class="section-header"><h2>Settings</h2></div>
-      <div id="settings-content" class="compact-form" style="max-width:520px;">
+      <form id="settings-content" class="compact-form" style="max-width:520px;" onsubmit="return false">
         <div id="settings-demo-notice" style="display:none;margin-bottom:1.25rem;padding:.75rem 1rem;border:1px solid var(--border,#2d3447);border-radius:6px;font-size:0.85rem;color:var(--muted,#9aa3b2)">
           Settings are view-only in the demo.
           <a href="https://www.patreon.com/waypoint_ops" target="_blank" rel="noopener">Subscribe to create your own layout →</a>
@@ -898,7 +898,7 @@
             <tbody id="members-body"></tbody>
           </table>
         </fieldset>
-      </div>
+      </form>
     </section>
 
   </main>

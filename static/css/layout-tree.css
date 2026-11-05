@@ -360,6 +360,16 @@
   font-style: italic;
 }
 
+/* Heading for a multi-control widget (car-type picker, spot picker) — not a
+   real form <label> since it has no single associated control, but matches
+   Pico's own label styling so it looks identical. */
+.field-label {
+  display: block;
+  margin-bottom: calc(var(--pico-spacing, 1rem) * 0.375);
+  color: var(--pico-color);
+  font-weight: var(--pico-form-label-font-weight, var(--pico-font-weight));
+}
+
 /* ── Industry form: car-type picker ──────────────────────────────────────── */
 .car-type-picker {
   display: flex;

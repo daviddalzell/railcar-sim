@@ -115,7 +115,7 @@ async function refreshLibraryGrid() {
         return `
         <div class="lib-thumb${f.assigned ? " lib-assigned" : ""}${sel}"
              data-path="${f.path}" data-url="${f.url}" data-is-default="${f.is_default}">
-          <img src="${f.url}" alt="" loading="lazy" />
+          <img src="${f.url}" alt="" loading="lazy" width="200" height="150" />
           ${badge}${actions}
         </div>`;
       }).join("");
@@ -1008,7 +1008,7 @@ $("#btn-edit-waybills").addEventListener("click", async () => {
     return `
       <div class="slot-assign-row ${i === activeSlot ? "active-slot" : ""}">
         <span class="slot-num">${i + 1}${i === activeSlot ? " ★" : ""}</span>
-        <select data-slot="${i}" class="slot-picker"></select>
+        <select id="waybill-slot-${i}" data-slot="${i}" class="slot-picker"></select>
       </div>
     `;
   }).join("");
