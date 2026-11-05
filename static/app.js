@@ -1300,6 +1300,10 @@ $("#btn-help-expand-all").addEventListener("click", () => {
       ]);
       appState.opsMode = appState.settings?.ops_mode || "free";
       populateCarTypeSelects();
+      // loadRoster() runs concurrently above, not after this — on a fast load it can
+      // render before appState.carTypes exists, so default car-type images silently
+      // fail to resolve on the very first paint. Re-render now that carTypes is in.
+      renderCarGrid();
     })(),
   ]);
   document.querySelector('a[href*="patreon.com"]')

@@ -184,11 +184,12 @@ function renderPlanPreview(plan) {
           : g.cars.map(c => `
             <div style="display:flex;gap:0.5rem;align-items:center;
                         padding:0.4rem 0;border-bottom:1px solid var(--pico-table-border-color)">
-              ${c.photo_url || c.photo_path
-                ? `<img src="${photoSrc(c.photo_path, c.photo_url)}"
-                       style="width:48px;height:32px;object-fit:cover;border-radius:4px" alt="">`
-                : `<div style="width:48px;height:32px;background:var(--pico-secondary-background);
-                              border-radius:4px;flex-shrink:0"></div>`}
+              ${(() => {
+                const imgSrc = c.photo_path ? photoSrc(c.photo_path, c.photo_url) : defaultCarImage(c.car_type);
+                return imgSrc
+                  ? `<img src="${imgSrc}" class="car-type-thumb" alt="">`
+                  : `<div class="car-type-thumb no-photo" style="font-size:0.55rem;">${c.car_type || "?"}</div>`;
+              })()}
               <div>
                 <strong>${c.reporting_marks || "—"} ${c.car_number || ""}</strong>
                 <span style="color:var(--pico-muted-color);font-size:0.85em"> &middot; ${c.car_type || "?"}</span>
