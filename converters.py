@@ -168,7 +168,7 @@ def dispatch_plan_to_dict(plan: DispatchPlan, db: Session) -> dict:
         "engineer": plan.engineer,
         "conductor": plan.conductor,
         "special_instructions": plan.special_instructions,
-        "warnings": [],
+        "warnings": json.loads(plan.warnings_json or "[]"),
     }
 
 

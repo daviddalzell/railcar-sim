@@ -736,6 +736,35 @@ $("#btn-toggle-layout-status").addEventListener("click", () => {
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 
+let dispatcherHintToken = 0;
+
+async function updateDispatcherHintStrip() {
+  const strip = $("#disp-hint-strip");
+  const originId = parseInt($("#disp-origin").value);
+  const areaId   = parseInt($("#disp-area").value);
+  const destId   = parseInt($("#disp-destination").value);
+  if (!originId || !areaId || !destId) { strip.innerHTML = ""; return; }
+
+  const token = ++dispatcherHintToken;
+  strip.innerHTML = "Checking…";
+  try {
+    const preview = await api("POST", "/api/dispatcher/preview-plan", {
+      origin_location_id: originId,
+      location_id: areaId,
+      destination_location_id: destId,
+    });
+    if (token !== dispatcherHintToken) return; // a newer selection superseded this request
+    const n = preview.inbound.length + preview.outbound.length + preview.local_spots.length;
+    const warnCount = (preview.warnings || []).length;
+    strip.innerHTML = `${preview.inbound.length} inbound · ${preview.outbound.length} outbound · ` +
+      `${preview.local_spots.length} local spot${preview.local_spots.length === 1 ? "" : "s"} · ` +
+      `${n} total` +
+      (warnCount ? ` · <span style="color:var(--pico-del-color,#c0392b)">⚠ ${warnCount} warning${warnCount === 1 ? "" : "s"}</span>` : "");
+  } catch {
+    if (token === dispatcherHintToken) strip.innerHTML = "";
+  }
+}
+
 async function loadDispatcherPanel() {
   const originSel = $("#disp-origin");
   const areaSel = $("#disp-area");
@@ -751,6 +780,12 @@ async function loadDispatcherPanel() {
   originSel.addEventListener("change", () => {
     if (!destSel.value) destSel.value = originSel.value;
   });
+
+  let hintDebounce = null;
+  [originSel, areaSel, destSel].forEach(sel => sel.addEventListener("change", () => {
+    clearTimeout(hintDebounce);
+    hintDebounce = setTimeout(updateDispatcherHintStrip, 300);
+  }));
 
   try {
     dispatchPlans = await api("GET", "/api/dispatcher/plans") || [];
@@ -791,6 +826,55 @@ function renderDispatchPlanList() {
   });
 }
 
+function consistCarRowHtml(c, arrow) {
+  const imgSrc = c.photo_path ? photoSrc(c.photo_path, c.photo_url) : (defaultCarImage(c.car_type) || null);
+  const thumb = imgSrc
+    ? `<div class="session-car-thumb"><img src="${imgSrc}" alt="${c.car_type}" /></div>`
+    : `<div class="session-car-thumb no-photo-thumb">${c.car_type}</div>`;
+  const dest = c.active_waybill?.destination_name || "?";
+  const from = c.current_location_name || "?";
+  return `
+  <div class="session-car-row">
+    ${thumb}
+    <div class="session-car-info">
+      <span class="session-car-marks">${c.reporting_marks || "—"} ${c.car_number || ""} <span class="muted">${c.car_type}</span></span>
+      <span class="session-car-move">${arrow} ${from} → ${dest}</span>
+    </div>
+    ${c.active_waybill?.industry_name ? `<span class="industry-tag">${c.active_waybill.industry_name}</span>` : ""}
+  </div>`;
+}
+
+function renderDispatcherPreview(containerEl, preview, handlers) {
+  const groups = [
+    { label: "Set out", cars: preview.inbound || [], arrow: "➡", empty: "No setouts planned." },
+    { label: "Spot locally", cars: preview.local_spots || [], arrow: "⬅", empty: "No local spots planned." },
+    { label: "Pick up", cars: preview.outbound || [], arrow: "⬅", empty: "No pickups planned." },
+  ];
+  const total = groups.reduce((n, g) => n + g.cars.length, 0);
+  const warningHtml = (preview.warnings || []).map(w => `<li>${w}</li>`).join("");
+
+  containerEl.innerHTML = `
+    <div class="panel-card" style="padding:0.75rem;margin:0.5rem 0">
+      <div class="button-row" style="margin-bottom:0.5rem">
+        <button class="disp-preview-confirm contrast">✓ ${handlers.confirmLabel || "Confirm"} (${total} car${total === 1 ? "" : "s"})</button>
+        <button class="disp-preview-regenerate outline">↺ Regenerate</button>
+        <button type="button" class="disp-preview-cancel outline secondary">Cancel</button>
+      </div>
+      ${warningHtml ? `<ul class="muted small" style="color:var(--pico-del-color,#c0392b);margin-bottom:0.5rem">${warningHtml}</ul>` : ""}
+      ${groups.map(g => `
+        <details open>
+          <summary class="muted small" style="cursor:pointer;font-weight:600">${g.label} (${g.cars.length})</summary>
+          ${g.cars.length === 0
+            ? `<p class="muted small">${g.empty}</p>`
+            : g.cars.map(c => consistCarRowHtml(c, g.arrow)).join("")}
+        </details>`).join("")}
+    </div>`;
+
+  containerEl.querySelector(".disp-preview-confirm").addEventListener("click", handlers.onConfirm);
+  containerEl.querySelector(".disp-preview-regenerate").addEventListener("click", handlers.onRegenerate);
+  containerEl.querySelector(".disp-preview-cancel").addEventListener("click", () => { containerEl.innerHTML = ""; });
+}
+
 function renderConsistCard(plan) {
   const statusBadgeMap = {
     draft:    '<span class="status-badge status-draft">Ready</span>',
@@ -828,23 +912,7 @@ function renderConsistCard(plan) {
   const assignedCabooseId = plan.caboose?.id ?? null;
   const hasPower = assignedPowerIds.length > 0;
 
-  function carRow(c) {
-    const imgSrc = c.photo_path ? photoSrc(c.photo_path, c.photo_url) : (defaultCarImage(c.car_type) || null);
-    const thumb = imgSrc
-      ? `<div class="session-car-thumb"><img src="${imgSrc}" alt="${c.car_type}" /></div>`
-      : `<div class="session-car-thumb no-photo-thumb">${c.car_type}</div>`;
-    const dest = c.active_waybill?.destination_name || "?";
-    const from = c.current_location_name || "?";
-    return `
-    <div class="session-car-row">
-      ${thumb}
-      <div class="session-car-info">
-        <span class="session-car-marks">${c.reporting_marks || "—"} ${c.car_number || ""} <span class="muted">${c.car_type}</span></span>
-        <span class="session-car-move">${c.role === "setout" ? "➡" : "⬅"} ${from} → ${dest}</span>
-      </div>
-      ${c.active_waybill?.industry_name ? `<span class="industry-tag">${c.active_waybill.industry_name}</span>` : ""}
-    </div>`;
-  }
+  const carRow = c => consistCarRowHtml(c, c.role === "setout" ? "➡" : "⬅");
 
   const setouts = plan.setouts || [];
   const pickups = plan.pickups || [];
@@ -857,11 +925,17 @@ function renderConsistCard(plan) {
   if (pickups.length) carListHtml += `<p class="muted small" style="margin:0.5rem 0 0.25rem"><strong>Pick up</strong></p>` + pickups.map(carRow).join("");
   if (!total) carListHtml = '<p class="muted small">No cars in this consist.</p>';
 
-  const metaHtml = (crew || route || !hasPower) ? `
+  const warningsHtml = (plan.warnings && plan.warnings.length) ? `
+    <ul class="consist-warnings muted small" style="margin:0.25rem 0 0;padding-left:1.1rem;color:var(--pico-del-color,#c0392b)">
+      ${plan.warnings.map(w => `<li>${w}</li>`).join("")}
+    </ul>` : "";
+
+  const metaHtml = (crew || route || !hasPower || warningsHtml) ? `
     <div class="panel-body" style="padding-bottom:0.4rem">
       ${crew ? `<div class="muted small" style="font-size:0.8rem">${crew}</div>` : ""}
       ${route}
       ${!hasPower ? `<div class="muted small consist-no-power-hint" style="font-size:0.75rem;color:var(--color-warning,#e07b00)">⚠ No locomotive assigned — open to assign power</div>` : ""}
+      ${warningsHtml}
     </div>` : "";
 
   return `
@@ -926,6 +1000,7 @@ function renderConsistCard(plan) {
         <button class="outline small consist-rebuild" data-plan-id="${plan.id}">↺ Rebuild</button>
         <button class="outline small contrast consist-delete" data-plan-id="${plan.id}">Delete Consist</button>
       </div>
+      <div id="consist-rebuild-preview-${plan.id}"></div>
     </div>
   </article>`;
 }
@@ -1094,15 +1169,12 @@ function wireConsistCard(planId) {
   card.querySelector(`.consist-rebuild[data-plan-id="${planId}"]`).addEventListener("click", async () => {
     const btn = card.querySelector(`.consist-rebuild[data-plan-id="${planId}"]`);
     try {
-      await withLoading(btn, "Rebuilding…", async () => {
-        const updated = await api("POST", `/api/dispatcher/plan/${planId}/rebuild`);
-        const idx = dispatchPlans.findIndex(p => p.id === planId);
-        if (idx !== -1) dispatchPlans[idx] = updated;
-        renderDispatchPlanList();
-        showToast("Consist rebuilt.", "success");
+      await withLoading(btn, "Previewing…", async () => {
+        const preview = await api("POST", `/api/dispatcher/plan/${planId}/preview-rebuild`);
+        showRebuildPreview(planId, preview);
       });
     } catch (err) {
-      showToast("Error rebuilding: " + err.message, "error");
+      showToast("Error previewing rebuild: " + err.message, "error");
     }
   });
 
@@ -1128,25 +1200,77 @@ function wireConsistCard(planId) {
   });
 }
 
+function showBuildPreview(params, preview) {
+  renderDispatcherPreview($("#disp-preview"), preview, {
+    confirmLabel: "Confirm & Build",
+    onConfirm: async (e) => {
+      await withLoading(e.target, "Building…", async () => {
+        try {
+          const newPlan = await api("POST", "/api/dispatcher/build-plan", params);
+          track("dispatcher_plan_built");
+          dispatchPlans.push(newPlan);
+          $("#disp-preview").innerHTML = "";
+          renderDispatchPlanList();
+          await renderLayoutStatus();
+        } catch (err) {
+          showToast("Error building consist: " + err.message, "error");
+        }
+      });
+    },
+    onRegenerate: async (e) => {
+      await withLoading(e.target, "Regenerating…", async () => {
+        try {
+          showBuildPreview(params, await api("POST", "/api/dispatcher/preview-plan", params));
+        } catch (err) {
+          showToast("Error regenerating preview: " + err.message, "error");
+        }
+      });
+    },
+  });
+}
+
+function showRebuildPreview(planId, preview) {
+  const container = document.getElementById(`consist-rebuild-preview-${planId}`);
+  if (!container) return;
+  renderDispatcherPreview(container, preview, {
+    confirmLabel: "Confirm Rebuild",
+    onConfirm: async (e) => {
+      await withLoading(e.target, "Rebuilding…", async () => {
+        try {
+          const updated = await api("POST", `/api/dispatcher/plan/${planId}/rebuild`);
+          const idx = dispatchPlans.findIndex(p => p.id === planId);
+          if (idx !== -1) dispatchPlans[idx] = updated;
+          renderDispatchPlanList();
+          showToast("Consist rebuilt.", "success");
+        } catch (err) {
+          showToast("Error rebuilding: " + err.message, "error");
+        }
+      });
+    },
+    onRegenerate: async (e) => {
+      await withLoading(e.target, "Regenerating…", async () => {
+        try {
+          showRebuildPreview(planId, await api("POST", `/api/dispatcher/plan/${planId}/preview-rebuild`));
+        } catch (err) {
+          showToast("Error regenerating preview: " + err.message, "error");
+        }
+      });
+    },
+  });
+}
+
 $("#btn-build-consist").addEventListener("click", async () => {
   const originId = parseInt($("#disp-origin").value);
   const areaId   = parseInt($("#disp-area").value);
   const destId   = parseInt($("#disp-destination").value);
   if (!originId || !areaId || !destId) { showToast("Select an origin, location, and destination first.", "warning"); return; }
+  const params = { origin_location_id: originId, location_id: areaId, destination_location_id: destId };
   const btn = $("#btn-build-consist");
-  await withLoading(btn, "Building…", async () => {
+  await withLoading(btn, "Previewing…", async () => {
     try {
-      const newPlan = await api("POST", "/api/dispatcher/build-plan", {
-        origin_location_id: originId,
-        location_id: areaId,
-        destination_location_id: destId,
-      });
-      track("dispatcher_plan_built");
-      dispatchPlans.push(newPlan);
-      renderDispatchPlanList();
-      await renderLayoutStatus();
+      showBuildPreview(params, await api("POST", "/api/dispatcher/preview-plan", params));
     } catch (err) {
-      showToast("Error building consist: " + err.message, "error");
+      showToast("Error previewing consist: " + err.message, "error");
     }
   });
 });

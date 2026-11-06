@@ -144,6 +144,7 @@ def init_db():
             ("spot_numbers",     "industries",    "TEXT DEFAULT ''"),
             ("cp_session_count", "cars",          "INTEGER DEFAULT 0"),
             ("operator_email",   "movement_logs", "TEXT"),
+            ("warnings_json",    "dispatch_plan", "TEXT DEFAULT '[]'"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {defn}"))

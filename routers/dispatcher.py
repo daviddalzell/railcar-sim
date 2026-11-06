@@ -11,7 +11,7 @@ from starlette.requests import Request
 
 from auth import require_admin
 from database import get_db
-from models import Car, DispatchPlan, Location, Track
+from models import Car, DispatchPlan, Industry, Location, Track
 from converters import car_to_dict, dispatch_plan_to_dict
 from schemas import DispatchBuildRequest, DispatchPlanIdentityUpdate, DispatchPowerUpdate, DispatchPlanStatusUpdate
 
@@ -79,6 +79,75 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
     ]
     consist_inbound = inbound[:available_spots]
 
+    # Per-track capacity: consist_inbound and local_spots both land cars on a specific
+    # destination track within the area — Track.car_capacity (when set) caps that track
+    # independently of the area-wide aggregate already enforced above.
+    occupancy_by_track: dict = {}
+    for car in area_cars:
+        occupancy_by_track[car.current_location_id] = occupancy_by_track.get(car.current_location_id, 0) + 1
+    track_overflow: dict = {}  # track_id -> number of cars excluded
+
+    def _enforce_track_capacity(cars):
+        kept = []
+        for car in cars:
+            wb = _get_active_waybill(car)
+            track = db.get(Track, wb.destination_id)
+            if track and track.car_capacity is not None and occupancy_by_track.get(track.id, 0) >= track.car_capacity:
+                track_overflow[track.id] = track_overflow.get(track.id, 0) + 1
+                continue
+            occupancy_by_track[wb.destination_id] = occupancy_by_track.get(wb.destination_id, 0) + 1
+            kept.append(car)
+        return kept
+
+    consist_inbound = _enforce_track_capacity(consist_inbound)
+    local_spots = _enforce_track_capacity(local_spots)
+
+    # Industry spot capacity: advance warning for what detectSpottingConflicts() would
+    # otherwise only catch once an operating session is already live.
+    by_industry: dict = {}
+    for car in consist_inbound + local_spots:
+        wb = _get_active_waybill(car)
+        if wb and wb.industry_id:
+            by_industry.setdefault(wb.industry_id, []).append(car)
+
+    industry_warnings = []
+    for industry_id, incoming in by_industry.items():
+        industry = db.get(Industry, industry_id)
+        if not industry:
+            continue
+        spot_nums = [s for s in (industry.spot_numbers or "").split(",") if s.strip()]
+        if not spot_nums:
+            continue
+        capacity = len(spot_nums)
+        current_count_at_industry = sum(
+            1 for c in area_cars
+            if c.current_location_id == industry.location_id
+            and (wb := _get_active_waybill(c)) and wb.industry_id == industry.id
+        )
+        if current_count_at_industry + len(incoming) > capacity:
+            free = max(0, capacity - current_count_at_industry)
+            warnings_needed = current_count_at_industry + len(incoming) - capacity
+            industry_warnings.append(
+                f"{industry.name} would receive {len(incoming)} car(s) but only has "
+                f"{free} of {capacity} spot(s) free ({warnings_needed} over)."
+            )
+
+    # Destination mismatch: outbound cars are matched against any yard/staging track
+    # layout-wide (not just the chosen destination) — see git history ce41f32/f0a150c for
+    # why that's broad by design. Surface a warning instead of narrowing the match.
+    destination_mismatch = sum(
+        1 for car in outbound
+        if (wb := _get_active_waybill(car)) and wb.destination_id != destination_id
+    )
+    destination_warning = None
+    if destination_mismatch:
+        destination = db.get(Track, destination_id)
+        dest_name = destination.name if destination else "the selected destination"
+        destination_warning = (
+            f"{destination_mismatch} outbound car{'s' if destination_mismatch != 1 else ''} "
+            f"headed for a different yard/staging track than {dest_name}."
+        )
+
     warnings = []
     left_behind = len(inbound) - len(consist_inbound)
     if left_behind > 0:
@@ -86,6 +155,15 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
             f"{left_behind} car{'s' if left_behind != 1 else ''} at origin cannot be delivered — "
             f"{area.name} is at or near capacity ({current_count}/{area.car_capacity} spots used)."
         )
+    for track_id, excluded in track_overflow.items():
+        track = db.get(Track, track_id)
+        warnings.append(
+            f"{track.name} is at capacity ({track.car_capacity}); "
+            f"{excluded} car{'s' if excluded != 1 else ''} left for a future trip."
+        )
+    warnings.extend(industry_warnings)
+    if destination_warning:
+        warnings.append(destination_warning)
     if not consist_inbound and not outbound and not local_spots:
         warnings.append("No eligible cars found for this origin and switching area.")
     total_work = len(consist_inbound) + len(outbound) + len(local_spots)
@@ -131,13 +209,13 @@ def build_dispatch_plan(request: Request, data: DispatchBuildRequest, db: Sessio
         available_spots=available_spots,
         built_at=time.time(),
         status="draft",
+        warnings_json=json.dumps(warnings),
     )
     db.add(plan)
     db.commit()
     db.refresh(plan)
 
     result = dispatch_plan_to_dict(plan, db)
-    result["warnings"] = warnings
 
     from routers import ops_events
     car_count = (len(json.loads(plan.setout_ids_json or "[]"))
@@ -150,6 +228,31 @@ def build_dispatch_plan(request: Request, data: DispatchBuildRequest, db: Sessio
         exclude_sid=request.headers.get("X-Subscriber-Id", ""),
     )
     return result
+
+
+@router.post("/dispatcher/preview-plan")
+def preview_dispatch_plan(data: DispatchBuildRequest, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+    """Read-only dry run of the build algorithm — no DispatchPlan row is created."""
+    area = db.get(Location, data.location_id)
+    if not area:
+        raise HTTPException(404, "Location not found")
+    origin = db.get(Track, data.origin_location_id)
+    if not origin:
+        raise HTTPException(404, "Origin track not found")
+    destination = db.get(Track, data.destination_location_id)
+    if not destination:
+        raise HTTPException(404, "Destination track not found")
+
+    consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
+        data.origin_location_id, data.location_id, data.destination_location_id, db
+    )
+    return {
+        "inbound": [car_to_dict(c) for c in consist_inbound],
+        "outbound": [car_to_dict(c) for c in outbound],
+        "local_spots": [car_to_dict(c) for c in local_spots],
+        "available_spots": available_spots,
+        "warnings": warnings,
+    }
 
 
 @router.get("/dispatcher/plans")
@@ -244,6 +347,46 @@ def update_dispatch_status(request: Request, plan_id: int, data: DispatchPlanSta
     return result
 
 
+@router.post("/dispatcher/plan/{plan_id}/preview-rebuild")
+def preview_rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+    """Read-only dry run of a rebuild — the plan's stored car lists are never overwritten."""
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    if not plan.origin_location_id or not plan.location_id or not plan.destination_location_id:
+        raise HTTPException(400, "Plan has no origin, destination, or location to rebuild from")
+
+    area = db.get(Location, plan.location_id)
+    if not area:
+        raise HTTPException(404, "Location not found")
+    origin = db.get(Track, plan.origin_location_id)
+    if not origin:
+        raise HTTPException(404, "Origin track not found")
+    destination = db.get(Track, plan.destination_location_id)
+    if not destination:
+        raise HTTPException(404, "Destination track not found")
+
+    # Temporarily exclude this plan's own cars from "claimed" so it previews its own
+    # rebuild correctly. Never committed — the request's session is closed without a
+    # commit, so this never persists (mirrors rebuild_dispatch_plan's own clear-before-
+    # rebuild step, minus the final commit).
+    plan.setout_ids_json = "[]"
+    plan.pickup_ids_json = "[]"
+    plan.spots_ids_json = "[]"
+    db.flush()
+
+    consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
+        plan.origin_location_id, plan.location_id, plan.destination_location_id, db
+    )
+    return {
+        "inbound": [car_to_dict(c) for c in consist_inbound],
+        "outbound": [car_to_dict(c) for c in outbound],
+        "local_spots": [car_to_dict(c) for c in local_spots],
+        "available_spots": available_spots,
+        "warnings": warnings,
+    }
+
+
 @router.post("/dispatcher/plan/{plan_id}/rebuild")
 def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     plan = db.get(DispatchPlan, plan_id)
@@ -277,8 +420,8 @@ def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict =
     plan.spots_ids_json = json.dumps([c.id for c in local_spots])
     plan.available_spots = available_spots
     plan.built_at = time.time()
+    plan.warnings_json = json.dumps(warnings)
     db.commit()
 
     result = dispatch_plan_to_dict(plan, db)
-    result["warnings"] = warnings
     return result
