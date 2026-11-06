@@ -194,6 +194,7 @@ def update_settings(data: LayoutSettingsUpdate, db: Session = Depends(get_db)):
     s.clock_start_time = data.clock_start_time
     s.clock_speed = data.clock_speed
     s.ops_mode = data.ops_mode
+    s.max_train_length = data.max_train_length
     db.commit()
     return settings_to_dict(s)
 

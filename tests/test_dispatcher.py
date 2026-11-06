@@ -220,3 +220,119 @@ def test_preview_rebuild_matches_plans_origin_area_destination(admin_client, db_
     assert preview.status_code == 200
     assert len(preview.json()["inbound"]) == 1
     assert preview.json()["inbound"][0]["id"] == car.id
+
+
+def test_build_excludes_power_car_types(admin_client, db_session):
+    """A locomotive that mistakenly ends up with an active waybill must never be
+    selected as consist cargo."""
+    area = Location(name="Industrial Park", car_capacity=20)
+    db_session.add(area)
+    db_session.flush()
+    origin = make_location(db_session, "Staging", "staging")
+    dest = make_location(db_session, "Yard", "yard")
+    track = make_location(db_session, "Siding", "yard")
+    track.location_id = area.id
+    db_session.flush()
+
+    loco = make_car(db_session, "locomotive", origin.id)
+    make_waybill(db_session, origin.id, track.id, car_id=loco.id, slot_index=0)
+    db_session.commit()
+
+    r = admin_client.post("/api/dispatcher/build-plan", json={
+        "origin_location_id": origin.id,
+        "location_id": area.id,
+        "destination_location_id": dest.id,
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["setouts"] == []
+    assert data["pickups"] == []
+    assert data["spots"] == []
+
+
+def test_build_plan_respects_max_train_length(admin_client, db_session):
+    r = admin_client.put("/api/settings", json={
+        "clock_start_time": "08:00", "clock_speed": 4, "ops_mode": "free",
+        "max_train_length": 1,
+    })
+    assert r.status_code == 200
+    assert admin_client.get("/api/settings").json()["max_train_length"] == 1
+
+    area = Location(name="Industrial Park", car_capacity=20)
+    db_session.add(area)
+    db_session.flush()
+    origin = make_location(db_session, "Staging", "staging")
+    dest = make_location(db_session, "Yard", "yard")
+    track = make_location(db_session, "Siding", "yard")
+    track.location_id = area.id
+    db_session.flush()
+
+    cars = [make_car(db_session, "boxcar", origin.id) for _ in range(3)]
+    for car in cars:
+        make_waybill(db_session, origin.id, track.id, car_id=car.id, slot_index=0)
+    db_session.commit()
+
+    r = admin_client.post("/api/dispatcher/build-plan", json={
+        "origin_location_id": origin.id,
+        "location_id": area.id,
+        "destination_location_id": dest.id,
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data["setouts"]) == 1
+    assert any("length limit" in w for w in data["warnings"])
+    assert not any("at or near capacity" in w for w in data["warnings"])
+
+
+def test_remove_car_from_plan_sticks_across_rebuild(admin_client, db_session):
+    area = Location(name="Industrial Park", car_capacity=20)
+    db_session.add(area)
+    db_session.flush()
+    origin = make_location(db_session, "Staging", "staging")
+    dest = make_location(db_session, "Yard", "yard")
+    track = make_location(db_session, "Siding", "yard")
+    track.location_id = area.id
+    db_session.flush()
+
+    car1 = make_car(db_session, "boxcar", origin.id)
+    car2 = make_car(db_session, "boxcar", origin.id)
+    make_waybill(db_session, origin.id, track.id, car_id=car1.id, slot_index=0)
+    make_waybill(db_session, origin.id, track.id, car_id=car2.id, slot_index=0)
+    db_session.commit()
+
+    build_params = {
+        "origin_location_id": origin.id,
+        "location_id": area.id,
+        "destination_location_id": dest.id,
+    }
+    built = admin_client.post("/api/dispatcher/build-plan", json=build_params).json()
+    assert len(built["setouts"]) == 2
+    plan_id = built["id"]
+
+    r = admin_client.delete(f"/api/dispatcher/plan/{plan_id}/car/{car1.id}")
+    assert r.status_code == 200
+    updated = r.json()
+    assert [c["id"] for c in updated["setouts"]] == [car2.id]
+
+    # A fresh build with the same params must not re-select car1 — without
+    # excluded_ids_json it would no longer be claimed by anything (it's gone from
+    # every setout/pickup/spots list) and would otherwise be eligible again.
+    second = admin_client.post("/api/dispatcher/build-plan", json=build_params).json()
+    assert car1.id not in [c["id"] for c in second["setouts"]]
+
+
+def test_remove_car_not_in_plan_404s(admin_client, db_session):
+    from models import DispatchPlan
+
+    plan = DispatchPlan(
+        plan_type="switching", status="draft",
+        setout_ids_json="[]", pickup_ids_json="[]",
+        spots_ids_json="[]", available_spots=0, built_at=0,
+    )
+    db_session.add(plan)
+    db_session.flush()
+    car = make_car(db_session, "boxcar")
+    db_session.commit()
+
+    r = admin_client.delete(f"/api/dispatcher/plan/{plan.id}/car/{car.id}")
+    assert r.status_code == 404

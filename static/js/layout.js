@@ -32,6 +32,7 @@ async function loadLayout() {
     $("#clock-speed").value = String(appState.settings.clock_speed);
     appState.opsMode = appState.settings.ops_mode || "free";
     $("#setting-ops-mode").value = appState.opsMode;
+    $("#setting-max-train-length").value = appState.settings.max_train_length ?? "";
   }
 }
 
@@ -159,6 +160,7 @@ $("#clock-settings-form").addEventListener("submit", async e => {
     clock_start_time: $("#clock-start-time").value,
     clock_speed: parseInt($("#clock-speed").value),
     ops_mode: appState.settings?.ops_mode || "free",
+    max_train_length: appState.settings?.max_train_length ?? null,
   });
   showToast("Clock settings saved.", "success");
 });
@@ -170,9 +172,22 @@ $("#ops-mode-form").addEventListener("submit", async e => {
     clock_start_time: appState.settings?.clock_start_time || "08:00",
     clock_speed: appState.settings?.clock_speed || 4,
     ops_mode: newMode,
+    max_train_length: appState.settings?.max_train_length ?? null,
   });
   appState.opsMode = newMode;
   showToast("Operations mode saved.", "success");
+});
+
+$("#train-length-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const raw = $("#setting-max-train-length").value;
+  appState.settings = await api("PUT", "/api/settings", {
+    clock_start_time: appState.settings?.clock_start_time || "08:00",
+    clock_speed: appState.settings?.clock_speed || 4,
+    ops_mode: appState.settings?.ops_mode || "free",
+    max_train_length: raw ? parseInt(raw) : null,
+  });
+  showToast("Max train length saved.", "success");
 });
 
 // ── Location Tree ────────────────────────────────────────────────────────────

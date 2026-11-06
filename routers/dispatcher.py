@@ -12,10 +12,15 @@ from starlette.requests import Request
 from auth import require_admin
 from database import get_db
 from models import Car, DispatchPlan, Industry, Location, Track
-from converters import car_to_dict, dispatch_plan_to_dict
+from converters import car_to_dict, dispatch_plan_to_dict, get_or_create_settings
 from schemas import DispatchBuildRequest, DispatchPlanIdentityUpdate, DispatchPowerUpdate, DispatchPlanStatusUpdate
 
 router = APIRouter(prefix="/api", tags=["dispatcher"])
+
+
+_POWER_CAR_TYPES = {"locomotive", "caboose"}  # matches the string convention already
+# used client-side (static/js/operations.js's power/caboose selects) and in
+# converters.py's "caboose" role tag — no CarType.is_power flag exists to reuse instead.
 
 
 def _get_active_waybill(car: Car):
@@ -37,12 +42,14 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
         Track.location_type.in_(["staging", "yard"])
     ).all()}
 
-    # Collect car IDs already claimed by other non-complete plans
+    # Collect car IDs already claimed by other non-complete plans (including cars a
+    # human explicitly removed from one of them — see excluded_ids_json below).
     claimed_ids: set = set()
     for other in db.query(DispatchPlan).filter(DispatchPlan.status != "complete").all():
         claimed_ids |= set(json.loads(other.setout_ids_json or "[]"))
         claimed_ids |= set(json.loads(other.pickup_ids_json or "[]"))
         claimed_ids |= set(json.loads(other.spots_ids_json or "[]"))
+        claimed_ids |= set(json.loads(other.excluded_ids_json or "[]"))
 
     current_count = db.query(Car).filter(
         Car.current_location_id.in_(list(area_location_ids))
@@ -54,13 +61,15 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
 
     outbound = [
         car for car in area_cars
-        if car.id not in claimed_ids
+        if car.car_type not in _POWER_CAR_TYPES
+        and car.id not in claimed_ids
         and (wb := _get_active_waybill(car)) and wb.destination_id in dispatch_ids
     ]
 
     local_spots = [
         car for car in area_cars
-        if car.id not in claimed_ids
+        if car.car_type not in _POWER_CAR_TYPES
+        and car.id not in claimed_ids
         and (wb := _get_active_waybill(car))
         and wb.destination_id in area_location_ids
         and car.current_location_id != wb.destination_id
@@ -74,10 +83,18 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
     ).all()
     inbound = [
         car for car in origin_cars
-        if car.id not in claimed_ids
+        if car.car_type not in _POWER_CAR_TYPES
+        and car.id not in claimed_ids
         and (wb := _get_active_waybill(car)) and wb.destination_id in area_location_ids
     ]
-    consist_inbound = inbound[:available_spots]
+
+    # Max train length: a hard cap on how many NEW cars can board (outbound/local_spots
+    # are already-committed existing-in-area traffic, not discretionary additions).
+    settings = get_or_create_settings(db)
+    inbound_cap = available_spots
+    if settings.max_train_length is not None:
+        inbound_cap = min(inbound_cap, max(0, settings.max_train_length - len(outbound) - len(local_spots)))
+    consist_inbound = inbound[:inbound_cap]
 
     # Pulls before puts: a siding isn't full if its occupant is leaving on this same
     # trip, so net out same-visit pulls (outbound leaves the area; local_spots leaves
@@ -160,11 +177,17 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
         )
 
     warnings = []
-    left_behind = len(inbound) - len(consist_inbound)
-    if left_behind > 0:
+    left_behind_capacity = len(inbound) - min(len(inbound), available_spots)
+    if left_behind_capacity > 0:
         warnings.append(
-            f"{left_behind} car{'s' if left_behind != 1 else ''} at origin cannot be delivered — "
-            f"{area.name} is at or near capacity ({current_count}/{area.car_capacity} spots used)."
+            f"{left_behind_capacity} car{'s' if left_behind_capacity != 1 else ''} at origin cannot be "
+            f"delivered — {area.name} is at or near capacity ({current_count}/{area.car_capacity} spots used)."
+        )
+    left_behind_length_only = max(0, (len(inbound) - len(consist_inbound)) - left_behind_capacity)
+    if left_behind_length_only > 0:
+        warnings.append(
+            f"{left_behind_length_only} car{'s' if left_behind_length_only != 1 else ''} at origin cannot "
+            f"be delivered — train is at its {settings.max_train_length}-car length limit."
         )
     for track_id, over in track_overflow.items():
         track = db.get(Track, track_id)
@@ -293,6 +316,28 @@ def delete_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict = 
 @router.delete("/dispatcher/plans", status_code=204)
 def clear_all_dispatch_plans(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     _clear_dispatch_plan(db)
+
+
+@router.delete("/dispatcher/plan/{plan_id}/car/{car_id}")
+def remove_car_from_plan(plan_id: int, car_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+    plan = db.get(DispatchPlan, plan_id)
+    if not plan:
+        raise HTTPException(404, "Dispatch plan not found")
+    removed = False
+    for attr in ("setout_ids_json", "pickup_ids_json", "spots_ids_json"):
+        ids = json.loads(getattr(plan, attr) or "[]")
+        if car_id in ids:
+            ids.remove(car_id)
+            setattr(plan, attr, json.dumps(ids))
+            removed = True
+    if not removed:
+        raise HTTPException(404, "Car not found in this consist")
+    excluded = json.loads(plan.excluded_ids_json or "[]")
+    if car_id not in excluded:
+        excluded.append(car_id)
+        plan.excluded_ids_json = json.dumps(excluded)
+    db.commit()
+    return dispatch_plan_to_dict(plan, db)
 
 
 @router.patch("/dispatcher/plan/{plan_id}/power")

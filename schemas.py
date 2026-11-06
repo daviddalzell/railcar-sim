@@ -164,6 +164,7 @@ class LayoutSettingsUpdate(BaseModel):
     clock_start_time: str = "08:00"
     clock_speed: int = 4
     ops_mode: str = "free"
+    max_train_length: Optional[int] = None
 
 
 class DeleteUploadRequest(BaseModel):

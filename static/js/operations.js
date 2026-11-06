@@ -826,7 +826,7 @@ function renderDispatchPlanList() {
   });
 }
 
-function consistCarRowHtml(c, arrow) {
+function consistCarRowHtml(c, arrow, role) {
   const imgSrc = c.photo_path ? photoSrc(c.photo_path, c.photo_url) : (defaultCarImage(c.car_type) || null);
   const thumb = imgSrc
     ? `<div class="session-car-thumb"><img src="${imgSrc}" alt="${c.car_type}" /></div>`
@@ -834,21 +834,22 @@ function consistCarRowHtml(c, arrow) {
   const dest = c.active_waybill?.destination_name || "?";
   const from = c.current_location_name || "?";
   return `
-  <div class="session-car-row">
+  <div class="session-car-row" data-car-id="${c.id}" data-role="${role}">
     ${thumb}
     <div class="session-car-info">
       <span class="session-car-marks">${c.reporting_marks || "—"} ${c.car_number || ""} <span class="muted">${c.car_type}</span></span>
       <span class="session-car-move">${arrow} ${from} → ${dest}</span>
     </div>
     ${c.active_waybill?.industry_name ? `<span class="industry-tag">${c.active_waybill.industry_name}</span>` : ""}
+    <button type="button" class="car-row-remove" data-car-id="${c.id}" data-role="${role}" title="Remove from consist">✕</button>
   </div>`;
 }
 
 function renderDispatcherPreview(containerEl, preview, handlers) {
   const groups = [
-    { label: "Set out", cars: preview.inbound || [], arrow: "➡", empty: "No setouts planned." },
-    { label: "Spot locally", cars: preview.local_spots || [], arrow: "⬅", empty: "No local spots planned." },
-    { label: "Pick up", cars: preview.outbound || [], arrow: "⬅", empty: "No pickups planned." },
+    { label: "Set out", cars: preview.inbound || [], arrow: "➡", role: "inbound", empty: "No setouts planned." },
+    { label: "Spot locally", cars: preview.local_spots || [], arrow: "⬅", role: "local_spots", empty: "No local spots planned." },
+    { label: "Pick up", cars: preview.outbound || [], arrow: "⬅", role: "outbound", empty: "No pickups planned." },
   ];
   const total = groups.reduce((n, g) => n + g.cars.length, 0);
   const warningHtml = (preview.warnings || []).map(w => `<li>${w}</li>`).join("");
@@ -866,13 +867,21 @@ function renderDispatcherPreview(containerEl, preview, handlers) {
           <summary class="muted small" style="cursor:pointer;font-weight:600">${g.label} (${g.cars.length})</summary>
           ${g.cars.length === 0
             ? `<p class="muted small">${g.empty}</p>`
-            : g.cars.map(c => consistCarRowHtml(c, g.arrow)).join("")}
+            : g.cars.map(c => consistCarRowHtml(c, g.arrow, g.role)).join("")}
         </details>`).join("")}
     </div>`;
 
   containerEl.querySelector(".disp-preview-confirm").addEventListener("click", handlers.onConfirm);
   containerEl.querySelector(".disp-preview-regenerate").addEventListener("click", handlers.onRegenerate);
   containerEl.querySelector(".disp-preview-cancel").addEventListener("click", () => { containerEl.innerHTML = ""; });
+  containerEl.querySelectorAll(".car-row-remove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const carId = parseInt(btn.dataset.carId);
+      const role = btn.dataset.role;
+      preview[role] = (preview[role] || []).filter(c => c.id !== carId);
+      renderDispatcherPreview(containerEl, preview, handlers);
+    });
+  });
 }
 
 function renderConsistCard(plan) {
@@ -912,7 +921,7 @@ function renderConsistCard(plan) {
   const assignedCabooseId = plan.caboose?.id ?? null;
   const hasPower = assignedPowerIds.length > 0;
 
-  const carRow = c => consistCarRowHtml(c, c.role === "setout" ? "➡" : "⬅");
+  const carRow = c => consistCarRowHtml(c, c.role === "setout" ? "➡" : "⬅", c.role);
 
   const setouts = plan.setouts || [];
   const pickups = plan.pickups || [];
@@ -1089,6 +1098,21 @@ function wireConsistCard(planId) {
       showToast("Power removed.", "success");
     } catch (err) {
       showToast("Error removing power: " + err.message, "error");
+    }
+  });
+
+  document.getElementById(`consist-car-list-${planId}`)?.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".car-row-remove");
+    if (!btn) return;
+    const carId = parseInt(btn.dataset.carId);
+    try {
+      const updated = await api("DELETE", `/api/dispatcher/plan/${planId}/car/${carId}`);
+      const idx = dispatchPlans.findIndex(p => p.id === planId);
+      if (idx !== -1) dispatchPlans[idx] = updated;
+      renderDispatchPlanList();
+      showToast("Car removed from consist.", "success");
+    } catch (err) {
+      showToast("Error removing car: " + err.message, "error");
     }
   });
 

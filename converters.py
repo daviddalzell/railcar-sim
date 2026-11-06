@@ -197,6 +197,7 @@ def settings_to_dict(s: LayoutSettings) -> dict:
         "clock_start_time": s.clock_start_time,
         "clock_speed": s.clock_speed,
         "ops_mode": s.ops_mode or "free",
+        "max_train_length": s.max_train_length,
     }
 
 
