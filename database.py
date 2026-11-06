@@ -145,7 +145,6 @@ def init_db():
             ("cp_session_count", "cars",          "INTEGER DEFAULT 0"),
             ("operator_email",   "movement_logs", "TEXT"),
             ("warnings_json",    "dispatch_plan", "TEXT DEFAULT '[]'"),
-            ("excluded_ids_json", "dispatch_plan", "TEXT DEFAULT '[]'"),
             ("max_train_length", "layout_settings", "INTEGER"),
         ]:
             try:

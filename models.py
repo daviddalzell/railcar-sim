@@ -249,4 +249,3 @@ class DispatchPlan(Base):
     conductor: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     special_instructions: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     warnings_json: Mapped[str] = mapped_column(String, default="[]")
-    excluded_ids_json: Mapped[str] = mapped_column(String, default="[]")

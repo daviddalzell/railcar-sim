@@ -284,7 +284,8 @@ def test_build_plan_respects_max_train_length(admin_client, db_session):
     assert not any("at or near capacity" in w for w in data["warnings"])
 
 
-def test_remove_car_from_plan_sticks_across_rebuild(admin_client, db_session):
+def test_build_plan_respects_excluded_car_ids(admin_client, db_session):
+    """A car removed from the preview before confirming must not be in the committed plan."""
     area = Location(name="Industrial Park", car_capacity=20)
     db_session.add(area)
     db_session.flush()
@@ -300,28 +301,20 @@ def test_remove_car_from_plan_sticks_across_rebuild(admin_client, db_session):
     make_waybill(db_session, origin.id, track.id, car_id=car2.id, slot_index=0)
     db_session.commit()
 
-    build_params = {
+    r = admin_client.post("/api/dispatcher/build-plan", json={
         "origin_location_id": origin.id,
         "location_id": area.id,
         "destination_location_id": dest.id,
-    }
-    built = admin_client.post("/api/dispatcher/build-plan", json=build_params).json()
-    assert len(built["setouts"]) == 2
-    plan_id = built["id"]
-
-    r = admin_client.delete(f"/api/dispatcher/plan/{plan_id}/car/{car1.id}")
+        "excluded_car_ids": [car1.id],
+    })
     assert r.status_code == 200
-    updated = r.json()
-    assert [c["id"] for c in updated["setouts"]] == [car2.id]
-
-    # A fresh build with the same params must not re-select car1 — without
-    # excluded_ids_json it would no longer be claimed by anything (it's gone from
-    # every setout/pickup/spots list) and would otherwise be eligible again.
-    second = admin_client.post("/api/dispatcher/build-plan", json=build_params).json()
-    assert car1.id not in [c["id"] for c in second["setouts"]]
+    data = r.json()
+    assert [c["id"] for c in data["setouts"]] == [car2.id]
 
 
-def test_remove_car_not_in_plan_404s(admin_client, db_session):
+def test_committed_plan_has_no_car_delete_route(admin_client, db_session):
+    """Cars can only be removed before a consist is committed — no endpoint exists to
+    remove one afterward."""
     from models import DispatchPlan
 
     plan = DispatchPlan(
@@ -336,3 +329,34 @@ def test_remove_car_not_in_plan_404s(admin_client, db_session):
 
     r = admin_client.delete(f"/api/dispatcher/plan/{plan.id}/car/{car.id}")
     assert r.status_code == 404
+
+
+def test_rebuild_respects_excluded_car_ids(admin_client, db_session):
+    """A car removed from the rebuild preview before confirming must not reappear."""
+    area = Location(name="Industrial Park", car_capacity=20)
+    db_session.add(area)
+    db_session.flush()
+    origin = make_location(db_session, "Staging", "staging")
+    dest = make_location(db_session, "Yard", "yard")
+    track = make_location(db_session, "Siding", "yard")
+    track.location_id = area.id
+    db_session.flush()
+
+    car1 = make_car(db_session, "boxcar", origin.id)
+    car2 = make_car(db_session, "boxcar", origin.id)
+    make_waybill(db_session, origin.id, track.id, car_id=car1.id, slot_index=0)
+    make_waybill(db_session, origin.id, track.id, car_id=car2.id, slot_index=0)
+    db_session.commit()
+
+    built = admin_client.post("/api/dispatcher/build-plan", json={
+        "origin_location_id": origin.id,
+        "location_id": area.id,
+        "destination_location_id": dest.id,
+    }).json()
+    assert len(built["setouts"]) == 2
+
+    rebuilt = admin_client.post(f"/api/dispatcher/plan/{built['id']}/rebuild", json={
+        "excluded_car_ids": [car1.id],
+    })
+    assert rebuilt.status_code == 200
+    assert [c["id"] for c in rebuilt.json()["setouts"]] == [car2.id]

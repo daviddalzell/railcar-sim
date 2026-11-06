@@ -826,7 +826,7 @@ function renderDispatchPlanList() {
   });
 }
 
-function consistCarRowHtml(c, arrow, role) {
+function consistCarRowHtml(c, arrow, role, removable) {
   const imgSrc = c.photo_path ? photoSrc(c.photo_path, c.photo_url) : (defaultCarImage(c.car_type) || null);
   const thumb = imgSrc
     ? `<div class="session-car-thumb"><img src="${imgSrc}" alt="${c.car_type}" /></div>`
@@ -841,7 +841,7 @@ function consistCarRowHtml(c, arrow, role) {
       <span class="session-car-move">${arrow} ${from} → ${dest}</span>
     </div>
     ${c.active_waybill?.industry_name ? `<span class="industry-tag">${c.active_waybill.industry_name}</span>` : ""}
-    <button type="button" class="car-row-remove" data-car-id="${c.id}" data-role="${role}" title="Remove from consist">✕</button>
+    ${removable ? `<button type="button" class="car-row-remove" data-car-id="${c.id}" data-role="${role}" title="Remove from consist">✕</button>` : ""}
   </div>`;
 }
 
@@ -867,7 +867,7 @@ function renderDispatcherPreview(containerEl, preview, handlers) {
           <summary class="muted small" style="cursor:pointer;font-weight:600">${g.label} (${g.cars.length})</summary>
           ${g.cars.length === 0
             ? `<p class="muted small">${g.empty}</p>`
-            : g.cars.map(c => consistCarRowHtml(c, g.arrow, g.role)).join("")}
+            : g.cars.map(c => consistCarRowHtml(c, g.arrow, g.role, true)).join("")}
         </details>`).join("")}
     </div>`;
 
@@ -879,6 +879,8 @@ function renderDispatcherPreview(containerEl, preview, handlers) {
       const carId = parseInt(btn.dataset.carId);
       const role = btn.dataset.role;
       preview[role] = (preview[role] || []).filter(c => c.id !== carId);
+      preview._removedIds = preview._removedIds || new Set();
+      preview._removedIds.add(carId);
       renderDispatcherPreview(containerEl, preview, handlers);
     });
   });
@@ -921,7 +923,7 @@ function renderConsistCard(plan) {
   const assignedCabooseId = plan.caboose?.id ?? null;
   const hasPower = assignedPowerIds.length > 0;
 
-  const carRow = c => consistCarRowHtml(c, c.role === "setout" ? "➡" : "⬅", c.role);
+  const carRow = c => consistCarRowHtml(c, c.role === "setout" ? "➡" : "⬅", c.role, false);
 
   const setouts = plan.setouts || [];
   const pickups = plan.pickups || [];
@@ -1101,21 +1103,6 @@ function wireConsistCard(planId) {
     }
   });
 
-  document.getElementById(`consist-car-list-${planId}`)?.addEventListener("click", async (e) => {
-    const btn = e.target.closest(".car-row-remove");
-    if (!btn) return;
-    const carId = parseInt(btn.dataset.carId);
-    try {
-      const updated = await api("DELETE", `/api/dispatcher/plan/${planId}/car/${carId}`);
-      const idx = dispatchPlans.findIndex(p => p.id === planId);
-      if (idx !== -1) dispatchPlans[idx] = updated;
-      renderDispatchPlanList();
-      showToast("Car removed from consist.", "success");
-    } catch (err) {
-      showToast("Error removing car: " + err.message, "error");
-    }
-  });
-
   card.querySelector(`.consist-start-session[data-plan-id="${planId}"]`).addEventListener("click", async () => {
     const plan = dispatchPlans.find(p => p.id === planId);
     if (!plan) return;
@@ -1230,7 +1217,10 @@ function showBuildPreview(params, preview) {
     onConfirm: async (e) => {
       await withLoading(e.target, "Building…", async () => {
         try {
-          const newPlan = await api("POST", "/api/dispatcher/build-plan", params);
+          const newPlan = await api("POST", "/api/dispatcher/build-plan", {
+            ...params,
+            excluded_car_ids: [...(preview._removedIds || [])],
+          });
           track("dispatcher_plan_built");
           dispatchPlans.push(newPlan);
           $("#disp-preview").innerHTML = "";
@@ -1261,7 +1251,9 @@ function showRebuildPreview(planId, preview) {
     onConfirm: async (e) => {
       await withLoading(e.target, "Rebuilding…", async () => {
         try {
-          const updated = await api("POST", `/api/dispatcher/plan/${planId}/rebuild`);
+          const updated = await api("POST", `/api/dispatcher/plan/${planId}/rebuild`, {
+            excluded_car_ids: [...(preview._removedIds || [])],
+          });
           const idx = dispatchPlans.findIndex(p => p.id === planId);
           if (idx !== -1) dispatchPlans[idx] = updated;
           renderDispatchPlanList();

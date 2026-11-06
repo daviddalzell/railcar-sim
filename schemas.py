@@ -52,6 +52,11 @@ class DispatchBuildRequest(BaseModel):
     origin_location_id: int
     location_id: int
     destination_location_id: int
+    excluded_car_ids: list[int] = []
+
+
+class DispatchRebuildRequest(BaseModel):
+    excluded_car_ids: list[int] = []
 
 
 class DispatchPowerUpdate(BaseModel):

@@ -13,7 +13,10 @@ from auth import require_admin
 from database import get_db
 from models import Car, DispatchPlan, Industry, Location, Track
 from converters import car_to_dict, dispatch_plan_to_dict, get_or_create_settings
-from schemas import DispatchBuildRequest, DispatchPlanIdentityUpdate, DispatchPowerUpdate, DispatchPlanStatusUpdate
+from schemas import (
+    DispatchBuildRequest, DispatchPlanIdentityUpdate, DispatchPowerUpdate,
+    DispatchPlanStatusUpdate, DispatchRebuildRequest,
+)
 
 router = APIRouter(prefix="/api", tags=["dispatcher"])
 
@@ -32,8 +35,14 @@ def _clear_dispatch_plan(db: Session):
     db.commit()
 
 
-def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id: int, db: Session) -> tuple:
-    """Core build logic. Returns (consist_inbound, outbound, local_spots, available_spots, warnings)."""
+def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id: int, db: Session,
+                          excluded_car_ids=frozenset()) -> tuple:
+    """Core build logic. Returns (consist_inbound, outbound, local_spots, available_spots, warnings).
+
+    excluded_car_ids: cars a human removed from this specific preview before confirming —
+    request-scoped only, never persisted. Cars can only be removed before a plan is
+    committed; once built, a consist's car list is fixed until the next Rebuild.
+    """
     area = db.get(Location, data_area_id)
     origin = db.get(Track, data_origin_id)
 
@@ -42,14 +51,13 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
         Track.location_type.in_(["staging", "yard"])
     ).all()}
 
-    # Collect car IDs already claimed by other non-complete plans (including cars a
-    # human explicitly removed from one of them — see excluded_ids_json below).
-    claimed_ids: set = set()
+    # Collect car IDs already claimed by other non-complete plans, plus this call's
+    # own request-scoped exclusions.
+    claimed_ids: set = set(excluded_car_ids)
     for other in db.query(DispatchPlan).filter(DispatchPlan.status != "complete").all():
         claimed_ids |= set(json.loads(other.setout_ids_json or "[]"))
         claimed_ids |= set(json.loads(other.pickup_ids_json or "[]"))
         claimed_ids |= set(json.loads(other.spots_ids_json or "[]"))
-        claimed_ids |= set(json.loads(other.excluded_ids_json or "[]"))
 
     current_count = db.query(Car).filter(
         Car.current_location_id.in_(list(area_location_ids))
@@ -230,7 +238,8 @@ def build_dispatch_plan(request: Request, data: DispatchBuildRequest, db: Sessio
         raise HTTPException(404, "Destination track not found")
 
     consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
-        data.origin_location_id, data.location_id, data.destination_location_id, db
+        data.origin_location_id, data.location_id, data.destination_location_id, db,
+        excluded_car_ids=set(data.excluded_car_ids),
     )
 
     plan = DispatchPlan(
@@ -316,28 +325,6 @@ def delete_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict = 
 @router.delete("/dispatcher/plans", status_code=204)
 def clear_all_dispatch_plans(db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     _clear_dispatch_plan(db)
-
-
-@router.delete("/dispatcher/plan/{plan_id}/car/{car_id}")
-def remove_car_from_plan(plan_id: int, car_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
-    plan = db.get(DispatchPlan, plan_id)
-    if not plan:
-        raise HTTPException(404, "Dispatch plan not found")
-    removed = False
-    for attr in ("setout_ids_json", "pickup_ids_json", "spots_ids_json"):
-        ids = json.loads(getattr(plan, attr) or "[]")
-        if car_id in ids:
-            ids.remove(car_id)
-            setattr(plan, attr, json.dumps(ids))
-            removed = True
-    if not removed:
-        raise HTTPException(404, "Car not found in this consist")
-    excluded = json.loads(plan.excluded_ids_json or "[]")
-    if car_id not in excluded:
-        excluded.append(car_id)
-        plan.excluded_ids_json = json.dumps(excluded)
-    db.commit()
-    return dispatch_plan_to_dict(plan, db)
 
 
 @router.patch("/dispatcher/plan/{plan_id}/power")
@@ -445,7 +432,8 @@ def preview_rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _
 
 
 @router.post("/dispatcher/plan/{plan_id}/rebuild")
-def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict = Depends(require_admin)):
+def rebuild_dispatch_plan(plan_id: int, data: DispatchRebuildRequest = DispatchRebuildRequest(),
+                           db: Session = Depends(get_db), _: dict = Depends(require_admin)):
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")
@@ -469,7 +457,8 @@ def rebuild_dispatch_plan(plan_id: int, db: Session = Depends(get_db), _: dict =
     db.flush()
 
     consist_inbound, outbound, local_spots, available_spots, warnings = _run_build_algorithm(
-        plan.origin_location_id, plan.location_id, plan.destination_location_id, db
+        plan.origin_location_id, plan.location_id, plan.destination_location_id, db,
+        excluded_car_ids=set(data.excluded_car_ids),
     )
 
     plan.setout_ids_json = json.dumps([c.id for c in consist_inbound])
