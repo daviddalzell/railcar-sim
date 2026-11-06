@@ -356,12 +356,13 @@
               <select id="disp-destination"><option value="">— select destination —</option></select>
             </label>
           </div>
+          <div id="disp-hint-strip" class="muted small" style="margin:0.25rem 0 0"></div>
           <div class="button-row">
             <button id="btn-build-consist">+ Build Consist</button>
             <button id="btn-clear-all-plans" class="outline secondary">✕ Clear All</button>
           </div>
+          <div id="disp-preview" style="margin-top:0.75rem"></div>
           <div id="dispatch-plans-list" style="margin-top:0.75rem"></div>
-          <div id="dispatch-warnings" class="hidden session-warnings" style="margin-top:0.5rem"></div>
         </div><!-- /dispatcher-body -->
       </article>
 
@@ -612,6 +613,17 @@
           </select>
         </label>
         <button type="submit" class="small">Save Ops Mode</button>
+      </form>
+
+      <hr />
+      <div class="section-header" style="margin-top:0">
+        <h3>Dispatcher</h3>
+      </div>
+      <form id="train-length-form" class="inline-form">
+        <label>Max train length (cars)
+          <input id="setting-max-train-length" type="number" min="1" placeholder="No limit" />
+        </label>
+        <button type="submit" class="small">Save Train Length</button>
       </form>
     </section>
 

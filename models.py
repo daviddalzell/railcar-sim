@@ -212,6 +212,7 @@ class LayoutSettings(Base):
     clock_start_time: Mapped[str] = mapped_column(String, default="08:00")
     clock_speed: Mapped[int] = mapped_column(Integer, default=4)
     ops_mode: Mapped[str] = mapped_column(String, default="free")  # "free" | "timetable_train_order" | "track_warrant"
+    max_train_length: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 
 class SessionClock(Base):
@@ -247,3 +248,4 @@ class DispatchPlan(Base):
     engineer: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     conductor: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     special_instructions: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    warnings_json: Mapped[str] = mapped_column(String, default="[]")

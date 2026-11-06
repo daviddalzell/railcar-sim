@@ -52,6 +52,11 @@ class DispatchBuildRequest(BaseModel):
     origin_location_id: int
     location_id: int
     destination_location_id: int
+    excluded_car_ids: list[int] = []
+
+
+class DispatchRebuildRequest(BaseModel):
+    excluded_car_ids: list[int] = []
 
 
 class DispatchPowerUpdate(BaseModel):
@@ -164,6 +169,7 @@ class LayoutSettingsUpdate(BaseModel):
     clock_start_time: str = "08:00"
     clock_speed: int = 4
     ops_mode: str = "free"
+    max_train_length: Optional[int] = None
 
 
 class DeleteUploadRequest(BaseModel):
