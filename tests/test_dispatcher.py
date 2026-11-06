@@ -26,7 +26,8 @@ def admin_client(db_session):
     app.dependency_overrides.clear()
 
 
-def test_build_plan_enforces_per_track_capacity(admin_client, db_session):
+def test_build_plan_still_delivers_cars_over_track_capacity(admin_client, db_session):
+    """A full siding doesn't refuse the car — it rides along for CP since the area has room."""
     area = Location(name="Industrial Park", car_capacity=20)
     db_session.add(area)
     db_session.flush()
@@ -50,8 +51,40 @@ def test_build_plan_enforces_per_track_capacity(admin_client, db_session):
     })
     assert r.status_code == 200
     data = r.json()
+    assert len(data["setouts"]) == 2  # neither car is excluded
+    assert any("Track A" in w and "CP" in w for w in data["warnings"])
+
+
+def test_build_plan_nets_out_same_visit_pulls(admin_client, db_session):
+    """A siding occupant leaving this same trip frees its slot for an inbound car."""
+    area = Location(name="Industrial Park", car_capacity=20)
+    db_session.add(area)
+    db_session.flush()
+    origin = make_location(db_session, "Staging", "staging")
+    dest = make_location(db_session, "Yard", "yard")
+    track_a = make_location(db_session, "Track A", "industry")
+    track_a.location_id = area.id
+    track_a.car_capacity = 1
+    db_session.flush()
+
+    # Already occupies Track A, but is leaving this same trip (destination is the yard).
+    leaving_car = make_car(db_session, "boxcar", track_a.id)
+    make_waybill(db_session, track_a.id, dest.id, car_id=leaving_car.id, slot_index=0)
+    # New arrival destined for Track A, from the origin.
+    arriving_car = make_car(db_session, "boxcar", origin.id)
+    make_waybill(db_session, origin.id, track_a.id, car_id=arriving_car.id, slot_index=0)
+    db_session.commit()
+
+    r = admin_client.post("/api/dispatcher/build-plan", json={
+        "origin_location_id": origin.id,
+        "location_id": area.id,
+        "destination_location_id": dest.id,
+    })
+    assert r.status_code == 200
+    data = r.json()
     assert len(data["setouts"]) == 1
-    assert any("Track A" in w for w in data["warnings"])
+    assert len(data["pickups"]) == 1
+    assert not any("Track A" in w for w in data["warnings"])
 
 
 def test_build_plan_warns_on_industry_overcapacity(admin_client, db_session):
@@ -81,7 +114,7 @@ def test_build_plan_warns_on_industry_overcapacity(admin_client, db_session):
     assert r.status_code == 200
     data = r.json()
     assert len(data["setouts"]) == 2  # industry capacity only warns — it doesn't truncate
-    assert any("Acme Mill" in w for w in data["warnings"])
+    assert any("Acme Mill" in w and "CP" in w for w in data["warnings"])
 
 
 def test_build_plan_warns_on_destination_mismatch(admin_client, db_session):

@@ -79,31 +79,42 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
     ]
     consist_inbound = inbound[:available_spots]
 
-    # Per-track capacity: consist_inbound and local_spots both land cars on a specific
-    # destination track within the area — Track.car_capacity (when set) caps that track
-    # independently of the area-wide aggregate already enforced above.
+    # Pulls before puts: a siding isn't full if its occupant is leaving on this same
+    # trip, so net out same-visit pulls (outbound leaves the area; local_spots leaves
+    # its current track for a different one in the area) before checking what fits.
     occupancy_by_track: dict = {}
     for car in area_cars:
         occupancy_by_track[car.current_location_id] = occupancy_by_track.get(car.current_location_id, 0) + 1
-    track_overflow: dict = {}  # track_id -> number of cars excluded
 
-    def _enforce_track_capacity(cars):
-        kept = []
-        for car in cars:
-            wb = _get_active_waybill(car)
-            track = db.get(Track, wb.destination_id)
-            if track and track.car_capacity is not None and occupancy_by_track.get(track.id, 0) >= track.car_capacity:
-                track_overflow[track.id] = track_overflow.get(track.id, 0) + 1
-                continue
-            occupancy_by_track[wb.destination_id] = occupancy_by_track.get(wb.destination_id, 0) + 1
-            kept.append(car)
-        return kept
+    pulled_from_track: dict = {}
+    pulled_from_industry: dict = {}
+    for car in outbound + local_spots:
+        pulled_from_track[car.current_location_id] = pulled_from_track.get(car.current_location_id, 0) + 1
+        wb = _get_active_waybill(car)
+        if wb and wb.industry_id:
+            pulled_from_industry[wb.industry_id] = pulled_from_industry.get(wb.industry_id, 0) + 1
 
-    consist_inbound = _enforce_track_capacity(consist_inbound)
-    local_spots = _enforce_track_capacity(local_spots)
+    net_occupancy_by_track = {
+        tid: max(0, n - pulled_from_track.get(tid, 0)) for tid, n in occupancy_by_track.items()
+    }
 
-    # Industry spot capacity: advance warning for what detectSpottingConflicts() would
-    # otherwise only catch once an operating session is already live.
+    # Track capacity is a soft limit: it informs a "will need CP" warning but never
+    # removes a car from the plan. Location.car_capacity (already enforced above via
+    # available_spots and the local_spots cap) is the only thing that can leave a car
+    # at origin — a car whose specific siding is tight still rides along if the area
+    # itself has room, same as how industry-capacity overflow already works below.
+    track_baseline = dict(net_occupancy_by_track)  # occupancy after pulls, before this visit's arrivals
+    track_overflow: dict = {}  # track_id -> count of cars over that track's capacity
+    for car in consist_inbound + local_spots:
+        wb = _get_active_waybill(car)
+        track = db.get(Track, wb.destination_id)
+        if not track:
+            continue
+        net_occupancy_by_track[track.id] = net_occupancy_by_track.get(track.id, 0) + 1
+        if track.car_capacity is not None and net_occupancy_by_track[track.id] > track.car_capacity:
+            track_overflow[track.id] = track_overflow.get(track.id, 0) + 1
+
+    # Industry spot capacity: same soft-limit treatment, pulls-netted the same way.
     by_industry: dict = {}
     for car in consist_inbound + local_spots:
         wb = _get_active_waybill(car)
@@ -124,12 +135,12 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
             if c.current_location_id == industry.location_id
             and (wb := _get_active_waybill(c)) and wb.industry_id == industry.id
         )
-        if current_count_at_industry + len(incoming) > capacity:
-            free = max(0, capacity - current_count_at_industry)
-            warnings_needed = current_count_at_industry + len(incoming) - capacity
+        net_current = max(0, current_count_at_industry - pulled_from_industry.get(industry.id, 0))
+        if net_current + len(incoming) > capacity:
+            over = net_current + len(incoming) - capacity
             industry_warnings.append(
-                f"{industry.name} would receive {len(incoming)} car(s) but only has "
-                f"{free} of {capacity} spot(s) free ({warnings_needed} over)."
+                f"{industry.name}: {over} car{'s' if over != 1 else ''} will need temporary CP "
+                f"placement ({net_current} of {capacity} spot{'s' if capacity != 1 else ''} already in use)."
             )
 
     # Destination mismatch: outbound cars are matched against any yard/staging track
@@ -155,11 +166,12 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
             f"{left_behind} car{'s' if left_behind != 1 else ''} at origin cannot be delivered — "
             f"{area.name} is at or near capacity ({current_count}/{area.car_capacity} spots used)."
         )
-    for track_id, excluded in track_overflow.items():
+    for track_id, over in track_overflow.items():
         track = db.get(Track, track_id)
+        in_use = track_baseline.get(track_id, 0)
         warnings.append(
-            f"{track.name} is at capacity ({track.car_capacity}); "
-            f"{excluded} car{'s' if excluded != 1 else ''} left for a future trip."
+            f"{track.name}: {over} car{'s' if over != 1 else ''} will need temporary CP "
+            f"placement (track holds {track.car_capacity}, {in_use} already in use)."
         )
     warnings.extend(industry_warnings)
     if destination_warning:
