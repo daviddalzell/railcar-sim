@@ -219,13 +219,18 @@ def index(request: Request):
                 """), {"slug": slug, "date": date.today()})
         except Exception:
             pass
+    auth_disabled = bool(os.environ.get("AUTH_DISABLED"))
     return templates.TemplateResponse(
         "index.html", {
             "request": request,
             "vision_label": vision_label,
-            "supabase_url": os.environ.get("SUPABASE_URL", ""),
-            "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", ""),
-            "auth_disabled": bool(os.environ.get("AUTH_DISABLED")),
+            # AUTH_DISABLED means "fully isolated local sandbox" — never wire the
+            # frontend to real Supabase auth even if .env has real credentials
+            # (load_dotenv() loads them unconditionally; AUTH_DISABLED only bypasses
+            # backend JWT checks, not this template context, unless gated here).
+            "supabase_url": "" if auth_disabled else os.environ.get("SUPABASE_URL", ""),
+            "supabase_anon_key": "" if auth_disabled else os.environ.get("SUPABASE_ANON_KEY", ""),
+            "auth_disabled": auth_disabled,
             "is_demo": is_demo,
             "asset_version": _ASSET_VERSION,
             "layout_name": getattr(tenant, "name", "") or "",
