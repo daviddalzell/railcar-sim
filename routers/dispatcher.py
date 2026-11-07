@@ -67,11 +67,17 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
         Car.current_location_id.in_(list(area_location_ids))
     ).all() if area_location_ids else []
 
+    # A yard/staging track that happens to sit inside this same area satisfies both
+    # "destination is some yard/staging track" (outbound) and "destination is within
+    # the area" (local_spots) — exclude area-internal destinations from outbound so a
+    # car can never land in both lists at once (it isn't leaving the area at all).
     outbound = [
         car for car in area_cars
         if car.car_type not in _POWER_CAR_TYPES
         and car.id not in claimed_ids
-        and (wb := _get_active_waybill(car)) and wb.destination_id in dispatch_ids
+        and (wb := _get_active_waybill(car))
+        and wb.destination_id in dispatch_ids
+        and wb.destination_id not in area_location_ids
     ]
 
     local_spots = [

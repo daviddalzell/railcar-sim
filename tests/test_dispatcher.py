@@ -360,3 +360,35 @@ def test_rebuild_respects_excluded_car_ids(admin_client, db_session):
     })
     assert rebuilt.status_code == 200
     assert [c["id"] for c in rebuilt.json()["setouts"]] == [car2.id]
+
+
+def test_build_plan_no_overlap_when_destination_is_yard_track_in_area(admin_client, db_session):
+    """A car destined for a yard-type track that sits inside the area satisfies both
+    'some yard/staging track' (outbound) and 'within the area' (local_spots) — it must
+    land in exactly one of those lists, never both."""
+    area = Location(name="Millbrook Yard", car_capacity=20)
+    db_session.add(area)
+    db_session.flush()
+    origin = make_location(db_session, "Staging", "staging")
+    yard_track = make_location(db_session, "Yard Tracks", "yard")
+    yard_track.location_id = area.id
+    industry_track = make_location(db_session, "Riverside Grain Spur", "industry")
+    industry_track.location_id = area.id
+    db_session.flush()
+
+    car = make_car(db_session, "boxcar", industry_track.id)
+    make_waybill(db_session, industry_track.id, yard_track.id, car_id=car.id, slot_index=0)
+    db_session.commit()
+
+    r = admin_client.post("/api/dispatcher/build-plan", json={
+        "origin_location_id": origin.id,
+        "location_id": area.id,
+        "destination_location_id": origin.id,
+    })
+    assert r.status_code == 200
+    data = r.json()
+    pickup_ids = {c["id"] for c in data["pickups"]}
+    spot_ids = {c["id"] for c in data["spots"]}
+    assert not (pickup_ids & spot_ids)
+    assert car.id in spot_ids
+    assert car.id not in pickup_ids
