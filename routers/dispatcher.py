@@ -11,7 +11,7 @@ from starlette.requests import Request
 
 from auth import require_admin
 from database import get_db
-from models import Car, DispatchPlan, Industry, Location, Track
+from models import Car, DispatchPlan, Industry, Location, POWER_CAR_TYPES, Track
 from converters import car_to_dict, dispatch_plan_to_dict, get_or_create_settings
 from schemas import (
     DispatchBuildRequest, DispatchPlanIdentityUpdate, DispatchPowerUpdate,
@@ -19,11 +19,6 @@ from schemas import (
 )
 
 router = APIRouter(prefix="/api", tags=["dispatcher"])
-
-
-_POWER_CAR_TYPES = {"locomotive", "caboose"}  # matches the string convention already
-# used client-side (static/js/operations.js's power/caboose selects) and in
-# converters.py's "caboose" role tag — no CarType.is_power flag exists to reuse instead.
 
 
 def _get_active_waybill(car: Car):
@@ -79,7 +74,7 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
     # car can never land in both lists at once (it isn't leaving the area at all).
     outbound = [
         car for car in area_cars
-        if car.car_type not in _POWER_CAR_TYPES
+        if car.car_type not in POWER_CAR_TYPES
         and car.id not in claimed_ids
         and (wb := _get_active_waybill(car))
         and wb.destination_id in dispatch_ids
@@ -88,7 +83,7 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
 
     local_spots = [
         car for car in area_cars
-        if car.car_type not in _POWER_CAR_TYPES
+        if car.car_type not in POWER_CAR_TYPES
         and car.id not in claimed_ids
         and (wb := _get_active_waybill(car))
         and wb.destination_id in area_location_ids
@@ -103,7 +98,7 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
     ).all()
     inbound = [
         car for car in origin_cars
-        if car.car_type not in _POWER_CAR_TYPES
+        if car.car_type not in POWER_CAR_TYPES
         and car.id not in claimed_ids
         and (wb := _get_active_waybill(car)) and wb.destination_id in area_location_ids
     ]

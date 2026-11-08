@@ -136,6 +136,13 @@ class Industry(Base):
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="industry")
 
 
+POWER_CAR_TYPES = {"locomotive", "caboose"}  # matches the string convention already used
+# client-side (static/js/operations.js's power/caboose selects) and in converters.py's
+# "caboose" role tag — no CarType.is_power flag exists to reuse instead. Cars of these
+# types should never be selected as cargo by routers/dispatcher.py or routers/session.py's
+# automatic car-selection algorithms, only ever assigned explicitly as power.
+
+
 class Car(Base):
     __tablename__ = "cars"
 

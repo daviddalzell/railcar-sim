@@ -15,7 +15,7 @@ from starlette.requests import Request
 import sse_shared
 from auth import get_current_user
 from database import get_db
-from models import Car, Location, MovementLog, SessionClock, Track, Waybill
+from models import Car, Location, MovementLog, POWER_CAR_TYPES, SessionClock, Track, Waybill
 from converters import car_to_dict, clock_to_dict, start_session_clock as _start_session_clock, clear_session_clock
 from schemas import LayoutSettingsUpdate, SessionEndRequest
 from converters import get_or_create_settings, settings_to_dict
@@ -85,6 +85,8 @@ def _build_session_plan(db: Session) -> dict:
     arrivals, departures, spots, warnings = [], [], [], []
 
     for car in db.query(Car).all():
+        if car.car_type in POWER_CAR_TYPES:
+            continue
         wb = _get_active_waybill(car)
         if not wb or wb.destination_id is None:
             continue
