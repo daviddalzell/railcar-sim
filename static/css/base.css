@@ -79,8 +79,16 @@ body {
 /* Compact default button height — scoped to the button tag via custom
    property, so it never touches input/select/textarea sizing (Pico shares
    --pico-form-element-spacing-vertical across all form elements, but a
-   property redefined on `button` only inherits down into buttons). */
-button, [type="submit"], [type="reset"], [role="button"] {
+   property redefined on `button` only inherits down into buttons).
+   Must list all four [type=...] button variants Pico itself targets
+   (button/submit/reset/file) plus [role=button] — Pico's own button rule
+   is `[role=button],[type=button],[type=file]::file-selector-button,
+   [type=reset],[type=submit],button`, and any `[type=...]` attribute
+   selector (specificity 0,1,0) beats a plain `button` type selector
+   (0,0,1). Omitting [type="button"] here left every <button type="button">
+   in the app (20+ in templates/index.html alone) matching Pico's
+   higher-specificity [type=button] font-size instead of this rule's. */
+button, [type="button"], [type="submit"], [type="reset"], [role="button"] {
   --pico-form-element-spacing-vertical: 0.4rem;
   --pico-form-element-spacing-horizontal: 1rem;
   font-size: 0.85rem;

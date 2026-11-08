@@ -162,3 +162,32 @@ def test_required_car_type_none_matches_any(client, db_session):
     assert r.json()["assigned"] >= 1
     wb = db_session.query(Waybill).filter(Waybill.car_id == car.id).first()
     assert wb is not None
+
+
+def test_bulk_auto_assign_skips_locomotives_and_cabooses(client, db_session):
+    """A locomotive or caboose must never be handed a waybill — they're power, not
+    cargo (issue #51)."""
+    staging = make_location(db_session, "Staging", "staging")
+    yard = make_location(db_session, "Yard", "yard")
+    loco = make_car(db_session, "locomotive", location_id=staging.id)
+    caboose = make_car(db_session, "caboose", location_id=staging.id)
+    make_waybill(db_session, staging.id, yard.id, is_empty=False)
+    make_waybill(db_session, staging.id, yard.id, is_empty=False)
+    db_session.commit()
+
+    r = client.post("/api/auto-assign-waybills")
+    assert r.status_code == 200
+    assert db_session.query(Waybill).filter(Waybill.car_id == loco.id).count() == 0
+    assert db_session.query(Waybill).filter(Waybill.car_id == caboose.id).count() == 0
+
+
+def test_single_car_auto_assign_skips_locomotive(client, db_session):
+    staging = make_location(db_session, "Staging", "staging")
+    yard = make_location(db_session, "Yard", "yard")
+    loco = make_car(db_session, "locomotive", location_id=staging.id)
+    make_waybill(db_session, staging.id, yard.id, is_empty=False)
+    db_session.commit()
+
+    r = client.post(f"/api/cars/{loco.id}/auto-assign")
+    assert r.status_code == 200
+    assert db_session.query(Waybill).filter(Waybill.car_id == loco.id).count() == 0

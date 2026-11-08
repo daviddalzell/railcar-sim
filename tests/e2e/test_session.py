@@ -63,6 +63,11 @@ def test_dispatch_and_run_session(page: Page):
     page.locator("#disp-destination").select_option(str(staging))
     page.locator("#btn-build-consist").click()
 
+    # Building a consist now previews before committing — confirm it.
+    confirm_btn = page.locator("#disp-preview .disp-preview-confirm")
+    expect(confirm_btn).to_be_visible()
+    confirm_btn.click()
+
     start_btn = page.locator(".consist-start-session").first
     expect(start_btn).to_be_visible()
     plan_id = start_btn.get_attribute("data-plan-id")

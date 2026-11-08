@@ -193,6 +193,20 @@
   color: var(--rail-accent, #c0392b);
 }
 
+.car-row-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted, #888);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0 0.3rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.car-row-remove:hover {
+  color: var(--rail-accent, #c0392b);
+}
+
 /* ── Session status bar (persistent, bottom of viewport) ─────────────────── */
 #session-status-bar {
   position: fixed;

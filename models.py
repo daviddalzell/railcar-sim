@@ -136,6 +136,13 @@ class Industry(Base):
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="industry")
 
 
+POWER_CAR_TYPES = {"locomotive", "caboose"}  # matches the string convention already used
+# client-side (static/js/operations.js's power/caboose selects) and in converters.py's
+# "caboose" role tag — no CarType.is_power flag exists to reuse instead. Cars of these
+# types should never be selected as cargo by routers/dispatcher.py or routers/session.py's
+# automatic car-selection algorithms, only ever assigned explicitly as power.
+
+
 class Car(Base):
     __tablename__ = "cars"
 
@@ -212,6 +219,7 @@ class LayoutSettings(Base):
     clock_start_time: Mapped[str] = mapped_column(String, default="08:00")
     clock_speed: Mapped[int] = mapped_column(Integer, default=4)
     ops_mode: Mapped[str] = mapped_column(String, default="free")  # "free" | "timetable_train_order" | "track_warrant"
+    max_train_length: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 
 class SessionClock(Base):
@@ -247,3 +255,4 @@ class DispatchPlan(Base):
     engineer: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     conductor: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     special_instructions: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    warnings_json: Mapped[str] = mapped_column(String, default="[]")
