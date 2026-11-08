@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Car, CommodityCarTypeMap, Industry, Track, Waybill
+from models import Car, CommodityCarTypeMap, Industry, POWER_CAR_TYPES, Track, Waybill
 from converters import car_to_dict, waybill_to_dict
 from schemas import GenerateWaybillsRequest
 
@@ -131,6 +131,8 @@ def auto_assign_one_car(car, unassigned: list, staging_ids: set, db: Session, st
     """Fill open waybill slots for a single car. Returns number of slots filled.
     Mutates `unassigned` in place (removes assigned loaded waybills).
     Falls back to cloning existing waybills when the pool is exhausted so all 4 slots are always filled."""
+    if car.car_type in POWER_CAR_TYPES:
+        return 0
     occupied = {w.slot_index for w in car.waybills if w.slot_index is not None}
     open_slots = [s for s in range(4) if s not in occupied]
     if not open_slots:
