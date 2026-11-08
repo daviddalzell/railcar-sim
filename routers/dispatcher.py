@@ -42,6 +42,13 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
     excluded_car_ids: cars a human removed from this specific preview before confirming —
     request-scoped only, never persisted. Cars can only be removed before a plan is
     committed; once built, a consist's car list is fixed until the next Rebuild.
+
+    Deliberately NOT folded into claimed_ids: doing so would let truncation
+    (inbound[:inbound_cap], the local_spots cap) reach one further into the candidate
+    pool and backfill a different, never-previewed car into the freed slot. Selection
+    and truncation run exactly as if nothing were excluded, then excluded_car_ids is
+    applied as a final filter on the already-decided lists below — "remove one" shrinks
+    the consist by one, it never substitutes something the operator didn't review.
     """
     area = db.get(Location, data_area_id)
     origin = db.get(Track, data_origin_id)
@@ -51,9 +58,8 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
         Track.location_type.in_(["staging", "yard"])
     ).all()}
 
-    # Collect car IDs already claimed by other non-complete plans, plus this call's
-    # own request-scoped exclusions.
-    claimed_ids: set = set(excluded_car_ids)
+    # Collect car IDs already claimed by other non-complete plans.
+    claimed_ids: set = set()
     for other in db.query(DispatchPlan).filter(DispatchPlan.status != "complete").all():
         claimed_ids |= set(json.loads(other.setout_ids_json or "[]"))
         claimed_ids |= set(json.loads(other.pickup_ids_json or "[]"))
@@ -222,6 +228,14 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
             f"Large switch list ({total_work} car moves, limit {work_threshold} for this area). "
             "Consider regenerating for a shorter session, or plan for two yard trips."
         )
+
+    # Apply operator-requested removals last, after selection/truncation/warnings are
+    # already decided — see the excluded_car_ids note above for why this can't happen
+    # any earlier without risking a backfill.
+    if excluded_car_ids:
+        consist_inbound = [c for c in consist_inbound if c.id not in excluded_car_ids]
+        outbound = [c for c in outbound if c.id not in excluded_car_ids]
+        local_spots = [c for c in local_spots if c.id not in excluded_car_ids]
 
     return consist_inbound, outbound, local_spots, available_spots, warnings
 

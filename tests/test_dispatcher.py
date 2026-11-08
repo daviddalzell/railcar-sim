@@ -312,6 +312,40 @@ def test_build_plan_respects_excluded_car_ids(admin_client, db_session):
     assert [c["id"] for c in data["setouts"]] == [car2.id]
 
 
+def test_excluded_car_ids_does_not_backfill_an_unreviewed_car(admin_client, db_session):
+    """Removing a car from a capacity-constrained preview must shrink the consist by
+    one — it must never let a different, never-previewed car take the freed slot."""
+    area = Location(name="Industrial Park", car_capacity=2)
+    db_session.add(area)
+    db_session.flush()
+    origin = make_location(db_session, "Staging", "staging")
+    dest = make_location(db_session, "Yard", "yard")
+    track = make_location(db_session, "Siding", "yard")
+    track.location_id = area.id
+    db_session.flush()
+
+    car1 = make_car(db_session, "boxcar", origin.id)
+    car2 = make_car(db_session, "boxcar", origin.id)
+    car3 = make_car(db_session, "boxcar", origin.id)
+    for car in (car1, car2, car3):
+        make_waybill(db_session, origin.id, track.id, car_id=car.id, slot_index=0)
+    db_session.commit()
+
+    build_params = {
+        "origin_location_id": origin.id,
+        "location_id": area.id,
+        "destination_location_id": dest.id,
+    }
+    preview = admin_client.post("/api/dispatcher/preview-plan", json=build_params).json()
+    assert [c["id"] for c in preview["inbound"]] == [car1.id, car2.id]  # car3 left behind by capacity
+
+    built = admin_client.post("/api/dispatcher/build-plan", json={
+        **build_params,
+        "excluded_car_ids": [car1.id],
+    }).json()
+    assert [c["id"] for c in built["setouts"]] == [car2.id]  # not [car2, car3]
+
+
 def test_committed_plan_has_no_car_delete_route(admin_client, db_session):
     """Cars can only be removed before a consist is committed — no endpoint exists to
     remove one afterward."""
