@@ -445,12 +445,15 @@ function renderLocationTree() {
   // Add track to group
   root.querySelectorAll(".add-track-to-group").forEach(btn => {
     btn.addEventListener("click", () => {
+      // Show the form before setting any <select>'s value — Safari/WebKit can
+      // apply a select's value correctly while display:none but fail to paint the
+      // chosen option's label once revealed, until something else forces a reflow.
+      showOnlyLayoutForm($("#track-form"));
       $("#tf-name").value = "";
       $("#tf-type").value = "yard";
       $("#tf-capacity").value = "";
       $("#tf-group-id").value = btn.dataset.groupId || "";
       $("#tf-edit-id").value = "";
-      showOnlyLayoutForm($("#track-form"));
     });
   });
 
@@ -487,12 +490,13 @@ function renderLocationTree() {
     btn.addEventListener("click", () => {
       const t = appState.locations.find(l => l.id === parseInt(btn.dataset.id));
       if (!t) return;
+      // See the add-track-to-group handler above for why the form shows first.
+      showOnlyLayoutForm($("#track-form"));
       $("#tf-name").value = t.name;
       $("#tf-type").value = t.location_type;
       $("#tf-capacity").value = t.car_capacity ?? "";
       $("#tf-group-id").value = t.location_id || "";
       $("#tf-edit-id").value = t.id;
-      showOnlyLayoutForm($("#track-form"));
     });
   });
 
@@ -828,6 +832,10 @@ $("#track-form").addEventListener("submit", async e => {
 
 // Open the industry form for a new industry, optionally pre-attached to a track.
 function openIndustryForm(trackId = null) {
+  // Show the form before setting #ind-location's value — see the add-track-to-group
+  // handler above for why (Safari/WebKit paints a select's label incorrectly if its
+  // value is set while display:none).
+  showOnlyLayoutForm($("#industry-form"));
   $("#ind-name").value = "";
   populateCarTypeMultiSelect($("#ind-inbound-car-types"), "");
   $("#ind-inbound-commodities").value = "";
@@ -844,12 +852,13 @@ function openIndustryForm(trackId = null) {
     $("#ind-location").value = "";
     populateSpotPicker($("#ind-spot-numbers"), 0, "");
   }
-  showOnlyLayoutForm($("#industry-form"));
   $("#industry-form").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 // Open the industry form to edit an existing industry.
 function openIndustryEdit(ind) {
+  // See the add-track-to-group handler above for why the form shows first.
+  showOnlyLayoutForm($("#industry-form"));
   $("#ind-name").value = ind.name;
   $("#ind-location").value = ind.location_id || "";
   refreshSpotPickerForLocation(ind.spot_numbers || "");
@@ -861,7 +870,6 @@ function openIndustryEdit(ind) {
   roleToCheckboxes(ind.industry_role || "consumer");
   hide($("#inbound-commodity-warn"));
   hide($("#outbound-commodity-warn"));
-  showOnlyLayoutForm($("#industry-form"));
   $("#industry-form").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
