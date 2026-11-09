@@ -215,9 +215,17 @@ async def import_data(request: Request, file: UploadFile = File(...), db: Sessio
         import_table(db, Location, tables.get("locations", []))
         import_table(db, Track,    tables.get("tracks", []))
     else:
-        # Old backup: "switching_areas" = Location (old SwitchingArea), "locations" = Track (old Location)
+        # Old backup: "switching_areas" = Location (old SwitchingArea), "locations" = Track (old Location).
+        # The old Location's group FK was also renamed in the same PR (switching_area_id ->
+        # location_id) — import_table filters each row down to the current model's column
+        # keys, so without this remap switching_area_id is silently dropped and every
+        # imported track comes in unassigned to any location.
+        old_tracks = tables.get("locations", [])
+        for row in old_tracks:
+            if "switching_area_id" in row:
+                row["location_id"] = row.pop("switching_area_id")
         import_table(db, Location, tables.get("switching_areas", []))
-        import_table(db, Track,    tables.get("locations", []))
+        import_table(db, Track,    old_tracks)
     import_table(db, Industry,            tables.get("industries", []))
     import_table(db, CommodityCarTypeMap, tables.get("commodity_car_type_map", []))
     import_table(db, Car,                 tables.get("cars", []))
