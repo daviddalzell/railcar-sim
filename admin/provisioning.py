@@ -153,7 +153,7 @@ def provision_tenant(
         db.refresh(tenant)
 
         # 4. Create Supabase Auth admin user
-        user_id = _create_supabase_user(admin_email, slug, "admin")
+        user_id = _create_supabase_user(admin_email, slug, "admin", tenant_name=name)
 
         result = {
             "tenant_id": tenant.id,
@@ -203,26 +203,117 @@ def _create_tenant_schema(engine, Base, schema_name: str) -> None:
         )
 
 
-def _create_supabase_user(email: str, tenant_slug: str, role: str) -> str | None:
-    """Invite a user via Supabase Auth. Returns user ID, or None if not configured."""
+def _create_supabase_user(email: str, tenant_slug: str, role: str, tenant_name: str = "") -> str | None:
+    """Invite a user via Supabase Auth. Returns user ID, or None if not configured.
+
+    Uses generate_link() rather than invite_user_by_email() — the latter has
+    Supabase send its own invite email, whose confirmation link redirect is
+    checked against the project's "Redirect URLs" allowlist. That allowlist
+    can't realistically list every tenant's dynamic subdomain, so Supabase
+    rejects the redirect and the member sees an "invalid link" error (this is
+    exactly what happened to a Patreon member's first invite). generate_link
+    sidesteps the allowlist entirely — we build our own confirm URL through
+    /auth/confirm (which JS-redirects to the right tenant subdomain) and send
+    it via our own SMTP, same pattern routers/settings.py's invite_operator()
+    already uses for inviting additional operators to an existing tenant.
+    """
     supabase_url = os.environ.get("SUPABASE_URL")
     supabase_key = os.environ.get("SUPABASE_KEY")
     if not (supabase_url and supabase_key):
         print(f"[provision] SUPABASE_URL not set — skipping auth user creation for {email}")
         return None
     try:
-        from supabase import create_client
-        client = create_client(supabase_url, supabase_key)
-        resp = client.auth.admin.invite_user_by_email(
-            email,
-            options={"data": {"tenant_slug": tenant_slug, "role": role}},
+        import httpx
+        from supabase import create_client, ClientOptions
+        client = create_client(supabase_url, supabase_key, options=ClientOptions(httpx_client=httpx.Client(timeout=15)))
+
+        link_type = "invite"
+        try:
+            link_resp = client.auth.admin.generate_link({
+                "type": "invite",
+                "email": email,
+                "options": {"data": {"tenant_slug": tenant_slug, "role": role}},
+            })
+        except Exception as gen_err:
+            # Email already has a Supabase user (e.g. a prior invite_user_by_email
+            # call already created one) — fall back to a magic link, same as
+            # invite_operator()'s identical fallback.
+            if "registered" in str(gen_err).lower() or "exists" in str(gen_err).lower():
+                link_type = "magiclink"
+                link_resp = client.auth.admin.generate_link({
+                    "type": "magiclink",
+                    "email": email,
+                    "options": {"data": {"tenant_slug": tenant_slug, "role": role}},
+                })
+                client.auth.admin.update_user_by_id(
+                    str(link_resp.user.id),
+                    {"user_metadata": {"tenant_slug": tenant_slug, "role": role}},
+                )
+            else:
+                raise
+
+        hashed_token = link_resp.properties.hashed_token
+        user_id = getattr(link_resp.user, "id", None)
+
+        app_url = os.environ.get("APP_URL", "https://waypoint-ops.com")
+        base = app_url.split("://", 1)[-1].removeprefix("www.")
+        tenant_url = f"https://{tenant_slug}.{base}"
+
+        from urllib.parse import quote
+        confirm_url = (
+            f"{app_url}/auth/confirm"
+            f"?token_hash={hashed_token}"
+            f"&type={link_type}"
+            f"&next={quote(tenant_url, safe='')}"
         )
-        user_id = getattr(resp.user, "id", None)
-        print(f"[provision] Supabase invite sent to {email} (id={user_id})")
+
+        _send_invite_email(email, tenant_name or tenant_slug, confirm_url)
+        print(f"[provision] Invite link generated and emailed to {email} (id={user_id})")
         return user_id
     except Exception as e:
         print(f"[provision] Warning: failed to create Supabase user for {email}: {e}")
         return None
+
+
+def _send_invite_email(admin_email: str, tenant_name: str, confirm_url: str) -> None:
+    """Send the initial invite — the app-hosted confirm link, not Supabase's own
+    invite email. Non-fatal: provisioning still succeeds if SMTP isn't configured
+    or the send fails, matching _create_supabase_user's existing tolerance."""
+    import smtplib
+    from email.message import EmailMessage
+    from email import policy
+
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_from = os.environ.get("SMTP_FROM", smtp_user)
+
+    if not smtp_user:
+        print(f"[provision] SMTP_USER not set — skipping invite email to {admin_email}")
+        return
+
+    smtp_pass = "".join(c for c in smtp_pass if ord(c) > 32 and ord(c) < 127)
+    subject = f"Your Waypoint layout is ready — {tenant_name}"
+    body = (
+        f"<p>Your Waypoint layout <strong>{tenant_name}</strong> is live!</p>"
+        f'<p><a href="{confirm_url}">Accept invitation &amp; set your password</a></p>'
+        f"<p style='color:#999;font-size:12px'>Or copy this link: {confirm_url}</p>"
+    )
+
+    try:
+        msg = EmailMessage(policy=policy.SMTP)
+        msg["Subject"] = subject
+        msg["From"] = smtp_from
+        msg["To"] = admin_email
+        msg.set_content(body, subtype="html", charset="utf-8")
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as srv:
+            srv.starttls()
+            srv.login(smtp_user, smtp_pass)
+            srv.send_message(msg)
+        print(f"[provision] Invite email sent to {admin_email}")
+    except Exception as e:
+        print(f"[provision] Warning: failed to send invite email to {admin_email}: {e}")
 
 
 # ── Subscription helpers ──────────────────────────────────────────────────────
