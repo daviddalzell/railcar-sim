@@ -35,7 +35,18 @@ function closeAllTreeMenus() {
   document.querySelectorAll("#location-tree .tree-actions.menu-open").forEach(el => el.classList.remove("menu-open"));
 }
 document.addEventListener("click", closeAllTreeMenus);
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeAllTreeMenus(); });
+
+// Close the Layout Setup Data actions menu (#65) the same way — its own
+// trigger/panel click handlers in export-import.js stopPropagation/call
+// this directly, so this only ever sees clicks that should close it.
+function closeDataMenu() {
+  const menu = $("#layout-data-menu");
+  if (!menu) return;
+  menu.classList.remove("open");
+  $("#btn-layout-data-menu")?.setAttribute("aria-expanded", "false");
+}
+document.addEventListener("click", closeDataMenu);
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeAllTreeMenus(); closeDataMenu(); } });
 
 function showToast(message, type = "info", duration = 3500) {
   const openDialog = document.querySelector("dialog[open]");

@@ -406,13 +406,17 @@
       <!-- Layout title + data export / import -->
       <div class="section-header mb-md">
         <h3 id="layout-setup-title">{{ layout_name or "My Layout" }}</h3>
-        <div class="button-row">
-          <button id="btn-export-backup" class="outline small">⬇ Export Backup</button>
-          <button id="btn-import-trigger" class="outline small">⬆ Import Backup</button>
-          <input type="file" id="import-file-input" accept=".zip" class="hidden" />
-          <button id="btn-import-cars" class="outline small">⬆ Import Cars</button>
-          <input type="file" id="import-cars-file" accept=".csv,.xml" class="hidden" />
-          <button id="btn-open-photo-library" class="outline small">📷 Photo Library</button>
+        <div class="data-menu" id="layout-data-menu">
+          <button class="icon-btn data-menu-trigger" id="btn-layout-data-menu"
+                  title="Data" aria-label="Data actions" aria-haspopup="true" aria-expanded="false">☰ Data</button>
+          <span class="data-menu-panel">
+            <button id="btn-export-backup" class="btn-muted">⬇ Export Backup</button>
+            <button id="btn-import-trigger" class="btn-muted">⬆ Import Backup</button>
+            <input type="file" id="import-file-input" accept=".zip" class="hidden" />
+            <button id="btn-import-cars" class="btn-muted">⬆ Import Cars</button>
+            <input type="file" id="import-cars-file" accept=".csv,.xml" class="hidden" />
+            <button id="btn-open-photo-library" class="btn-muted">📷 Photo Library</button>
+          </span>
         </div>
       </div>
       <hr />

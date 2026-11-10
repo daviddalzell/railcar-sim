@@ -9,6 +9,21 @@
 // app.js but are only invoked inside event handlers (runtime), so load order
 // relative to app.js is safe.
 
+// ── Data actions menu ─────────────────────────────────────────────────────────
+// Single trigger collapsed on every screen size (issue #65) — see
+// closeAllTreeMenus/closeDataMenu in app.js for the outside-click/Escape close.
+$("#btn-layout-data-menu").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const menu = $("#layout-data-menu");
+  const wasOpen = menu.classList.contains("open");
+  closeDataMenu();
+  if (!wasOpen) {
+    menu.classList.add("open");
+    $("#btn-layout-data-menu").setAttribute("aria-expanded", "true");
+  }
+});
+$("#layout-data-menu .data-menu-panel").addEventListener("click", () => closeDataMenu());
+
 // ── Export / Import ───────────────────────────────────────────────────────────
 $("#btn-open-photo-library").addEventListener("click", () => openPhotoLibrary(null));
 

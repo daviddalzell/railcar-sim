@@ -14,6 +14,46 @@
    dark slate bar in both themes, so its icons need to stay light-colored
    regardless of the page's adaptive text color). */
 
+/* Data actions menu (Export/Import Backup, Import Cars, Photo Library) — a
+   single trigger collapsed on every screen size (issue #65), unlike the
+   tree row's kebab which only collapses under 600px. Deliberately a fresh,
+   small rule set rather than reusing #location-tree's kebab CSS — that one
+   stays scoped to the tree so this doesn't risk regressing it. */
+.data-menu { position: relative; }
+.data-menu-panel { display: none; }
+.data-menu.open .data-menu-panel {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  min-width: 170px;
+  background: var(--pico-card-background-color, #fff);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  padding: 0.25rem;
+}
+.data-menu.open .data-menu-panel button {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  justify-content: flex-start;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: inherit;
+  opacity: 1;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.data-menu.open .data-menu-panel button:hover {
+  background: var(--icon-btn-hover, rgba(127, 127, 127, 0.15));
+}
+
 .chip-group {
   display: inline-flex;
   margin: 0.15rem 0.2rem 0 0;
