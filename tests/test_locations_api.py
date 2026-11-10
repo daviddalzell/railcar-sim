@@ -64,7 +64,22 @@ def test_list_tracks_shape(client, db_session):
     r = client.get("/api/tracks")
     assert r.status_code == 200
     row = r.json()[0]
-    assert set(row.keys()) == {"id", "name", "location_type", "location_id", "car_capacity", "position"}
+    assert set(row.keys()) == {"id", "name", "location_type", "location_id", "car_capacity", "current_car_count", "position"}
+
+
+def test_track_current_car_count_reflects_cars_there(client, db_session):
+    """Issue #46: the Layout Setup tree shows a per-track car-count chip,
+    same as the Location-group chip already did."""
+    track = make_location(db_session, "Siding 1", "industry")
+    other = make_location(db_session, "Siding 2", "industry")
+    make_car(db_session, "boxcar", track.id)
+    make_car(db_session, "boxcar", track.id)
+    make_car(db_session, "boxcar", other.id)
+    db_session.commit()
+
+    rows = {t["name"]: t for t in client.get("/api/tracks").json()}
+    assert rows["Siding 1"]["current_car_count"] == 2
+    assert rows["Siding 2"]["current_car_count"] == 1
 
 
 # ── Location-group CRUD on /api/locations ───────────────────────────────────────

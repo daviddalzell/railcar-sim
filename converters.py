@@ -84,6 +84,7 @@ def track_to_dict(t: Track) -> dict:
         "location_type": t.location_type,
         "location_id": t.location_id,
         "car_capacity": t.car_capacity,
+        "current_car_count": len(t.cars),
         "position": t.position,
     }
 

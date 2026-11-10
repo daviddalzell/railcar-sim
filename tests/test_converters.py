@@ -24,7 +24,7 @@ def test_track_to_dict_has_location_id_not_switching_area_id(db_session):
     d = track_to_dict(track)
     assert d["location_id"] == group.id
     assert "switching_area_id" not in d
-    assert set(d.keys()) == {"id", "name", "location_type", "location_id", "car_capacity", "position"}
+    assert set(d.keys()) == {"id", "name", "location_type", "location_id", "car_capacity", "current_car_count", "position"}
 
 
 def test_location_group_to_dict_uses_tracks_key(db_session):

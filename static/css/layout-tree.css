@@ -341,6 +341,19 @@
   color: color-mix(in srgb, var(--badge-orange), #fff 42%);
 }
 
+/* Car-count pill variant for the track row (issue #46) — .tree-track-row
+   sits on the adaptive --bg-muted background, not the permanently-dark rail
+   slate .car-count-pill above was designed for, so it needs its own colors
+   rather than the slate-bar recipe reused verbatim. */
+.car-count-pill.on-row {
+  color: color-mix(in srgb, var(--rail-dark), var(--rail-light) 25%);
+  background: color-mix(in srgb, var(--rail-dark) 14%, transparent);
+}
+.car-count-pill.on-row.full {
+  background: color-mix(in srgb, var(--badge-orange) 24%, transparent);
+  color: color-mix(in srgb, var(--badge-orange), #000 35%);
+}
+
 /* Industry rows with orange connector */
 .tree-industries {
   display: flex;
@@ -360,6 +373,14 @@
 
 .ind-bullet { color: var(--badge-orange, #d68910); line-height: 1; flex-shrink: 0; }
 .ind-name { color: var(--pico-muted-color); }
+/* Spot numbers an industry occupies on its track (issue #47) — secondary to
+   the name, so it's smaller/dimmer rather than another same-weight label. */
+.ind-spots {
+  font-size: 0.75rem;
+  color: var(--pico-muted-color);
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
 
 .tree-industry-empty {
   font-size: 0.8rem;

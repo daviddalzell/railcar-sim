@@ -273,11 +273,20 @@ function renderLocationTree() {
     const type = t.location_type || "yard";
     const tkey = `track-${t.id}`;
     const tCollapsed = !!collapsed[tkey];
+    const tCount = t.current_car_count ?? 0;
+    const tCap = t.car_capacity ?? null;
+    const tFull = tCap != null && tCount >= tCap;
     const indRows = inds.length
-      ? inds.map((i, j) => `
+      ? inds.map((i, j) => {
+          const spotNums = (i.spot_numbers || "").split(",").map(s => s.trim()).filter(Boolean);
+          const spotsLabel = spotNums.length
+            ? `Spots ${spotNums.slice(0, 3).join(", ")}${spotNums.length > 3 ? "…" : ""}`
+            : "";
+          return `
         <div class="tree-industry-row" data-ind-id="${i.id}">
           <span class="ind-bullet">•</span>
           <span class="ind-name">${i.name}</span>
+          ${spotsLabel ? `<span class="ind-spots">${spotsLabel}</span>` : ""}
           <span class="tree-actions">
             <button class="icon-btn move-ind" data-id="${i.id}" data-dir="up" title="Move up"${j === 0 ? " disabled" : ""}>↑</button>
             <button class="icon-btn move-ind" data-id="${i.id}" data-dir="down" title="Move down"${j === inds.length - 1 ? " disabled" : ""}>↓</button>
@@ -287,7 +296,8 @@ function renderLocationTree() {
               <button class="icon-btn del-ind-tree" data-id="${i.id}" title="Delete">🗑<span class="kebab-label">Delete</span></button>
             </span>
           </span>
-        </div>`).join("")
+        </div>`;
+        }).join("")
       : `<div class="tree-industry-empty"><em>No industries on this track</em></div>`;
     return `
       <div class="tree-track" data-track-id="${t.id}">
@@ -295,6 +305,7 @@ function renderLocationTree() {
           <button class="icon-btn caret track-caret" data-tkey="${tkey}" aria-label="Toggle">${tCollapsed ? "▶" : "▼"}</button>
           <span class="tree-track-name" data-id="${t.id}">${t.name}</span>
           <span class="track-type-badge track-type-${type}">${type}</span>
+          <span class="car-count-pill on-row${tFull ? " full" : ""}">${tCount}${tCap != null ? " / " + tCap : ""} cars</span>
           <span class="tree-actions">
             <button class="icon-btn move-track" data-id="${t.id}" data-dir="up" title="Move up"${isFirst ? " disabled" : ""}>↑</button>
             <button class="icon-btn move-track" data-id="${t.id}" data-dir="down" title="Move down"${isLast ? " disabled" : ""}>↓</button>
