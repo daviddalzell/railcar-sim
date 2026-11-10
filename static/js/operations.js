@@ -224,6 +224,27 @@ function loadSessionFromStorage() {
   catch { appState.session = null; }
 }
 
+// Sorts `incoming` by the same four-tier priority (perishable > longest-held > car-type
+// match > random tiebreak) and seeds each car's conflictDecision ("spot"/"hold") against
+// however many slots are actually available. `typeMatch(car)` lets callers compare
+// against whichever industry a car is individually bound for.
+function _seedConflictDecisions(incoming, available, typeMatch) {
+  const sorted = [...incoming].sort((a, b) => {
+    if (b.isPriority !== a.isPriority) return (b.isPriority ? 1 : 0) - (a.isPriority ? 1 : 0);
+    if (b.cpSessions !== a.cpSessions) return b.cpSessions - a.cpSessions;
+    const typeB = typeMatch(b) ? 1 : 0;
+    const typeA = typeMatch(a) ? 1 : 0;
+    if (typeB !== typeA) return typeB - typeA;
+    return a.priority - b.priority;
+  });
+  sorted.forEach((car, i) => {
+    const sc = appState.session.cars.find(c => c.id === car.id);
+    if (sc && sc.conflictDecision == null) {
+      sc.conflictDecision = i < available ? "spot" : "hold";
+    }
+  });
+}
+
 function detectSpottingConflicts() {
   if (!appState.session) return;
   // Clear stale conflictDecision on all cars first; re-seed below for active conflicts
@@ -237,6 +258,8 @@ function detectSpottingConflicts() {
     (byIndustry[car.toIndustryId] = byIndustry[car.toIndustryId] || []).push(car);
   }
   const conflicts = [];
+  const flaggedCarIds = new Set();  // a car already flagged by industry capacity isn't flagged twice
+
   for (const [indId, incoming] of Object.entries(byIndustry)) {
     const ind = appState.industries.find(i => i.id === parseInt(indId));
     const spotNums = (ind?.spot_numbers || "").split(",").filter(s => s.trim());
@@ -247,26 +270,47 @@ function detectSpottingConflicts() {
       c.active_waybill?.industry_id === ind.id
     ).length;
     if (currentCount + incoming.length > industryCapacity) {
-      const conflict = { ind, capacity: industryCapacity, spotNums, current: currentCount, cars: incoming };
-      conflicts.push(conflict);
-      // Seed per-car recommendations based on four-tier sort (only if not already decided)
-      const available = industryCapacity - currentCount;
-      const sorted = [...incoming].sort((a, b) => {
-        if (b.isPriority !== a.isPriority) return (b.isPriority ? 1 : 0) - (a.isPriority ? 1 : 0);
-        if (b.cpSessions !== a.cpSessions) return b.cpSessions - a.cpSessions;
-        const typeA = carTypeMatchesIndustry(a, ind) ? 1 : 0;
-        const typeB = carTypeMatchesIndustry(b, ind) ? 1 : 0;
-        if (typeB !== typeA) return typeB - typeA;
-        return a.priority - b.priority;
+      conflicts.push({
+        kind: "industry", key: `ind-${ind.id}`, label: ind.name,
+        meta: [
+          ind.commodities ? `Accepts: ${ind.commodities}` : "",
+          ind.inbound_car_types ? `Car types: ${ind.inbound_car_types}` : "",
+        ].filter(Boolean).join(" · "),
+        capacity: industryCapacity, current: currentCount, cars: incoming,
       });
-      sorted.forEach((car, i) => {
-        const sc = appState.session.cars.find(c => c.id === car.id);
-        if (sc && sc.conflictDecision == null) {
-          sc.conflictDecision = i < available ? "spot" : "hold";
-        }
-      });
+      incoming.forEach(car => flaggedCarIds.add(car.id));
+      _seedConflictDecisions(incoming, industryCapacity - currentCount, car => carTypeMatchesIndustry(car, ind));
     }
   }
+
+  // Track car_capacity: a physical siding can hold multiple industries, so cars can
+  // overflow the track itself even when each individual industry is within its own
+  // spot_numbers limit (issue #53). Cars already flagged above aren't flagged twice —
+  // resolving the more specific industry conflict resolves this one too.
+  const byTrack = {};
+  for (const car of relevant) {
+    if (flaggedCarIds.has(car.id)) continue;
+    const ind = appState.industries.find(i => i.id === car.toIndustryId);
+    if (!ind || ind.location_id == null) continue;
+    (byTrack[ind.location_id] = byTrack[ind.location_id] || []).push(car);
+  }
+  for (const [trackId, incoming] of Object.entries(byTrack)) {
+    const track = appState.locations.find(t => t.id === parseInt(trackId));
+    if (!track || track.car_capacity == null) continue;
+    const currentCount = appState.cars.filter(c => c.current_location_id === track.id).length;
+    if (currentCount + incoming.length > track.car_capacity) {
+      conflicts.push({
+        kind: "track", key: `trk-${track.id}`, label: track.name, meta: "",
+        capacity: track.car_capacity, current: currentCount, cars: incoming,
+      });
+      const typeMatch = car => {
+        const ind = appState.industries.find(i => i.id === car.toIndustryId);
+        return ind ? carTypeMatchesIndustry(car, ind) : false;
+      };
+      _seedConflictDecisions(incoming, track.car_capacity - currentCount, typeMatch);
+    }
+  }
+
   appState.session.conflicts = conflicts;
 }
 
@@ -296,26 +340,22 @@ function renderSpottingConflicts() {
   el.innerHTML = `
     <div class="conflict-panel">
       <p class="conflict-panel-title">⚠ Resolve Spotting Conflicts</p>
-      ${conflicts.map(({ ind, capacity, spotNums, current, cars: incoming }) => {
+      ${conflicts.map(({ key, label, meta, capacity, current, cars: incoming }) => {
         const available = capacity - current;
         const spotCount = incoming.filter(c => {
           const sc = appState.session.cars.find(x => x.id === c.id);
           return sc?.conflictDecision === "spot";
         }).length;
         const spotsLeft = available - spotCount;
-        const metaLine = [
-          ind.commodities ? `Accepts: ${ind.commodities}` : "",
-          ind.inbound_car_types ? `Car types: ${ind.inbound_car_types}` : "",
-        ].filter(Boolean).join(" · ");
         return `
-        <div class="conflict-group" data-ind-id="${ind.id}">
+        <div class="conflict-group" data-conflict-key="${key}">
           <div class="conflict-group-header">
             <div class="conflict-industry-header">
-              <div class="conflict-industry-name">${ind.name}</div>
-              ${metaLine ? `<div class="conflict-industry-meta">${metaLine}</div>` : ""}
+              <div class="conflict-industry-name">${label}</div>
+              ${meta ? `<div class="conflict-industry-meta">${meta}</div>` : ""}
               <div class="conflict-spot-status">${available} spot${available !== 1 ? "s" : ""} open &middot; ${incoming.length} car${incoming.length !== 1 ? "s" : ""} arriving</div>
             </div>
-            <button class="outline small conflict-accept-suggestion" data-ind-id="${ind.id}">Accept suggestion</button>
+            <button class="outline small conflict-accept-suggestion" data-conflict-key="${key}">Accept suggestion</button>
           </div>
           ${incoming.map(car => {
             const sc = appState.session.cars.find(x => x.id === car.id);
@@ -332,10 +372,10 @@ function renderSpottingConflicts() {
               </div>
               <div class="conflict-car-actions">
                 <button class="outline small conflict-spot-btn${isSpot ? " is-active" : ""}"
-                        data-car-id="${car.id}" data-ind-id="${ind.id}"
+                        data-car-id="${car.id}" data-conflict-key="${key}"
                         ${spotDisabled ? "disabled" : ""}>&#10003; Spot</button>
                 <button class="outline small conflict-hold-btn${isHeld ? " is-active" : ""}"
-                        data-car-id="${car.id}" data-ind-id="${ind.id}">Hold</button>
+                        data-car-id="${car.id}" data-conflict-key="${key}">Hold</button>
               </div>
             </div>`;
           }).join("")}
@@ -347,8 +387,8 @@ function renderSpottingConflicts() {
   el.querySelectorAll(".conflict-spot-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const carId = parseInt(btn.dataset.carId);
-      const indId = parseInt(btn.dataset.indId);
-      const conflict = (appState.session.conflicts || []).find(c => c.ind.id === indId);
+      const conflictKey = btn.dataset.conflictKey;
+      const conflict = (appState.session.conflicts || []).find(c => c.key === conflictKey);
       const sc = appState.session.cars.find(c => c.id === carId);
       if (!conflict || !sc) return;
       const available = conflict.capacity - conflict.current;
@@ -384,8 +424,8 @@ function renderSpottingConflicts() {
   el.querySelectorAll(".conflict-hold-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const carId = parseInt(btn.dataset.carId);
-      const indId = parseInt(btn.dataset.indId);
-      const conflict = (appState.session.conflicts || []).find(c => c.ind.id === indId);
+      const conflictKey = btn.dataset.conflictKey;
+      const conflict = (appState.session.conflicts || []).find(c => c.key === conflictKey);
       const sc = appState.session.cars.find(c => c.id === carId);
       if (!conflict || !sc) return;
 
@@ -411,8 +451,8 @@ function renderSpottingConflicts() {
   // Accept suggestion handler — commit all pre-filled decisions
   el.querySelectorAll(".conflict-accept-suggestion").forEach(btn => {
     btn.addEventListener("click", () => {
-      const indId = parseInt(btn.dataset.indId);
-      const conflict = (appState.session.conflicts || []).find(c => c.ind.id === indId);
+      const conflictKey = btn.dataset.conflictKey;
+      const conflict = (appState.session.conflicts || []).find(c => c.key === conflictKey);
       if (!conflict) return;
       _commitConflictDecisions(conflict);
     });
