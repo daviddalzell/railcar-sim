@@ -347,8 +347,11 @@ def update_dispatch_power(plan_id: int, data: DispatchPowerUpdate, db: Session =
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")
-    # Exclusivity check
-    other_plans = db.query(DispatchPlan).filter(DispatchPlan.id != plan_id).all()
+    # Exclusivity check — a completed plan no longer holds its power/caboose, same as
+    # _run_build_algorithm's claimed_ids already treats completed plans' cargo cars.
+    other_plans = db.query(DispatchPlan).filter(
+        DispatchPlan.id != plan_id, DispatchPlan.status != "complete"
+    ).all()
     for other in other_plans:
         other_power = set(json.loads(other.power_ids_json or "[]"))
         conflicts = set(data.power_ids) & other_power

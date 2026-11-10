@@ -911,11 +911,13 @@ function renderConsistCard(plan) {
     ? `<div class="muted small consist-route">${plan.origin_name}${plan.location_name ? ` → ${plan.location_name}` : ""} → ${plan.destination_name}</div>`
     : "";
 
+  // A completed plan no longer holds its power/caboose (mirrors the backend's
+  // /power exclusivity check and _run_build_algorithm's claimed_ids for cargo).
   const assignedElsewhere = new Set(
-    dispatchPlans.filter(p => p.id !== plan.id).flatMap(p => (p.power || []).map(c => c.id))
+    dispatchPlans.filter(p => p.id !== plan.id && p.status !== "complete").flatMap(p => (p.power || []).map(c => c.id))
   );
   const caboosesElsewhere = new Set(
-    dispatchPlans.filter(p => p.id !== plan.id && p.caboose).map(p => p.caboose.id)
+    dispatchPlans.filter(p => p.id !== plan.id && p.status !== "complete" && p.caboose).map(p => p.caboose.id)
   );
   const locos    = appState.cars.filter(c => c.car_type === "locomotive" && !assignedElsewhere.has(c.id));
   const cabooses = appState.cars.filter(c => c.car_type === "caboose"    && !caboosesElsewhere.has(c.id));

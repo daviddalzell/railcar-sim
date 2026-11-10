@@ -426,3 +426,58 @@ def test_build_plan_no_overlap_when_destination_is_yard_track_in_area(admin_clie
     assert not (pickup_ids & spot_ids)
     assert car.id in spot_ids
     assert car.id not in pickup_ids
+
+
+def test_power_reassignable_once_plan_completes(admin_client, db_session):
+    """A locomotive/caboose left on a completed plan must be assignable to a new
+    consist without deleting the completed plan (issue #61) — mirrors the
+    claimed_ids exclusion _run_build_algorithm already applies to cargo cars."""
+    from models import DispatchPlan
+
+    loco = make_car(db_session, "locomotive")
+    caboose = make_car(db_session, "caboose")
+    done = DispatchPlan(
+        plan_type="switching", status="complete",
+        setout_ids_json="[]", pickup_ids_json="[]", spots_ids_json="[]",
+        power_ids_json=f"[{loco.id}]", caboose_id=caboose.id,
+        available_spots=0, built_at=0,
+    )
+    new_plan = DispatchPlan(
+        plan_type="switching", status="draft",
+        setout_ids_json="[]", pickup_ids_json="[]", spots_ids_json="[]",
+        available_spots=0, built_at=0,
+    )
+    db_session.add_all([done, new_plan])
+    db_session.commit()
+
+    r = admin_client.patch(f"/api/dispatcher/plan/{new_plan.id}/power", json={
+        "power_ids": [loco.id], "caboose_id": caboose.id,
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert [c["id"] for c in data["power"]] == [loco.id]
+    assert data["caboose"]["id"] == caboose.id
+
+
+def test_power_still_exclusive_across_active_plans(admin_client, db_session):
+    """Non-complete plans still conflict — only a completed plan's power frees up."""
+    from models import DispatchPlan
+
+    loco = make_car(db_session, "locomotive")
+    active = DispatchPlan(
+        plan_type="switching", status="active",
+        setout_ids_json="[]", pickup_ids_json="[]", spots_ids_json="[]",
+        power_ids_json=f"[{loco.id}]", available_spots=0, built_at=0,
+    )
+    new_plan = DispatchPlan(
+        plan_type="switching", status="draft",
+        setout_ids_json="[]", pickup_ids_json="[]", spots_ids_json="[]",
+        available_spots=0, built_at=0,
+    )
+    db_session.add_all([active, new_plan])
+    db_session.commit()
+
+    r = admin_client.patch(f"/api/dispatcher/plan/{new_plan.id}/power", json={
+        "power_ids": [loco.id], "caboose_id": None,
+    })
+    assert r.status_code == 409
