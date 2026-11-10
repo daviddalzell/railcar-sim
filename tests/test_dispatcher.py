@@ -481,3 +481,39 @@ def test_power_still_exclusive_across_active_plans(admin_client, db_session):
         "power_ids": [loco.id], "caboose_id": None,
     })
     assert r.status_code == 409
+
+
+def test_power_assignment_rejects_locomotive_not_at_origin(admin_client, db_session):
+    """Only power physically sitting at the plan's origin track can be added
+    (issue #59) — a locomotive elsewhere in the layout can't couple onto this
+    train."""
+    from models import DispatchPlan
+
+    origin = make_location(db_session, "Staging", "staging")
+    elsewhere = make_location(db_session, "Other Yard", "yard")
+    loco_at_origin  = make_car(db_session, "locomotive", origin.id)
+    loco_elsewhere  = make_car(db_session, "locomotive", elsewhere.id)
+    caboose_elsewhere = make_car(db_session, "caboose", elsewhere.id)
+    plan = DispatchPlan(
+        plan_type="switching", status="draft", origin_location_id=origin.id,
+        setout_ids_json="[]", pickup_ids_json="[]", spots_ids_json="[]",
+        available_spots=0, built_at=0,
+    )
+    db_session.add(plan)
+    db_session.commit()
+
+    r = admin_client.patch(f"/api/dispatcher/plan/{plan.id}/power", json={
+        "power_ids": [loco_elsewhere.id], "caboose_id": None,
+    })
+    assert r.status_code == 400
+
+    r = admin_client.patch(f"/api/dispatcher/plan/{plan.id}/power", json={
+        "power_ids": [], "caboose_id": caboose_elsewhere.id,
+    })
+    assert r.status_code == 400
+
+    r = admin_client.patch(f"/api/dispatcher/plan/{plan.id}/power", json={
+        "power_ids": [loco_at_origin.id], "caboose_id": None,
+    })
+    assert r.status_code == 200
+    assert [c["id"] for c in r.json()["power"]] == [loco_at_origin.id]

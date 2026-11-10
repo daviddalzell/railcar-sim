@@ -919,8 +919,14 @@ function renderConsistCard(plan) {
   const caboosesElsewhere = new Set(
     dispatchPlans.filter(p => p.id !== plan.id && p.status !== "complete" && p.caboose).map(p => p.caboose.id)
   );
-  const locos    = appState.cars.filter(c => c.car_type === "locomotive" && !assignedElsewhere.has(c.id));
-  const cabooses = appState.cars.filter(c => c.car_type === "caboose"    && !caboosesElsewhere.has(c.id));
+  // Only power sitting at this plan's origin track can couple onto this train — a
+  // car already assigned to this plan stays selectable even if its location since
+  // drifted, so an existing assignment never just disappears from the dropdown.
+  const atOrigin = c => c.current_location_id === plan.origin_location_id;
+  const locos    = appState.cars.filter(c => c.car_type === "locomotive" && !assignedElsewhere.has(c.id)
+    && (atOrigin(c) || (plan.power || []).some(p => p.id === c.id)));
+  const cabooses = appState.cars.filter(c => c.car_type === "caboose"    && !caboosesElsewhere.has(c.id)
+    && (atOrigin(c) || plan.caboose?.id === c.id));
   const assignedPowerIds  = (plan.power || []).map(c => c.id);
   const assignedCabooseId = plan.caboose?.id ?? null;
   const hasPower = assignedPowerIds.length > 0;

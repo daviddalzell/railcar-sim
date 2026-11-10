@@ -347,6 +347,13 @@ def update_dispatch_power(plan_id: int, data: DispatchPowerUpdate, db: Session =
     plan = db.get(DispatchPlan, plan_id)
     if not plan:
         raise HTTPException(404, "Dispatch plan not found")
+    # Only power actually sitting at this plan's origin track can be assigned to it —
+    # a locomotive elsewhere in the layout can't physically couple onto this train.
+    if plan.origin_location_id is not None:
+        car_ids = list(data.power_ids) + ([data.caboose_id] if data.caboose_id else [])
+        for car in db.query(Car).filter(Car.id.in_(car_ids)).all():
+            if car.current_location_id != plan.origin_location_id:
+                raise HTTPException(400, f"{car.reporting_marks} {car.car_number} is not at this consist's origin")
     # Exclusivity check — a completed plan no longer holds its power/caboose, same as
     # _run_build_algorithm's claimed_ids already treats completed plans' cargo cars.
     other_plans = db.query(DispatchPlan).filter(
