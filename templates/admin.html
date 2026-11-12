@@ -157,6 +157,7 @@
     <button class="active" data-tab="tenants">Tenants</button>
     <button data-tab="keys">Access Keys</button>
     <button data-tab="reminders">Renewal Reminders</button>
+    <button data-tab="demo-leads">Demo Leads</button>
   </nav>
   <main>
 
@@ -233,6 +234,28 @@
       </div>
     </div>
 
+    <!-- Demo Leads tab -->
+    <div class="tab-panel" id="tab-demo-leads">
+      <div class="section">
+        <div class="section-header">
+          <h2>Demo Leads</h2>
+          <button class="btn btn-blue btn-sm" id="refresh-demo-leads-btn">↻ Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table id="demo-leads-table">
+            <thead>
+              <tr>
+                <th>Email</th><th>Marketing OK?</th><th>Captured</th>
+              </tr>
+            </thead>
+            <tbody id="demo-leads-body">
+              <tr><td colspan="3" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -279,13 +302,14 @@
     showApp();
     loadTenants();
     loadKeys();
+    loadDemoLeads();
   }
 
   $("pw-btn").addEventListener("click", async () => {
     const pw = $("pw-input").value;
     $("login-error").style.display = "none";
     const ok = await tryLogin(pw);
-    if (ok) { showApp(); loadTenants(); loadKeys(); }
+    if (ok) { showApp(); loadTenants(); loadKeys(); loadDemoLeads(); }
     else { $("login-error").textContent = "Incorrect password."; $("login-error").style.display = "block"; }
   });
   $("pw-input").addEventListener("keydown", e => { if (e.key === "Enter") $("pw-btn").click(); });
@@ -458,6 +482,25 @@
       msg.className = "msg msg-err";
     }
   });
+
+  // ── Demo Leads ────────────────────────────────────────────────────────────
+
+  async function loadDemoLeads() {
+    const r = await api("GET", "/admin/demo-leads");
+    if (!r || !r.ok) return;
+    const leads = await r.json();
+    const tbody = $("demo-leads-body");
+    if (!leads.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty">No demo leads yet.</td></tr>'; return; }
+    tbody.innerHTML = leads.map(l => `
+      <tr>
+        <td>${l.email}</td>
+        <td><span class="badge ${l.marketing_opt_in ? "badge-active" : "badge-unused"}">${l.marketing_opt_in ? "yes" : "no"}</span></td>
+        <td>${fmtDate(l.created_at)}</td>
+      </tr>
+    `).join("");
+  }
+
+  $("refresh-demo-leads-btn").addEventListener("click", loadDemoLeads);
 
 })();
 </script>

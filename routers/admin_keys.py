@@ -241,6 +241,36 @@ def send_renewal_reminders(admin_session: str | None = Cookie(default=None)):
     return {"sent": sent, "errors": errors}
 
 
+# ── Admin: demo leads ──────────────────────────────────────────────────────────
+
+@router.get("/admin/demo-leads")
+def list_demo_leads(admin_session: str | None = Cookie(default=None)):
+    _verify_admin_cookie(admin_session)
+    from database import SessionLocal
+    from models import DemoLead
+    db = SessionLocal()
+    try:
+        leads = db.query(DemoLead).order_by(DemoLead.created_at.desc()).all()
+    finally:
+        db.close()
+    # Belt-and-suspenders de-dupe by email — demo_leads.email already has a
+    # DB-level UNIQUE constraint, and capture_demo_lead() upserts in place
+    # rather than inserting a second row, so this shouldn't ever trigger;
+    # it's just insurance against the list itself ever showing a repeat.
+    seen = set()
+    result = []
+    for lead in leads:
+        if lead.email in seen:
+            continue
+        seen.add(lead.email)
+        result.append({
+            "email": lead.email,
+            "marketing_opt_in": lead.marketing_opt_in,
+            "created_at": lead.created_at.isoformat() if lead.created_at else None,
+        })
+    return result
+
+
 # ── Public: redeem access key ─────────────────────────────────────────────────
 
 class RedeemRequest(BaseModel):
