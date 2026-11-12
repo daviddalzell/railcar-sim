@@ -202,6 +202,15 @@ Check: tenant row exists in `public.tenants`, schema exists, table counts > 0, `
 - Revoked users are tracked in `public.tenant_members` (`is_active = false`)
 - Tenant context is cached in-memory; call `invalidate_tenant_cache(slug)` after updating a tenant row
 
+### Member support
+`support@waypoint-ops.com` is a plain mailbox — no ticket tracking, no
+threading. Surfaced via a `mailto:` link in the login dialog and landing
+page footer, specifically to cover logged-out/locked-out users (broken
+invite links, forgotten passwords), since the in-app "Send feedback"
+dialog (`routers/feedback.py`) requires a logged-in session. A trackable
+backend (self-hosted FreeScout, a hosted helpdesk, etc. — see #68) is a
+known gap, deliberately deferred; don't assume one exists.
+
 ---
 
 ## Frontend (`static/app.js`)
