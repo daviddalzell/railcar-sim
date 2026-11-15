@@ -32,20 +32,34 @@ def clone_to_demo(template_schema: str = "t_demo_template") -> bool:
     from dotenv import load_dotenv
     load_dotenv()
 
+    import time
+
     from database import engine
     from sqlalchemy import text
 
-    # Check template has cars before committing to a destructive truncate
-    try:
-        with engine.connect() as conn:
-            count = conn.execute(
-                text(f'SELECT COUNT(*) FROM "{template_schema}".cars')
-            ).scalar()
-        if not count:
-            print(f"[clone_demo] {template_schema}.cars is empty — falling back to hardcoded seed")
-            return False
-    except Exception as exc:
-        print(f"[clone_demo] Cannot read {template_schema}: {exc} — falling back to hardcoded seed")
+    # Check template has cars before committing to a destructive truncate.
+    # Retried a few times: this runs right after the nightly cron's request
+    # may have cold-started a stopped Fly machine, and the first DB query
+    # can transiently fail even though the template schema is fine (#71).
+    count = None
+    last_exc = None
+    for attempt in range(3):
+        try:
+            with engine.connect() as conn:
+                count = conn.execute(
+                    text(f'SELECT COUNT(*) FROM "{template_schema}".cars')
+                ).scalar()
+            last_exc = None
+            break
+        except Exception as exc:
+            last_exc = exc
+            if attempt < 2:
+                time.sleep(2)
+    if last_exc is not None:
+        print(f"[clone_demo] Cannot read {template_schema} after retries: {last_exc} — falling back to hardcoded seed")
+        return False
+    if not count:
+        print(f"[clone_demo] {template_schema}.cars is empty — falling back to hardcoded seed")
         return False
 
     # Purge demo tenant's uploaded photos before wiping the car rows

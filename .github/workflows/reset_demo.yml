@@ -11,8 +11,18 @@ jobs:
     steps:
       - name: Reset demo data
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST "${{ secrets.WAYPOINT_URL }}/admin/reset-demo" \
             -H "X-Sync-Secret: ${{ secrets.SYNC_SECRET }}")
+          STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
           echo "HTTP status: $STATUS"
-          [ "$STATUS" = "200" ] || exit 1
+          echo "Response body: $BODY"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::reset-demo returned HTTP $STATUS"
+            exit 1
+          fi
+          if ! echo "$BODY" | grep -qE '"source"[[:space:]]*:[[:space:]]*"template"'; then
+            echo "::error::reset-demo fell back to the hardcoded fixture instead of cloning demo-template — check the t_demo_template tenant and DB connectivity"
+            exit 1
+          fi
