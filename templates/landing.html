@@ -47,12 +47,12 @@
     }
 
     main {
-      flex: 1;
+      flex: none;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 4rem 2rem;
+      padding: 4rem 2rem 2.5rem;
       text-align: center;
     }
 
@@ -94,7 +94,7 @@
       flex-wrap: wrap;
       gap: 0.75rem;
       justify-content: center;
-      margin-bottom: 4rem;
+      margin-bottom: 2rem;
     }
 
     .btn {
@@ -138,19 +138,14 @@
     }
 
     .features {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1.5rem;
-      justify-content: center;
-      max-width: 760px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      max-width: 520px;
       margin: 0 auto;
-      padding: 0 1rem;
     }
 
     .feature {
-      flex: 1;
-      min-width: 200px;
-      max-width: 220px;
       text-align: left;
       background: #161b26;
       border: 1px solid #2d3447;
@@ -159,6 +154,7 @@
     }
 
     .feature-icon {
+      width: 28px; height: 28px;
       font-size: 1.4rem;
       margin-bottom: 0.6rem;
       display: block;
@@ -176,6 +172,15 @@
       color: #5a6475;
       line-height: 1.5;
     }
+
+    .gallery { max-width: 880px; margin: 0 auto; }
+    .gal-thumbs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.6rem; margin-top: 1rem; }
+    .gal-thumb { background: #161b26; border: 2px solid #2d3447; border-radius: 8px; padding: 0; cursor: pointer; overflow: hidden; color: #8b95a5; font: inherit; font-size: 0.72rem; text-align: center; opacity: 0.75; transition: opacity .15s, border-color .15s; }
+    .gal-thumb:hover { opacity: 1; }
+    .gal-thumb.active { border-color: #d97706; opacity: 1; color: #f0f2f5; }
+    .gal-thumb img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; }
+    .gal-thumb span { display: block; padding: 0.35rem 0.25rem; }
+    @media (max-width: 520px) { .gal-thumbs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
     footer {
       padding: 1.5rem 2rem;
@@ -206,8 +211,10 @@
     <p class="eyebrow">Model Railroad Operations</p>
     <h1>Operations sessions,<br><em>simplified</em></h1>
     <p class="subtitle">
-      Waypoint brings car forwarding, switch lists, and session management
-      to your layout — accessible from any device on your layout room network.
+      Built for small layouts, so you get the most out of every operation.
+      Waybill-driven car forwarding, a dispatcher that builds your next
+      train, and live switch lists your crew can follow — right from a
+      phone or tablet.
     </p>
 
     <div class="actions">
@@ -220,6 +227,88 @@
       <code>yourlayout.waypoint-ops.com</code>
     </div>
   </main>
+
+  <section style="padding: 0 2rem 3rem;">
+    <div class="features">
+      <div class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="11" height="7" rx="1"/><path d="M14 11h4l3 4v0H14"/><path d="M5 8V5h4v3"/><circle cx="7" cy="18" r="2"/><circle cx="13" cy="18" r="2"/><circle cx="19" cy="18" r="1.6"/></svg>
+        <h3>Car forwarding</h3>
+        <p>Waybills, industries, and car routing — all in one place.</p>
+      </div>
+      <div class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M8.5 12h7M8.5 16h5"/></svg>
+        <h3>Switch lists</h3>
+        <p>A live switch list for every session — arrivals, departures, and spots, built from your waybills.</p>
+      </div>
+      <div class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c3 .2 5 2.4 5 5.8"/></svg>
+        <h3>Multi-operator</h3>
+        <p>Invite your crew and manage roles from the settings panel.</p>
+      </div>
+      <div class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg>
+        <h3>Any device</h3>
+        <p>Works on phones, tablets, and laptops — no app to install.</p>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding: 0 2rem 3rem;">
+    <figure class="gallery">
+      <img id="gal-main" alt="" style="width:100%;height:auto;display:block;border-radius:10px;border:1px solid #2d3447;box-shadow:0 12px 40px rgba(0,0,0,0.45);">
+      <figcaption id="gal-cap" style="margin-top:0.75rem;text-align:center;font-size:0.8rem;color:#8b95a5;min-height:1.2em;"></figcaption>
+      <div id="gal-thumbs" class="gal-thumbs" role="tablist" aria-label="Product screenshots"></div>
+    </figure>
+  </section>
+  <script>
+  (function(){
+    var shots=[
+  {
+    "src": "/static/images/landing/car-roster.jpg",
+    "label": "Car Roster",
+    "alt": "Car roster",
+    "cap": "The car roster — every car, its current track, and its next waybill move at a glance."
+  },
+  {
+    "src": "/static/images/landing/operations.jpg",
+    "label": "Operations",
+    "alt": "Operations session",
+    "cap": "Operations — a ready train with its power, set-outs and local spots, built from your waybills."
+  },
+  {
+    "src": "/static/images/landing/waybills.jpg",
+    "label": "Waybills",
+    "alt": "Car waybill cards",
+    "cap": "Waybills — each car carries a rotating set of waybill cards that drive where it goes next."
+  },
+  {
+    "src": "/static/images/landing/layout-setup.jpg",
+    "label": "Layout Setup",
+    "alt": "Layout setup",
+    "cap": "Layout setup — locations, tracks and industries, with car capacity tracked for each."
+  },
+  {
+    "src": "/static/images/landing/industries.jpg",
+    "label": "Industries",
+    "alt": "Industry editor",
+    "cap": "Industries — define what each one receives and ships, and which spots it has."
+  }
+];
+    var main=document.getElementById("gal-main"),cap=document.getElementById("gal-cap"),box=document.getElementById("gal-thumbs"),btns=[];
+    function show(i){
+      main.src=shots[i].src;main.alt=shots[i].alt;cap.textContent=shots[i].cap;
+      btns.forEach(function(b,j){b.classList.toggle("active",j===i);b.setAttribute("aria-selected",j===i?"true":"false");});
+    }
+    shots.forEach(function(s,i){
+      var b=document.createElement("button");b.type="button";b.className="gal-thumb";b.setAttribute("role","tab");
+      var im=document.createElement("img");im.src=s.src;im.alt="";
+      var l=document.createElement("span");l.textContent=s.label;
+      b.appendChild(im);b.appendChild(l);b.addEventListener("click",function(){show(i);});
+      box.appendChild(b);btns.push(b);
+    });
+    show(0);
+  })();
+  </script>
 
   <section style="padding: 0 2rem 3rem; max-width: 480px; margin: 0 auto; width: 100%;">
     <div style="background:#161b26;border:1px solid #2d3447;border-radius:10px;padding:1.5rem;">
@@ -236,31 +325,6 @@
         <button id="redeem-btn" class="btn btn-primary" style="padding:0.6rem 1.1rem;font-size:0.9rem;border:none;cursor:pointer;">Activate</button>
       </div>
       <div id="redeem-msg" style="margin-top:0.65rem;font-size:0.85rem;"></div>
-    </div>
-  </section>
-
-  <section style="padding: 0 2rem 4rem;">
-    <div class="features">
-      <div class="feature">
-        <span class="feature-icon">🚂</span>
-        <h3>Car forwarding</h3>
-        <p>Waybills, industries, and car routing — all in one place.</p>
-      </div>
-      <div class="feature">
-        <span class="feature-icon">📋</span>
-        <h3>Switch lists</h3>
-        <p>Printable lists and QR codes for car-by-car instructions.</p>
-      </div>
-      <div class="feature">
-        <span class="feature-icon">👥</span>
-        <h3>Multi-operator</h3>
-        <p>Invite your crew and manage roles from the settings panel.</p>
-      </div>
-      <div class="feature">
-        <span class="feature-icon">📱</span>
-        <h3>Any device</h3>
-        <p>Works on phones, tablets, and laptops — no app to install.</p>
-      </div>
     </div>
   </section>
 
