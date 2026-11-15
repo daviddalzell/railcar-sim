@@ -88,7 +88,7 @@
     .subtitle {
       font-size: 1.05rem;
       color: #8b95a5;
-      max-width: 48ch;
+      max-width: 58ch;
       line-height: 1.6;
       margin-bottom: 2.5rem;
     }
@@ -141,40 +141,123 @@
       font-size: 0.85rem;
     }
 
-    .features {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1rem;
-      max-width: 520px;
+    .narrative {
+      max-width: 760px;
       margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }
 
-    .feature {
+    .topic {
       text-align: left;
       background: #161b26;
       border: 1px solid #2d3447;
-      border-radius: 10px;
-      padding: 1.25rem;
+      border-radius: 12px;
+      padding: 1.6rem 1.75rem;
     }
 
-    .feature-icon {
-      width: 28px; height: 28px;
-      font-size: 1.4rem;
-      margin-bottom: 0.6rem;
-      display: block;
+    .topic-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      margin-bottom: 0.65rem;
     }
 
-    .feature h3 {
-      font-size: 0.9rem;
+    .topic-icon {
+      flex: none;
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      background: rgba(217, 119, 6, 0.14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .topic h3 {
+      font-size: 1.05rem;
       font-weight: 600;
-      color: #d4d9e4;
-      margin-bottom: 0.35rem;
+      color: #f0f2f5;
+      letter-spacing: -0.01em;
+      padding-top: 0.3rem;
     }
 
-    .feature p {
-      font-size: 0.8rem;
-      color: #5a6475;
-      line-height: 1.5;
+    .topic p.lead {
+      font-size: 0.9rem;
+      color: #c3cad6;
+      line-height: 1.65;
+    }
+
+    .reveal-toggle {
+      appearance: none;
+      background: none;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 0 0.1rem;
+      margin-top: 0.15rem;
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #d97706;
+      cursor: pointer;
+    }
+    .reveal-toggle:hover { color: #f0960e; }
+    .reveal-toggle:focus-visible {
+      outline: 2px solid #d97706;
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    .reveal-toggle .chevron {
+      transition: transform 0.2s ease;
+      transform: rotate(0deg);
+    }
+    .reveal-toggle[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+    .reveal-toggle .label-show { display: inline; }
+    .reveal-toggle .label-hide { display: none; }
+    .reveal-toggle[aria-expanded="true"] .label-show { display: none; }
+    .reveal-toggle[aria-expanded="true"] .label-hide { display: inline; }
+
+    .reveal-panel {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.28s ease;
+    }
+    .reveal-panel.open { grid-template-rows: 1fr; }
+    .reveal-panel > div { overflow: hidden; }
+
+    .topic ul {
+      list-style: none;
+      padding-top: 0.85rem;
+      margin-top: 0.4rem;
+      border-top: 1px solid #2d3447;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .topic li {
+      position: relative;
+      padding-left: 1.1rem;
+      font-size: 0.82rem;
+      color: #8b95a5;
+      line-height: 1.6;
+    }
+    .topic li::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 0.55em;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #d97706;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .reveal-panel, .reveal-toggle .chevron { transition: none; }
+    }
+
+    @media (max-width: 560px) {
+      .topic { padding: 1.3rem 1.25rem; }
     }
 
     .gallery { max-width: 880px; margin: 0 auto; }
@@ -215,10 +298,11 @@
     <p class="eyebrow">Model Railroad Operations</p>
     <h1>Operations sessions,<br><em>simplified</em></h1>
     <p class="subtitle">
-      Built for small layouts, so you get the most out of every operation.
-      Waybill-driven car forwarding, a dispatcher that builds your next
-      train, and live switch lists your crew can follow — right from a
-      phone or tablet.
+      Waypoint is a web-based platform that brings realistic railroad operations to your
+      model layout. Designed specifically for switching operations on small layouts, it
+      tracks rolling stock, automates waybill routing, and guides every car through
+      prototypical operating sessions — so you spend less time on paperwork and more
+      time running trains.
     </p>
 
     <div class="actions">
@@ -233,29 +317,117 @@
   </main>
 
   <section style="padding: 0 2rem 3rem;">
-    <div class="features">
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="11" height="7" rx="1"/><path d="M14 11h4l3 4v0H14"/><path d="M5 8V5h4v3"/><circle cx="7" cy="18" r="2"/><circle cx="13" cy="18" r="2"/><circle cx="19" cy="18" r="1.6"/></svg>
-        <h3>Car forwarding</h3>
-        <p>Waybills, industries, and car routing — all in one place.</p>
+    <div class="narrative">
+
+      <div class="topic">
+        <div class="topic-head">
+          <span class="topic-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6z"/></svg>
+          </span>
+          <h3>Secure, multi-operator access</h3>
+        </div>
+        <p class="lead">
+          Each layout is hosted on a secure cloud server with a custom web address and
+          password-protected logins. Invite guest operators to connect from their own
+          devices, while you keep full control over permissions and layout access.
+        </p>
       </div>
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M8.5 12h7M8.5 16h5"/></svg>
-        <h3>Switch lists</h3>
-        <p>A live switch list for every session — arrivals, departures, and spots, built from your waybills.</p>
+
+      <div class="topic">
+        <div class="topic-head">
+          <span class="topic-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="12" rx="2"/><circle cx="9" cy="10.5" r="1.6"/><path d="M4 15l4-3 3 2 4-4 5 5"/></svg>
+          </span>
+          <h3>AI tools, entirely optional</h3>
+        </div>
+        <p class="lead">
+          Waypoint offers optional AI integrations to streamline setup and configuration.
+          All core operational features work seamlessly without AI.
+        </p>
+        <button class="reveal-toggle" type="button" aria-expanded="false" aria-controls="panel-ai">
+          <span class="label-show">Learn more</span><span class="label-hide">Show less</span>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="reveal-panel" id="panel-ai"><div>
+          <ul>
+            <li>Photograph a new car and Waypoint's AI identifies its type, reporting marks, road number, and color. Using your own AI key, you can generate stylized images of rolling stock and locomotives.</li>
+            <li>Generate in and out loads and associate car types for industries based on the industry name.</li>
+            <li>Associate car types with loads using data from real railroad operations. Add your own carload types for operations unique to your layout's region or time period.</li>
+            <li>A free version of Gemini is built in to generate car data from photos and industry data from industry names. Layout owners can optionally add their own API key to generate stylized images of rolling stock. Waypoint supports Claude, GPT-4o, Gemini, and local Ollama vision models.</li>
+          </ul>
+        </div></div>
       </div>
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c3 .2 5 2.4 5 5.8"/></svg>
-        <h3>Multi-operator</h3>
-        <p>Invite your crew and manage roles from the settings panel.</p>
+
+      <div class="topic">
+        <div class="topic-head">
+          <span class="topic-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="11" height="7" rx="1"/><path d="M14 11h4l3 4v0H14"/><path d="M5 8V5h4v3"/><circle cx="7" cy="18" r="2"/><circle cx="13" cy="18" r="2"/><circle cx="19" cy="18" r="1.6"/></svg>
+          </span>
+          <h3>Waybills drive every move</h3>
+        </div>
+        <p class="lead">
+          Operations rely on virtual waybills modeled after the classic four-movement car card
+          system used by model railroaders for decades. Waybills automatically route cars based
+          on layout industries and can be updated on the fly.
+        </p>
+        <button class="reveal-toggle" type="button" aria-expanded="false" aria-controls="panel-waybills">
+          <span class="label-show">Learn more</span><span class="label-hide">Show less</span>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="reveal-panel" id="panel-waybills"><div>
+          <ul>
+            <li>The dispatcher defines train routes with origins, destinations, and intermediate stops. The virtual dispatcher automatically builds consists, assigns motive power, optional cabooses, and operating crews, and assigns train numbers and names.</li>
+            <li>Once a consist is confirmed, live switch lists can be accessed by the operating crew on a phone, tablet, or any device with internet access.</li>
+            <li>Multiple trains can be operated simultaneously by different operators.</li>
+            <li>Off-spot placement (constructive placement) is supported, so cars can be spotted in nearby areas when industry spots are overloaded.</li>
+            <li>Real-time notifications keep dispatchers and operators in sync across devices, while a fast clock runs railroad time at 1&times;, 2&times;, 4&times;, 6&times;, or 12&times; speed.</li>
+            <li>At the end of a session, car locations are updated, car waybills are advanced to the next routing, and head end power is released into the pool, ready for the next session.</li>
+          </ul>
+        </div></div>
       </div>
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg>
-        <h3>Any device</h3>
-        <p>Works on phones, tablets, and laptops — no app to install.</p>
+
+      <div class="topic">
+        <div class="topic-head">
+          <span class="topic-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 3 5-6 4 4"/><path d="M3 20h18"/></svg>
+          </span>
+          <h3>Any track arrangement</h3>
+        </div>
+        <p class="lead">
+          Waypoint can represent any physical track arrangement. Because it is tailored for
+          compact layouts, off-layout staging yards (fiddle yards) are seamlessly integrated
+          into operations. Multi-track yards and traditional staging yards are also fully supported.
+        </p>
+        <button class="reveal-toggle" type="button" aria-expanded="false" aria-controls="panel-track">
+          <span class="label-show">Learn more</span><span class="label-hide">Show less</span>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="reveal-panel" id="panel-track"><div>
+          <ul>
+            <li>Designate tracks as industry spurs, storage tracks, yard, or staging. Yard and staging tracks are intended as train origination and destination points.</li>
+            <li>Group tracks into locations, which could be towns, yards, switching areas, and so on.</li>
+            <li>Designate storage or industry tracks as team tracks.</li>
+            <li>Yards and staging support identifying departure and arrival tracks, rip tracks, and so on.</li>
+            <li>Use consist information to assemble cassettes, or pull cars from off-layout storage.</li>
+          </ul>
+        </div></div>
       </div>
+
     </div>
   </section>
+
+  <script>
+  (function () {
+    document.querySelectorAll(".reveal-toggle").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var panel = document.getElementById(btn.getAttribute("aria-controls"));
+        var expanded = btn.getAttribute("aria-expanded") === "true";
+        btn.setAttribute("aria-expanded", String(!expanded));
+        panel.classList.toggle("open", !expanded);
+      });
+    });
+  })();
+  </script>
 
   <section style="padding: 0 2rem 3rem;">
     <figure class="gallery">
