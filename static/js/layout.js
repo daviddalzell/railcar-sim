@@ -529,7 +529,7 @@ function renderLocationTree() {
       const indCount = appState.industries.filter(i => i.location_id === locId).length;
       openCascadeDeleteDialog(
         `Delete "${loc.name}"?`,
-        indCount ? `This will also remove ${indCount} industr${indCount === 1 ? "y" : "ies"}.` : "This cannot be undone.",
+        indCount ? `${indCount} industr${indCount === 1 ? "y" : "ies"} will become unassigned — they are not deleted.` : "This cannot be undone.",
         () => api("DELETE", `/api/tracks/${locId}`).then(loadLayout)
       );
     });
