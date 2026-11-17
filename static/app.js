@@ -301,16 +301,20 @@ function renderPowerStrip(power, caboose, editable = false) {
   function powerThumb(c) {
     const img = c.photo_path ? photoSrc(c.photo_path, c.photo_url) : defaultCarImage(c.car_type);
     return img
-      ? `<img src="${img}" alt="${c.car_type}" />`
-      : `<span style="font-size:0.65rem">${c.car_type}</span>`;
+      ? `<div class="session-car-thumb"><img src="${img}" alt="${c.car_type}" /></div>`
+      : `<div class="session-car-thumb no-photo-thumb">${c.car_type}</div>`;
   }
   function powerChip(c, label) {
     const removeBtn = editable
-      ? `<button class="power-chip-remove" data-remove-id="${c.id}" data-remove-type="${label}" title="Remove">✕</button>`
+      ? `<button type="button" class="power-chip-remove" data-remove-id="${c.id}" data-remove-type="${label}" title="Remove">✕</button>`
       : "";
+    const roleLabel = label === "caboose" ? "Caboose" : "Locomotive";
     return `<div class="power-chip" title="${label}">
       ${powerThumb(c)}
-      <span class="power-chip-marks">${c.reporting_marks || "—"} ${c.car_number || ""}</span>
+      <div class="session-car-info">
+        <span class="session-car-marks">${c.reporting_marks || "—"} ${c.car_number || ""}</span>
+        <span class="session-car-move">${roleLabel}</span>
+      </div>
       ${removeBtn}
     </div>`;
   }
