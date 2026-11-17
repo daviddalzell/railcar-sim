@@ -145,23 +145,8 @@
   border-radius: 4px;
 }
 
-.power-chip img,
-.power-chip > span:first-child {
-  width: 60px;
-  height: 48px;
-  object-fit: contain;
-  border-radius: 4px;
-  background: var(--car-img-bg);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px;
-}
-
-.power-chip-marks {
-  font-size: 0.75rem;
-  font-weight: 600;
+.power-chip .session-car-marks,
+.power-chip .session-car-move {
   white-space: nowrap;
 }
 
