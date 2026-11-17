@@ -45,6 +45,7 @@ body {
   --badge-green:    #27ae60;
   --badge-purple:   #8e44ad;
   --badge-orange:   #d68910;
+  --color-warning:  var(--badge-orange);
 
   --rail-green: #5c7a3e;
 
@@ -87,11 +88,20 @@ body {
    selector (specificity 0,1,0) beats a plain `button` type selector
    (0,0,1). Omitting [type="button"] here left every <button type="button">
    in the app (20+ in templates/index.html alone) matching Pico's
-   higher-specificity [type=button] font-size instead of this rule's. */
+   higher-specificity [type=button] font-size instead of this rule's.
+   margin-bottom: 0 for the same reason — Pico's own
+   `[type=button],[type=reset],[type=submit]{margin-bottom:var(--pico-spacing)}`
+   only matches elements with an explicit type="button"/"submit"/"reset"
+   attribute, so a bare <button> sibling with no type attribute (matching
+   only the lower-specificity `button` selector) gets no such margin —
+   two visually-identical buttons side by side end up different heights
+   purely because one happens to declare type="button" and the other
+   doesn't (issue #60). */
 button, [type="button"], [type="submit"], [type="reset"], [role="button"] {
   --pico-form-element-spacing-vertical: 0.4rem;
   --pico-form-element-spacing-horizontal: 1rem;
   font-size: 0.85rem;
+  margin-bottom: 0;
 }
 
 /* Borderless icon button (edit / delete / move / collapse-caret). Replaces

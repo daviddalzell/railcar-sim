@@ -166,7 +166,7 @@ function renderPlanPreview(plan) {
     { label: "Pick up for staging",  cars: plan.departures || [],  empty: "No pickups planned." },
   ];
   const warningHtml = (plan.warnings || []).map(w =>
-    `<li style="color:var(--pico-del-color,#c0392b)">${w}</li>`
+    `<li style="color:var(--color-warning,#d68910)">${w}</li>`
   ).join("");
   const total = (plan.arrivals?.length || 0) + (plan.departures?.length || 0) + (plan.spots?.length || 0);
 
@@ -799,7 +799,7 @@ async function updateDispatcherHintStrip() {
     strip.innerHTML = `${preview.inbound.length} inbound · ${preview.outbound.length} outbound · ` +
       `${preview.local_spots.length} local spot${preview.local_spots.length === 1 ? "" : "s"} · ` +
       `${n} total` +
-      (warnCount ? ` · <span style="color:var(--pico-del-color,#c0392b)">⚠ ${warnCount} warning${warnCount === 1 ? "" : "s"}</span>` : "");
+      (warnCount ? ` · <span style="color:var(--color-warning,#d68910)">⚠ ${warnCount} warning${warnCount === 1 ? "" : "s"}</span>` : "");
   } catch {
     if (token === dispatcherHintToken) strip.innerHTML = "";
   }
@@ -901,7 +901,7 @@ function renderDispatcherPreview(containerEl, preview, handlers) {
         <button class="disp-preview-regenerate outline">↺ Regenerate</button>
         <button type="button" class="disp-preview-cancel outline secondary">Cancel</button>
       </div>
-      ${warningHtml ? `<ul class="muted small" style="color:var(--pico-del-color,#c0392b);margin-bottom:0.5rem">${warningHtml}</ul>` : ""}
+      ${warningHtml ? `<ul class="muted small" style="color:var(--color-warning,#d68910);margin-bottom:0.5rem">${warningHtml}</ul>` : ""}
       ${groups.map(g => `
         <details open>
           <summary class="muted small" style="cursor:pointer;font-weight:600">${g.label} (${g.cars.length})</summary>
@@ -985,7 +985,7 @@ function renderConsistCard(plan) {
   if (!total) carListHtml = '<p class="muted small">No cars in this consist.</p>';
 
   const warningsHtml = (plan.warnings && plan.warnings.length) ? `
-    <ul class="consist-warnings muted small" style="margin:0.25rem 0 0;padding-left:1.1rem;color:var(--pico-del-color,#c0392b)">
+    <ul class="consist-warnings muted small" style="margin:0.25rem 0 0;padding-left:1.1rem;color:var(--color-warning,#d68910)">
       ${plan.warnings.map(w => `<li>${w}</li>`).join("")}
     </ul>` : "";
 
