@@ -52,6 +52,14 @@ def car_to_dict(car: Car) -> dict:
         "active_waybill": waybill_to_dict(active) if active else None,
         "waybill_count": len(car.waybills),
         "cp_session_count": car.cp_session_count or 0,
+        "light_weight": car.light_weight,
+        "load_limit": car.load_limit,
+        "capacity": car.capacity,
+        "built_date": car.built_date,
+        "reweigh_date": car.reweigh_date,
+        "reweigh_location": car.reweigh_location,
+        "cots_date": car.cots_date,
+        "cots_location": car.cots_location,
     }
 
 

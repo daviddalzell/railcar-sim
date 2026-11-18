@@ -530,6 +530,10 @@ $("#btn-add-manual").addEventListener("click", () => {
   $("#field-number").value = "";
   $("#field-type").value = "other";
   $("#field-color").value = "";
+  ["light-weight", "load-limit", "capacity", "built-date", "reweigh-date",
+   "reweigh-location", "cots-date", "cots-location"].forEach(id => { $(`#field-${id}`).value = ""; });
+  $("#dataplate-details").open = false;
+  hide($("#dataplate-ai-hint"));
   updateDefaultImageOffer();
 });
 
@@ -542,12 +546,41 @@ async function cancelAddCar() {
 $("#btn-cancel-car").addEventListener("click", cancelAddCar);
 $("#btn-cancel-car-top").addEventListener("click", cancelAddCar);
 
+function readDataplateFields(prefix) {
+  const num = (id) => { const v = $(`#${prefix}${id}`).value.trim(); return v ? parseInt(v, 10) : null; };
+  const str = (id) => $(`#${prefix}${id}`).value.trim();
+  return {
+    light_weight: num("light-weight"),
+    load_limit: num("load-limit"),
+    capacity: num("capacity"),
+    built_date: str("built-date"),
+    reweigh_date: str("reweigh-date"),
+    reweigh_location: str("reweigh-location"),
+    cots_date: str("cots-date"),
+    cots_location: str("cots-location"),
+  };
+}
+
 function applyAnalysis(result) {
   if (result.photo_path) appState.photoPath = result.photo_path;
   $("#field-marks").value = result.reporting_marks || "";
   $("#field-number").value = result.car_number || "";
   $("#field-type").value  = result.car_type || "other";
   $("#field-color").value = result.color || "";
+  $("#field-light-weight").value = result.light_weight || "";
+  $("#field-load-limit").value = result.load_limit || "";
+  $("#field-capacity").value = result.capacity || "";
+  $("#field-built-date").value = result.built_date || "";
+  $("#field-reweigh-date").value = result.reweigh_date || "";
+  $("#field-reweigh-location").value = result.reweigh_location || "";
+  $("#field-cots-date").value = result.cots_date || "";
+  $("#field-cots-location").value = result.cots_location || "";
+  const foundDataplate = [
+    result.light_weight, result.load_limit, result.capacity, result.built_date,
+    result.reweigh_date, result.reweigh_location, result.cots_date, result.cots_location,
+  ].some(v => v !== null && v !== undefined && v !== "");
+  $("#dataplate-details").open = foundDataplate;
+  if (foundDataplate) show($("#dataplate-ai-hint")); else hide($("#dataplate-ai-hint"));
   if (result._error) {
     $("#vision-error-msg").textContent =
       "Vision analysis failed — please fill in details manually. (" + result._error + ")";
@@ -706,6 +739,7 @@ $("#btn-save-car").addEventListener("click", async () => {
     car_number: $("#field-number").value.trim(),
     reporting_marks: $("#field-marks").value.trim(),
     photo_path: appState.photoPath || "",
+    ...readDataplateFields("field-"),
   };
   const btn = $("#btn-save-car");
   try {
@@ -742,6 +776,28 @@ async function openCarDetail(carId) {
       `).join("")
     : "<p class='muted'>No waybill cards yet. Click Edit Waybills to assign from the pool.</p>";
 
+  const hasDataplate = [
+    car.light_weight, car.load_limit, car.capacity, car.built_date,
+    car.reweigh_date, car.reweigh_location, car.cots_date, car.cots_location,
+  ].some(v => v !== null && v !== undefined && v !== "");
+  const fmtLbs = (v) => v != null ? `${v.toLocaleString()} lbs` : "—";
+  const dataplateHtml = `
+    <details class="dataplate-fields"${hasDataplate ? " open" : ""}>
+      <summary>Data plate</summary>
+      <div class="grid">
+        <p><strong>Light Weight:</strong> ${fmtLbs(car.light_weight)}</p>
+        <p><strong>Load Limit:</strong> ${fmtLbs(car.load_limit)}</p>
+      </div>
+      <div class="grid">
+        <p><strong>Capacity:</strong> ${fmtLbs(car.capacity)}</p>
+        <p><strong>Built:</strong> ${car.built_date || "—"}</p>
+      </div>
+      <div class="grid">
+        <p><strong>Reweigh:</strong> ${car.reweigh_date || "—"}${car.reweigh_location ? ` (${car.reweigh_location})` : ""}</p>
+        <p><strong>COTS:</strong> ${car.cots_date || "—"}${car.cots_location ? ` (${car.cots_location})` : ""}</p>
+      </div>
+    </details>`;
+
   const detailDefImg = defaultCarImage(car.car_type);
   $("#detail-body").innerHTML = `
     <div class="detail-grid">
@@ -757,6 +813,7 @@ async function openCarDetail(carId) {
         <p><strong>Active Slot:</strong> ${activeSlot + 1} of ${Math.max(waybills.length, 1)}</p>
       </div>
     </div>
+    ${dataplateHtml}
     <h5>Waybill Cards</h5>
     <div class="waybill-list">${wbHtml}</div>
   `;
@@ -817,6 +874,18 @@ $("#btn-edit-car").addEventListener("click", () => {
   $("#edit-field-number").value = car.car_number || "";
   $("#edit-field-type").value = car.car_type || "other";
   $("#edit-field-color").value = car.color || "";
+  $("#edit-field-light-weight").value = car.light_weight ?? "";
+  $("#edit-field-load-limit").value = car.load_limit ?? "";
+  $("#edit-field-capacity").value = car.capacity ?? "";
+  $("#edit-field-built-date").value = car.built_date || "";
+  $("#edit-field-reweigh-date").value = car.reweigh_date || "";
+  $("#edit-field-reweigh-location").value = car.reweigh_location || "";
+  $("#edit-field-cots-date").value = car.cots_date || "";
+  $("#edit-field-cots-location").value = car.cots_location || "";
+  $("#edit-dataplate-details").open = [
+    car.light_weight, car.load_limit, car.capacity, car.built_date,
+    car.reweigh_date, car.reweigh_location, car.cots_date, car.cots_location,
+  ].some(v => v !== null && v !== undefined && v !== "");
   // photo section
   const preview = $("#edit-photo-preview");
   const btnText = $("#edit-photo-btn-text");
@@ -882,6 +951,7 @@ $("#btn-save-edit-car").addEventListener("click", async () => {
         color: $("#edit-field-color").value.trim(),
         car_number: $("#edit-field-number").value.trim(),
         reporting_marks: $("#edit-field-marks").value.trim(),
+        ...readDataplateFields("edit-field-"),
       };
       const newPhoto = $("#edit-photo-path").value;
       if (newPhoto) body.photo_path = newPhoto;

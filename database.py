@@ -146,6 +146,14 @@ def init_db():
             ("operator_email",   "movement_logs", "TEXT"),
             ("warnings_json",    "dispatch_plan", "TEXT DEFAULT '[]'"),
             ("max_train_length", "layout_settings", "INTEGER"),
+            ("light_weight",     "cars",          "INTEGER"),
+            ("load_limit",       "cars",          "INTEGER"),
+            ("capacity",         "cars",          "INTEGER"),
+            ("built_date",       "cars",          "TEXT"),
+            ("reweigh_date",     "cars",          "TEXT"),
+            ("reweigh_location", "cars",          "TEXT"),
+            ("cots_date",        "cars",          "TEXT"),
+            ("cots_location",    "cars",          "TEXT"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {defn}"))

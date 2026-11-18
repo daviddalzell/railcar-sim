@@ -12,6 +12,14 @@ class CarCreate(BaseModel):
     reporting_marks: str = ""
     photo_path: str = ""
     current_location_id: Optional[int] = None
+    light_weight: Optional[int] = None
+    load_limit: Optional[int] = None
+    capacity: Optional[int] = None
+    built_date: Optional[str] = None
+    reweigh_date: Optional[str] = None
+    reweigh_location: Optional[str] = None
+    cots_date: Optional[str] = None
+    cots_location: Optional[str] = None
 
 
 class CarUpdate(BaseModel):
@@ -21,6 +29,14 @@ class CarUpdate(BaseModel):
     reporting_marks: Optional[str] = None
     current_location_id: Optional[int] = None
     photo_path: Optional[str] = None
+    light_weight: Optional[int] = None
+    load_limit: Optional[int] = None
+    capacity: Optional[int] = None
+    built_date: Optional[str] = None
+    reweigh_date: Optional[str] = None
+    reweigh_location: Optional[str] = None
+    cots_date: Optional[str] = None
+    cots_location: Optional[str] = None
 
 
 class TrackCreate(BaseModel):

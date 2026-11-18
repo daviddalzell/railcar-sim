@@ -26,10 +26,20 @@ Return ONLY a JSON object with these fields (no markdown, no explanation):
   "car_type": "<one of: boxcar, flatcar, gondola, tank car, hopper, covered hopper, refrigerator car, caboose, passenger car, other>",
   "color": "<primary color of the car body>",
   "car_number": "<the numeric or alphanumeric road number stenciled on the car side, or empty string if not visible>",
-  "reporting_marks": "<the railroad owner initials stenciled on the car, e.g. UP, BNSF, SP, CN — or empty string if not visible>"
+  "reporting_marks": "<the railroad owner initials stenciled on the car, e.g. UP, BNSF, SP, CN — or empty string if not visible>",
+  "light_weight": "<the LT WT (light/tare weight) in lbs stenciled on the car, digits only, or empty string if not visible>",
+  "load_limit": "<the LD LMT in lbs stenciled on the car, digits only, or empty string if not visible>",
+  "capacity": "<the CAPY in lbs stenciled on the car, digits only, or empty string if not visible>",
+  "built_date": "<the NEW or BLT date stenciled on the car, e.g. '5-48', or empty string if not visible>",
+  "reweigh_date": "<the RWD (reweigh) date stenciled on the car, e.g. '3-60', or empty string if not visible>",
+  "reweigh_location": "<the shop code next to the reweigh date, or empty string if not visible>",
+  "cots_date": "<the COTS (Clean-Oil-Test-Stencil) date stenciled on the car, or empty string if not visible>",
+  "cots_location": "<the shop code next to the COTS date, or empty string if not visible>"
 }
 
-If you cannot determine a value, use an empty string. For car_type, always pick the closest match from the list."""
+If you cannot determine a value, use an empty string. For car_type, always pick the closest match from the list.
+The weight/date/shop fields are small stenciled text that may be illegible or absent — leave them empty rather
+than guessing."""
 
 _MEDIA_TYPES = {
     ".jpg": "image/jpeg",
@@ -132,12 +142,29 @@ def _parse_json_response(raw: str) -> dict:
         return {}
 
 
+def _parse_stenciled_int(value) -> int | None:
+    """Vision providers return stenciled weights as strings (sometimes with
+    commas/units); keep only the digits, or None if nothing legible."""
+    if value is None:
+        return None
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    return int(digits) if digits else None
+
+
 def _normalize(data: dict) -> dict:
     return {
         "car_type": data.get("car_type", "other"),
         "color": data.get("color", ""),
         "car_number": data.get("car_number", ""),
         "reporting_marks": data.get("reporting_marks", ""),
+        "light_weight": _parse_stenciled_int(data.get("light_weight")),
+        "load_limit": _parse_stenciled_int(data.get("load_limit")),
+        "capacity": _parse_stenciled_int(data.get("capacity")),
+        "built_date": data.get("built_date", ""),
+        "reweigh_date": data.get("reweigh_date", ""),
+        "reweigh_location": data.get("reweigh_location", ""),
+        "cots_date": data.get("cots_date", ""),
+        "cots_location": data.get("cots_location", ""),
     }
 
 
