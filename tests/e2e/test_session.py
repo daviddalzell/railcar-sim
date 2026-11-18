@@ -63,14 +63,20 @@ def test_dispatch_and_run_session(page: Page):
     page.locator("#disp-destination").select_option(str(staging))
     page.locator("#btn-build-consist").click()
 
-    # Building a consist now previews before committing — confirm it.
+    # Building a consist now previews before committing — confirm it. Capture
+    # the build response directly for the new plan's id rather than locating
+    # ".consist-start-session" positionally: other e2e tests in this session
+    # share one DB (see live_server in conftest.py) and may have already
+    # built/confirmed their own plans, so ".first" is not reliably *this*
+    # plan once more than one exists.
     confirm_btn = page.locator("#disp-preview .disp-preview-confirm")
     expect(confirm_btn).to_be_visible()
-    confirm_btn.click()
+    with page.expect_response(lambda r: "/api/dispatcher/build-plan" in r.url) as resp_info:
+        confirm_btn.click()
+    plan_id = resp_info.value.json()["id"]
 
-    start_btn = page.locator(".consist-start-session").first
+    start_btn = page.locator(f".consist-start-session[data-plan-id='{plan_id}']").first
     expect(start_btn).to_be_visible()
-    plan_id = start_btn.get_attribute("data-plan-id")
 
     # Assign power via the API (the power <select> lives in a collapsed card
     # section; power assignment is setup, not the behavior under test), then
