@@ -417,6 +417,45 @@ header nav a.active {
   margin-bottom: 0.5rem;
 }
 
+/* ── Car data plate (prototype weight/reweigh/COTS fields) ───────────────── */
+.dataplate-fields {
+  border: 1px solid var(--border-light);
+  border-radius: var(--card-radius);
+  margin-bottom: 1rem;
+  padding: 0;
+}
+.dataplate-fields[open] {
+  border-color: var(--badge-orange);
+  padding-bottom: 0.75rem;
+}
+.dataplate-fields summary {
+  cursor: pointer;
+  padding: 0.6rem 0.85rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.dataplate-fields > .grid,
+.dataplate-fields > label {
+  padding: 0 0.85rem;
+}
+.dataplate-fields small {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.ai-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #8a6d1f;
+  background: #fdf2da;
+  border: 1px solid #efd9a3;
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  margin: 0 0.85rem 0.6rem;
+}
+
 .button-row {
   display: flex;
   align-items: center;

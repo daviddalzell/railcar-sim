@@ -156,6 +156,16 @@ class Car(Base):
     active_waybill_slot: Mapped[int] = mapped_column(Integer, default=0)
     cp_session_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
+    # Prototype data plate — informational only, no simulation logic reads these.
+    light_weight: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    load_limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    built_date: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    reweigh_date: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    reweigh_location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    cots_date: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    cots_location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
     current_location: Mapped[Optional["Track"]] = relationship("Track", back_populates="cars")
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="car", order_by="Waybill.slot_index", foreign_keys="Waybill.car_id")
     movement_logs: Mapped[List["MovementLog"]] = relationship("MovementLog", back_populates="car")

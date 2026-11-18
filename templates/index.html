@@ -140,6 +140,24 @@
             </label>
             <label>Color <input id="field-color" type="text" placeholder="e.g. brown" /></label>
           </div>
+          <details id="dataplate-details" class="dataplate-fields">
+            <summary>Prototype data (optional)</summary>
+            <div id="dataplate-ai-hint" class="hidden ai-hint">✨ Filled in from the photo — double-check before saving.</div>
+            <div class="grid">
+              <label>Light Weight <small>(lbs)</small> <input id="field-light-weight" type="number" placeholder="41000" /></label>
+              <label>Load Limit <small>(lbs)</small> <input id="field-load-limit" type="number" placeholder="128000" /></label>
+              <label>Capacity <small>(lbs)</small> <input id="field-capacity" type="number" placeholder="100000" /></label>
+            </div>
+            <label>Built Date <small>e.g. 5-48</small> <input id="field-built-date" type="text" placeholder="MM-YY" /></label>
+            <div class="grid">
+              <label>Reweigh Date <input id="field-reweigh-date" type="text" placeholder="MM-YY" /></label>
+              <label>Reweigh Location <input id="field-reweigh-location" type="text" placeholder="shop code" /></label>
+            </div>
+            <div class="grid">
+              <label>COTS Date <input id="field-cots-date" type="text" placeholder="MM-YY" /></label>
+              <label>COTS Location <input id="field-cots-location" type="text" placeholder="shop code" /></label>
+            </div>
+          </details>
           <div id="vision-error" class="hidden error-msg">
             <span id="vision-error-msg"></span>
             <button id="btn-retry-vision" class="outline small ml-sm">↻ Retry</button>
@@ -222,6 +240,23 @@
             </label>
             <label>Color <input id="edit-field-color" type="text" placeholder="e.g. brown" /></label>
           </div>
+          <details id="edit-dataplate-details" class="dataplate-fields">
+            <summary>Prototype data (optional)</summary>
+            <div class="grid">
+              <label>Light Weight <small>(lbs)</small> <input id="edit-field-light-weight" type="number" placeholder="41000" /></label>
+              <label>Load Limit <small>(lbs)</small> <input id="edit-field-load-limit" type="number" placeholder="128000" /></label>
+              <label>Capacity <small>(lbs)</small> <input id="edit-field-capacity" type="number" placeholder="100000" /></label>
+            </div>
+            <label>Built Date <small>e.g. 5-48</small> <input id="edit-field-built-date" type="text" placeholder="MM-YY" /></label>
+            <div class="grid">
+              <label>Reweigh Date <input id="edit-field-reweigh-date" type="text" placeholder="MM-YY" /></label>
+              <label>Reweigh Location <input id="edit-field-reweigh-location" type="text" placeholder="shop code" /></label>
+            </div>
+            <div class="grid">
+              <label>COTS Date <input id="edit-field-cots-date" type="text" placeholder="MM-YY" /></label>
+              <label>COTS Location <input id="edit-field-cots-location" type="text" placeholder="shop code" /></label>
+            </div>
+          </details>
           <footer>
             <button id="btn-save-edit-car">Save</button>
             <button id="btn-cancel-edit-car" class="outline secondary">Cancel</button>
