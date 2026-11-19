@@ -10,7 +10,7 @@ from typing import Optional
 from auth import require_admin
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from PIL import Image
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from starlette.requests import Request
 
 import storage
@@ -62,7 +62,12 @@ router = APIRouter(prefix="/api", tags=["cars"])
 
 @router.get("/cars")
 def list_cars(db: Session = Depends(get_db)):
-    cars = db.query(Car).all()
+    cars = db.query(Car).options(
+        selectinload(Car.waybills).selectinload(Waybill.origin),
+        selectinload(Car.waybills).selectinload(Waybill.destination),
+        selectinload(Car.waybills).selectinload(Waybill.industry),
+        selectinload(Car.current_location),
+    ).all()
     return [car_to_dict(c) for c in cars]
 
 

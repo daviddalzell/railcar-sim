@@ -356,12 +356,18 @@ function renderCarGrid() {
     grid.innerHTML = freight.map(carCardHTML).join("");
   }
 
-  $$(".car-card").forEach(card => {
-    card.addEventListener("click", () => openCarDetail(parseInt(card.dataset.id)));
-  });
-
   checkOrphanedCars();
 }
+
+// Delegated once on the stable container elements rather than re-attaching a
+// listener per card on every renderCarGrid() call — a full-roster rebuild
+// after a single-car edit used to mean hundreds of fresh listeners each time.
+function _onCarCardClick(e) {
+  const card = e.target.closest(".car-card");
+  if (card) openCarDetail(parseInt(card.dataset.id));
+}
+$("#car-grid").addEventListener("click", _onCarCardClick);
+$("#power-pool-list").addEventListener("click", _onCarCardClick);
 
 function checkOrphanedCars() {
   const orphaned = appState.cars.filter(c => c.current_location_id && !c.current_location_name);
