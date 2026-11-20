@@ -789,7 +789,7 @@ async function openCarDetail(carId) {
   const fmtLbs = (v) => v != null ? `${v.toLocaleString()} lbs` : "—";
   const dataplateHtml = `
     <details class="dataplate-fields"${hasDataplate ? " open" : ""}>
-      <summary>Data plate</summary>
+      <summary>Stenciled data</summary>
       <div class="grid">
         <p><strong>Light Weight:</strong> ${fmtLbs(car.light_weight)}</p>
         <p><strong>Load Limit:</strong> ${fmtLbs(car.load_limit)}</p>
