@@ -52,7 +52,7 @@ These changes target large rosters. At 15–30 cars the app is already fast, so 
 
 ## Verification
 
-1. **Seed 800 cars** in local SQLite (ORM factories or a generated `/api/import/cars/commit` payload).
+1. **Seed 800 cars** — `python scripts/bench_roster.py --count 800` against a local `AUTH_DISABLED=1 uvicorn` server does this and prints `GET /api/cars`/`GET /api/operations` timing directly.
 2. **Backend, before/after:** count SQL queries per `GET /api/cars` and `/api/operations` with a SQLAlchemy `before_cursor_execute` counter; confirm the count drops from thousands to a small constant.
 3. **Add a perf-guard test** (`tests/test_car_scaling.py`): seed N cars, assert `GET /api/cars` issues a bounded number of queries independent of N — same spirit as `tests/test_dialogs.py`, catches future N+1 regressions.
 4. **Browser** (`AUTH_DISABLED=1 uvicorn main:app`): load 800 cars; confirm images load lazily on scroll, the grid renders quickly, and editing one car does not refetch all cars.

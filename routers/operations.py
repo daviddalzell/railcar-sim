@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: MIT
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from database import get_db
-from models import Car, Location, MovementLog, Track
+from models import Car, Location, MovementLog, Track, Waybill
 from converters import car_to_dict, location_group_to_dict
 
 router = APIRouter(prefix="/api", tags=["operations"])
@@ -56,17 +56,31 @@ def layout_status(db: Session = Depends(get_db)):
 
 @router.get("/operations")
 def operations(db: Session = Depends(get_db)):
-    cars = db.query(Car).all()
+    cars = db.query(Car).options(
+        selectinload(Car.waybills).selectinload(Waybill.origin),
+        selectinload(Car.waybills).selectinload(Waybill.destination),
+        selectinload(Car.waybills).selectinload(Waybill.industry),
+        selectinload(Car.current_location),
+    ).all()
+
+    # One grouped query for every car's recent moves instead of one query per
+    # car — logs come back ordered newest-first within each car, so slicing
+    # [:5] below still gives the 5 most recent per car.
+    logs_by_car: dict[int, list[MovementLog]] = {}
+    car_ids = [c.id for c in cars]
+    if car_ids:
+        all_logs = (
+            db.query(MovementLog)
+            .filter(MovementLog.car_id.in_(car_ids))
+            .order_by(MovementLog.car_id, MovementLog.timestamp.desc())
+            .all()
+        )
+        for log in all_logs:
+            logs_by_car.setdefault(log.car_id, []).append(log)
+
     result = []
     for car in cars:
         d = car_to_dict(car)
-        logs = (
-            db.query(MovementLog)
-            .filter(MovementLog.car_id == car.id)
-            .order_by(MovementLog.timestamp.desc())
-            .limit(5)
-            .all()
-        )
         d["recent_moves"] = [
             {
                 "timestamp": log.timestamp.isoformat(),
@@ -74,7 +88,7 @@ def operations(db: Session = Depends(get_db)):
                 "to_location_id": log.to_location_id,
                 "note": log.note,
             }
-            for log in logs
+            for log in logs_by_car.get(car.id, [])[:5]
         ]
         result.append(d)
     return result

@@ -276,13 +276,16 @@ async def import_cars(
             db.query(Waybill).filter(Waybill.car_id.isnot(None)).delete()
             db.query(Car).delete()
             db.flush()
-        for row in valid:
-            db.add(Car(
-                reporting_marks=row["reporting_marks"],
-                car_number=row["car_number"],
-                car_type=row["car_type"],
-                color=row["color"],
-            ))
+        if valid:
+            db.bulk_insert_mappings(Car, [
+                {
+                    "reporting_marks": row["reporting_marks"],
+                    "car_number": row["car_number"],
+                    "car_type": row["car_type"],
+                    "color": row["color"],
+                }
+                for row in valid
+            ])
         db.commit()
 
     return {
@@ -306,17 +309,18 @@ def commit_car_import(data: CarImportCommit, db: Session = Depends(get_db)):
         (c.reporting_marks.lower(), c.car_number.lower())
         for c in db.query(Car).all()
     }
-    imported = 0
+    mappings = []
     for row in data.cars:
         key = (row.reporting_marks.lower(), row.car_number.lower())
         if data.mode == "add" and key in existing_keys:
             continue
-        db.add(Car(
-            reporting_marks=row.reporting_marks,
-            car_number=row.car_number,
-            car_type=row.car_type,
-            color=row.color,
-        ))
-        imported += 1
+        mappings.append({
+            "reporting_marks": row.reporting_marks,
+            "car_number": row.car_number,
+            "car_type": row.car_type,
+            "color": row.color,
+        })
+    if mappings:
+        db.bulk_insert_mappings(Car, mappings)
     db.commit()
-    return {"imported": imported}
+    return {"imported": len(mappings)}

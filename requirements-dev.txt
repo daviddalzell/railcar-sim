@@ -4,3 +4,8 @@
 # installing these.
 pytest-playwright==0.10.0
 playwright==1.64.1
+
+# Used by scripts/bench_roster.py. Currently also pulled in transitively
+# (e.g. by supabase) in requirements.txt, but that's not guaranteed to stay
+# true — pin it explicitly here since this dev-only script imports it directly.
+requests>=2.31.0
