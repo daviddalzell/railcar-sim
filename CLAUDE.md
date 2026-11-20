@@ -245,11 +245,13 @@ Key patterns:
 
 ### Dialogs
 
-Native `<dialog>` elements. Three rules prevent the recurring "dialog won't dismiss" bugs (see `tests/test_dialogs.py`, which enforces the first two):
+Native `<dialog>` elements. Three rules prevent the recurring "dialog won't dismiss" bugs (see `tests/e2e/test_dialogs.py`, which enforces the first two):
 
 - **Never set `display` inline on a `<dialog>`.** It overrides the browser rule `dialog:not([open]) { display: none }`, so `.close()` leaves the dialog painted. Put any `display` rule in an `[open]`-scoped CSS selector instead (e.g. `#my-dialog[open] { display: flex }`).
 - **Close buttons use `rel="prev"` (the empty header ×) — never on a button with text.** PicoCSS styles a `rel="prev"` button as the close-icon, so a text button renders squished. For a text "Cancel", use a plain `<button type="button">` with `class="dialog-close"`.
 - **Do not hand-wire close handlers.** A delegated handler in `static/app.js` closes the nearest `<dialog>` for any `rel="prev"` or `.dialog-close` click. Give new dialogs one of those controls and dismissal works automatically.
+
+A fourth, related recurring bug class — **a desktop-only `#id` rule must be re-listed in whatever later selector is meant to override it for a different context (a mobile media query, a compact-mode rule, etc.), or it silently keeps winning.** ID specificity beats class specificity regardless of media query or source order. This has bitten a sibling-button group twice: #60 (Dispatcher preview's Cancel button kept a stray margin because `[type="button"]` wasn't in the compact-button override's selector list) and #89 (the car-detail footer's Auto-Assign button kept its desktop `max-width` on mobile because `#btn-auto-assign-car` wasn't re-listed in the mobile override). When a button group shares one override rule, every ID in that group needs to appear in every rule meant to apply to the whole group — a partial list is a bug waiting to surface the next time someone's eye catches a misaligned/mis-sized sibling. `tests/e2e/test_dialogs.py::test_mobile_car_detail_footer_buttons_equal_width` pins this invariant for the car-detail footer specifically; it won't catch a new instance in a different button group.
 
 ---
 

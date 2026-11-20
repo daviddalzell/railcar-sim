@@ -147,7 +147,8 @@
   .dialog-footer-primary button,
   .dialog-footer-secondary button,
   #btn-advance-waybill,
-  #btn-edit-waybills {
+  #btn-edit-waybills,
+  #btn-auto-assign-car {
     width: 100%;
     max-width: none;
   }
