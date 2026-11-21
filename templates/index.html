@@ -551,6 +551,14 @@
           </div>
           <div class="field-label">Spot number(s)</div>
           <div id="ind-spot-numbers" class="spot-picker"></div>
+          <div class="grid">
+            <label for="ind-avg-carloads">Avg. monthly carloads
+              <input id="ind-avg-carloads" type="number" min="0" step="1" placeholder="— uniform —" />
+            </label>
+            <label for="ind-dwell-multiplier">Dwell multiplier
+              <input id="ind-dwell-multiplier" type="number" min="0" step="0.1" value="1.0" />
+            </label>
+          </div>
           <input type="hidden" id="ind-edit-id" value="" />
           <div class="button-row">
             <button type="submit" class="small">Save</button>
@@ -584,6 +592,9 @@
             </label>
             <label>Car Type
               <select id="cmap-car-type"></select>
+            </label>
+            <label>Base dwell (turns)
+              <input id="cmap-dwell" type="number" min="0" step="1" value="1" />
             </label>
           </div>
           <div class="button-row">

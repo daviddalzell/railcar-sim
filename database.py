@@ -154,6 +154,11 @@ def init_db():
             ("reweigh_location", "cars",          "TEXT"),
             ("cots_date",        "cars",          "TEXT"),
             ("cots_location",    "cars",          "TEXT"),
+            ("avg_monthly_carloads", "industries", "INTEGER"),
+            ("dwell_multiplier", "industries",    "REAL DEFAULT 1.0"),
+            ("base_dwell_turns", "commodity_car_type_map", "INTEGER DEFAULT 1"),
+            ("dwell_turns_required", "cars",      "INTEGER DEFAULT 0"),
+            ("dwell_turns_elapsed",  "cars",      "INTEGER DEFAULT 0"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {defn}"))

@@ -79,6 +79,7 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
         and (wb := _get_active_waybill(car))
         and wb.destination_id in dispatch_ids
         and wb.destination_id not in area_location_ids
+        and car.dwell_turns_elapsed >= car.dwell_turns_required
     ]
 
     local_spots = [
@@ -88,8 +89,23 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
         and (wb := _get_active_waybill(car))
         and wb.destination_id in area_location_ids
         and car.current_location_id != wb.destination_id
+        and car.dwell_turns_elapsed >= car.dwell_turns_required
     ]
     local_spots = local_spots[:round(area.car_capacity * 0.375)]
+
+    # Cars that would otherwise qualify for outbound/local_spots but haven't
+    # finished dwelling at their industry yet — surfaced as a warning below.
+    still_dwelling = sum(
+        1 for car in area_cars
+        if car.car_type not in POWER_CAR_TYPES
+        and car.id not in claimed_ids
+        and (wb := _get_active_waybill(car))
+        and car.dwell_turns_elapsed < car.dwell_turns_required
+        and (
+            (wb.destination_id in dispatch_ids and wb.destination_id not in area_location_ids)
+            or (wb.destination_id in area_location_ids and car.current_location_id != wb.destination_id)
+        )
+    )
 
     available_spots = max(0, area.car_capacity - current_count + len(outbound))
 
@@ -214,6 +230,11 @@ def _run_build_algorithm(data_origin_id: int, data_area_id: int, destination_id:
     warnings.extend(industry_warnings)
     if destination_warning:
         warnings.append(destination_warning)
+    if still_dwelling:
+        warnings.append(
+            f"{still_dwelling} car{'s' if still_dwelling != 1 else ''} still dwelling at their industry "
+            "(not yet ready to move)."
+        )
     if not consist_inbound and not outbound and not local_spots:
         warnings.append("No eligible cars found for this origin and switching area.")
     total_work = len(consist_inbound) + len(outbound) + len(local_spots)

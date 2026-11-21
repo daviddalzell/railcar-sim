@@ -5,7 +5,7 @@ import random
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from database import get_db
 from models import Car, CommodityCarTypeMap, Industry, POWER_CAR_TYPES, Track, Waybill
@@ -22,6 +22,19 @@ def _car_type_matches(required: Optional[str], car_type: str) -> bool:
     if not required or required.lower() in _WILDCARD_TYPES:
         return True
     return required.lower() == car_type.lower()
+
+
+def industry_weight(waybill) -> float:
+    if waybill.industry_id and waybill.industry and waybill.industry.avg_monthly_carloads:
+        return max(waybill.industry.avg_monthly_carloads, 1)
+    return 1
+
+
+def weighted_shuffle(waybills: list) -> None:
+    """In-place weighted random permutation (Efraimidis-Spirakis): sorting by
+    random()**(1/weight) descending degenerates to a uniform shuffle when every
+    weight is 1, so unconfigured industries keep today's uniform behavior."""
+    waybills.sort(key=lambda w: random.random() ** (1.0 / industry_weight(w)), reverse=True)
 
 
 def _find_loaded_from(unassigned, location_id, car_type):
@@ -64,8 +77,10 @@ def _find_best_staging_for_car(unassigned, staging_ids, car_type, loaded_only=Fa
         if (w.origin_id in staging_ids
                 and w.destination_id is not None
                 and _car_type_matches(w.required_car_type, car_type)):
-            # Loaded waybills score higher so the car starts where real work is available
-            weight = 2 if not w.is_empty else 1
+            # Loaded waybills score higher so the car starts where real work is available,
+            # scaled by the destination industry's intensity so a high-carload industry
+            # is favored as a starting point too.
+            weight = (2 if not w.is_empty else 1) * industry_weight(w)
             counts[w.origin_id] = counts.get(w.origin_id, 0) + weight
     if not counts:
         return None
@@ -92,22 +107,23 @@ def _clone_waybill(source, car, slot: int, db: Session):
 def _fallback_candidate(db: Session, current_loc: int, staging_ids: set, car_type: str, always_empty: bool):
     """Search all waybills (including assigned) for a route to clone when the unassigned pool is exhausted."""
     if current_loc in staging_ids:
-        candidates = db.query(Waybill).filter(
+        candidates = db.query(Waybill).options(selectinload(Waybill.industry)).filter(
             Waybill.origin_id == current_loc,
             Waybill.is_empty == False,
             Waybill.destination_id.isnot(None),
         ).limit(20).all()
     elif always_empty:
-        candidates = db.query(Waybill).filter(
+        candidates = db.query(Waybill).options(selectinload(Waybill.industry)).filter(
             Waybill.origin_id == current_loc,
             Waybill.is_empty == True,
             Waybill.destination_id.in_(list(staging_ids)),
         ).limit(20).all()
     else:
-        candidates = db.query(Waybill).filter(
+        candidates = db.query(Waybill).options(selectinload(Waybill.industry)).filter(
             Waybill.origin_id == current_loc,
             Waybill.destination_id.isnot(None),
         ).limit(20).all()
+    weighted_shuffle(candidates)
     for w in candidates:
         if _car_type_matches(w.required_car_type, car_type):
             return w
@@ -116,11 +132,12 @@ def _fallback_candidate(db: Session, current_loc: int, staging_ids: set, car_typ
 
 def _fallback_starting_loc(db: Session, staging_ids: set, car_type: str):
     """When the unassigned pool has no staging-origin waybills, query all waybills for one to seed routing."""
-    candidates = db.query(Waybill).filter(
+    candidates = db.query(Waybill).options(selectinload(Waybill.industry)).filter(
         Waybill.origin_id.in_(list(staging_ids)),
         Waybill.is_empty == False,
         Waybill.destination_id.isnot(None),
     ).limit(20).all()
+    weighted_shuffle(candidates)
     for w in candidates:
         if _car_type_matches(w.required_car_type, car_type):
             return w.origin_id
@@ -138,7 +155,7 @@ def auto_assign_one_car(car, unassigned: list, staging_ids: set, db: Session, st
     if not open_slots:
         return 0
 
-    random.shuffle(unassigned)
+    weighted_shuffle(unassigned)
 
     always_empty = any(t in car.car_type.lower() for t in _ALWAYS_EMPTY_RETURN_TYPES)
 
@@ -372,7 +389,7 @@ def generate_waybills(data: GenerateWaybillsRequest, db: Session = Depends(get_d
 @router.post("/auto-assign-waybills")
 def auto_assign_waybills(db: Session = Depends(get_db)):
     cars = db.query(Car).all()
-    unassigned = db.query(Waybill).filter(Waybill.car_id.is_(None)).all()
+    unassigned = db.query(Waybill).options(selectinload(Waybill.industry)).filter(Waybill.car_id.is_(None)).all()
 
     staging_ids = {
         loc.id for loc in
@@ -402,7 +419,7 @@ def auto_assign_single_car(car_id: int, db: Session = Depends(get_db)):
         loc.id for loc in
         db.query(Track).filter(Track.location_type.in_(["staging", "yard"])).all()
     }
-    unassigned = db.query(Waybill).filter(Waybill.car_id.is_(None)).all()
+    unassigned = db.query(Waybill).options(selectinload(Waybill.industry)).filter(Waybill.car_id.is_(None)).all()
     # Only seed the starting location if the car is at a staging/yard — if it's
     # at an industry, let the algorithm pick the best staging from the pool so
     # the car gets a complete route rather than failing to find origin-matched waybills.
