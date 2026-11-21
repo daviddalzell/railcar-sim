@@ -8,6 +8,9 @@ uploads/
 # Dev / scratch scripts
 list_models.py
 
+# Local reference material — not part of the app
+Reference/
+
 # Python bytecode
 __pycache__/
 *.pyc
