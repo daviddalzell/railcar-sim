@@ -103,6 +103,8 @@ class IndustryCreate(BaseModel):
     outbound_commodities: str = ""
     outbound_car_types: str = ""
     spot_numbers: str = ""
+    avg_monthly_carloads: Optional[int] = None
+    dwell_multiplier: float = 1.0
 
 
 class WaybillCreate(BaseModel):
@@ -140,10 +142,12 @@ class GenerateWaybillsRequest(BaseModel):
 class CommodityCarTypeMapCreate(BaseModel):
     commodity: str
     car_type: str
+    base_dwell_turns: int = 1
 
 
 class CommodityCarTypeMapUpdate(BaseModel):
     car_type: str
+    base_dwell_turns: int = 1
 
 
 class CarSlotAssignment(BaseModel):

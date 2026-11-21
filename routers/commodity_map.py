@@ -67,7 +67,10 @@ def create_commodity_map(data: CommodityCarTypeMapCreate, db: Session = Depends(
         raise HTTPException(400, "Commodity name cannot be empty")
     if db.query(CommodityCarTypeMap).filter_by(commodity=normalized).first():
         raise HTTPException(409, f"Mapping for '{normalized}' already exists")
-    entry = CommodityCarTypeMap(commodity=normalized, car_type=data.car_type.strip().lower())
+    entry = CommodityCarTypeMap(
+        commodity=normalized, car_type=data.car_type.strip().lower(),
+        base_dwell_turns=data.base_dwell_turns,
+    )
     db.add(entry)
     db.commit()
     db.refresh(entry)
@@ -80,6 +83,7 @@ def update_commodity_map(map_id: int, data: CommodityCarTypeMapUpdate, db: Sessi
     if not entry:
         raise HTTPException(404, "Mapping not found")
     entry.car_type = data.car_type.strip().lower()
+    entry.base_dwell_turns = data.base_dwell_turns
     db.commit()
     db.refresh(entry)
     return commodity_map_to_dict(entry)

@@ -52,6 +52,8 @@ def car_to_dict(car: Car) -> dict:
         "active_waybill": waybill_to_dict(active) if active else None,
         "waybill_count": len(car.waybills),
         "cp_session_count": car.cp_session_count or 0,
+        "dwell_turns_required": car.dwell_turns_required or 0,
+        "dwell_turns_elapsed": car.dwell_turns_elapsed or 0,
         "light_weight": car.light_weight,
         "load_limit": car.load_limit,
         "capacity": car.capacity,
@@ -64,7 +66,10 @@ def car_to_dict(car: Car) -> dict:
 
 
 def commodity_map_to_dict(m: CommodityCarTypeMap) -> dict:
-    return {"id": m.id, "commodity": m.commodity, "car_type": m.car_type}
+    return {
+        "id": m.id, "commodity": m.commodity, "car_type": m.car_type,
+        "base_dwell_turns": m.base_dwell_turns or 1,
+    }
 
 
 def industry_to_dict(i: Industry) -> dict:
@@ -82,6 +87,8 @@ def industry_to_dict(i: Industry) -> dict:
         "spot_numbers": i.spot_numbers or "",
         "spot_count": len([s for s in (i.spot_numbers or "").split(",") if s.strip()]),
         "position": i.position,
+        "avg_monthly_carloads": i.avg_monthly_carloads,
+        "dwell_multiplier": i.dwell_multiplier if i.dwell_multiplier is not None else 1.0,
     }
 
 

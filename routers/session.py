@@ -9,13 +9,13 @@ from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from starlette.requests import Request
 
 import sse_shared
 from auth import get_current_user
 from database import get_db
-from models import Car, Location, MovementLog, POWER_CAR_TYPES, SessionClock, Track, Waybill
+from models import Car, CommodityCarTypeMap, Location, MovementLog, POWER_CAR_TYPES, SessionClock, Track, Waybill
 from converters import car_to_dict, clock_to_dict, start_session_clock as _start_session_clock, clear_session_clock
 from schemas import LayoutSettingsUpdate, SessionEndRequest
 from converters import get_or_create_settings, settings_to_dict
@@ -83,6 +83,7 @@ def _build_session_plan(db: Session) -> dict:
         Track.location_type == "storage"
     ).all()}
     arrivals, departures, spots, warnings = [], [], [], []
+    still_dwelling = 0
 
     for car in db.query(Car).all():
         if car.car_type in POWER_CAR_TYPES:
@@ -93,6 +94,8 @@ def _build_session_plan(db: Session) -> dict:
         if car.current_location_id != wb.destination_id:
             if car.current_location_id in dispatch_ids:
                 arrivals.append(car)
+            elif car.dwell_turns_elapsed < car.dwell_turns_required:
+                still_dwelling += 1
             elif wb.destination_id in dispatch_ids:
                 departures.append(car)
             elif car.current_location_id in storage_ids:
@@ -167,6 +170,10 @@ def _build_session_plan(db: Session) -> dict:
         warnings.append("No inbound cars (cars at yard/staging needing a move) available.")
     if not departures:
         warnings.append("No outbound cars (cars at industries needing a move) available.")
+    if still_dwelling:
+        warnings.append(
+            f"{still_dwelling} car(s) still dwelling at their industry (not yet ready to move)."
+        )
 
     def _enrich(car):
         d = car_to_dict(car)
@@ -289,14 +296,20 @@ def session_plan(request: Request, db: Session = Depends(get_db),
 def session_end(request: Request, req: SessionEndRequest, db: Session = Depends(get_db),
                 user: dict = Depends(get_current_user)):
     from routers import ops_events
-    from routers.automation import auto_assign_one_car
+    from routers.automation import auto_assign_one_car, weighted_shuffle
+    if not db.get(SessionClock, 1):
+        # Already ended (e.g. a duplicate/retried request) — nothing left to process,
+        # and re-running the dwell increment below would double-count every car.
+        return {"updated": []}
     operator_email = (user or {}).get("email", "local")
     staging_ids = {l.id for l in db.query(Track).filter(
         Track.location_type.in_(["staging", "yard"])
     ).all()}
+    commodity_dwell = {m.commodity: m.base_dwell_turns for m in db.query(CommodityCarTypeMap).all()}
 
     updated = []
     moves_completed = 0
+    touched_ids = set()
     for item in req.cars:
         car = db.get(Car, item.car_id)
         if not car:
@@ -312,6 +325,11 @@ def session_end(request: Request, req: SessionEndRequest, db: Session = Depends(
             new_slot, cycle_complete = _advance_slot(car)
             car.active_waybill_slot = new_slot
             car.cp_session_count = 0
+            base_turns = commodity_dwell.get((wb.commodity or "").strip().lower(), 1)
+            multiplier = wb.industry.dwell_multiplier if wb.industry_id and wb.industry else 1.0
+            car.dwell_turns_required = max(0, round(base_turns * multiplier) + random.choice([-1, 0, 0, 1]))
+            car.dwell_turns_elapsed = 0
+            touched_ids.add(car.id)
             if cycle_complete:
                 # Full cycle done — clear all waybills and assign a fresh random route
                 for w in list(car.waybills):
@@ -319,8 +337,10 @@ def session_end(request: Request, req: SessionEndRequest, db: Session = Depends(
                     w.slot_index = None
                 db.flush()
                 db.expire(car, ["waybills"])  # stale in-memory refs remain after flush; force reload
-                unassigned = db.query(Waybill).filter(Waybill.car_id.is_(None)).all()
-                random.shuffle(unassigned)
+                unassigned = db.query(Waybill).options(selectinload(Waybill.industry)).filter(
+                    Waybill.car_id.is_(None)
+                ).all()
+                weighted_shuffle(unassigned)
                 auto_assign_one_car(car, unassigned, staging_ids, db,
                                     starting_loc=car.current_location_id)
                 car.active_waybill_slot = 0
@@ -329,11 +349,19 @@ def session_end(request: Request, req: SessionEndRequest, db: Session = Depends(
             db.add(MovementLog(car_id=car.id, from_location_id=old_loc,
                                to_location_id=item.location_id, note="Session CP",
                                operator_email=operator_email))
-            # waybill NOT advanced for CP cars
+            # waybill NOT advanced for CP cars — it hasn't really arrived anywhere yet,
+            # so its dwell counters are deliberately left untouched (see touched_ids below)
             car.cp_session_count = (car.cp_session_count or 0) + 1
+            touched_ids.add(car.id)
         db.commit()
         db.refresh(car)
         updated.append(car_to_dict(car))
+
+    # Every other non-power car dwelled through this session unmoved — advance its clock.
+    db.query(Car).filter(
+        Car.car_type.notin_(POWER_CAR_TYPES), Car.id.notin_(touched_ids)
+    ).update({Car.dwell_turns_elapsed: Car.dwell_turns_elapsed + 1}, synchronize_session=False)
+    db.commit()
     clear_session_clock(db)
     tenant = getattr(request.state, "tenant", None)
     slug = getattr(tenant, "slug", None) or "local"

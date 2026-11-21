@@ -4,7 +4,7 @@
 import os
 from datetime import datetime, date as date_type
 from typing import List, Optional
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -131,6 +131,8 @@ class Industry(Base):
     outbound_car_types: Mapped[str] = mapped_column(String, default="")
     spot_numbers: Mapped[str] = mapped_column(String, default="")
     position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # manual order within its Track
+    avg_monthly_carloads: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    dwell_multiplier: Mapped[float] = mapped_column(Float, default=1.0, server_default="1.0")
 
     location: Mapped[Optional["Track"]] = relationship("Track", back_populates="industries")
     waybills: Mapped[List["Waybill"]] = relationship("Waybill", back_populates="industry")
@@ -155,6 +157,8 @@ class Car(Base):
     current_location_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tracks.id"), nullable=True)
     active_waybill_slot: Mapped[int] = mapped_column(Integer, default=0)
     cp_session_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    dwell_turns_required: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    dwell_turns_elapsed: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     # Prototype data plate — informational only, no simulation logic reads these.
     light_weight: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -212,6 +216,7 @@ class CommodityCarTypeMap(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     commodity: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     car_type: Mapped[str] = mapped_column(String, nullable=False)
+    base_dwell_turns: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
 
 class CarType(Base):

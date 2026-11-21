@@ -853,6 +853,8 @@ function openIndustryForm(trackId = null) {
   populateCarTypeMultiSelect($("#ind-outbound-car-types"), "");
   $("#ind-outbound-commodities").value = "";
   $("#ind-edit-id").value = "";
+  $("#ind-avg-carloads").value = "";
+  $("#ind-dwell-multiplier").value = "1.0";
   roleToCheckboxes("consumer");
   hide($("#inbound-commodity-warn"));
   hide($("#outbound-commodity-warn"));
@@ -878,6 +880,8 @@ function openIndustryEdit(ind) {
   populateCarTypeMultiSelect($("#ind-outbound-car-types"), ind.outbound_car_types || "");
   $("#ind-outbound-commodities").value = ind.outbound_commodities || "";
   $("#ind-edit-id").value = ind.id;
+  $("#ind-avg-carloads").value = ind.avg_monthly_carloads ?? "";
+  $("#ind-dwell-multiplier").value = ind.dwell_multiplier ?? 1.0;
   roleToCheckboxes(ind.industry_role || "consumer");
   hide($("#inbound-commodity-warn"));
   hide($("#outbound-commodity-warn"));
@@ -928,6 +932,8 @@ $("#industry-form").addEventListener("submit", async e => {
     outbound_commodities: $("#ind-outbound-commodities").value.trim(),
     outbound_car_types: getMultiSelectValues($("#ind-outbound-car-types")),
     spot_numbers: getSpotPickerValues($("#ind-spot-numbers")),
+    avg_monthly_carloads: $("#ind-avg-carloads").value ? parseInt($("#ind-avg-carloads").value) : null,
+    dwell_multiplier: parseFloat($("#ind-dwell-multiplier").value) || 1.0,
   };
   if (editId) {
     await api("PUT", `/api/industries/${editId}`, body);
@@ -1067,6 +1073,7 @@ function renderCommodityMapList() {
       if (!entry) return;
       $("#cmap-commodity").value = entry.commodity;
       $("#cmap-car-type").value = entry.car_type;
+      $("#cmap-dwell").value = entry.base_dwell_turns ?? 1;
       $("#cmap-edit-id").value = entry.id;
       $("#cmap-commodity").disabled = true;
       show($("#commodity-map-form"));
@@ -1112,6 +1119,7 @@ $("#btn-toggle-car-type").addEventListener("click", () => {
 $("#btn-add-commodity-map").addEventListener("click", () => {
   $("#cmap-commodity").value = "";
   $("#cmap-car-type").value = "boxcar";
+  $("#cmap-dwell").value = "1";
   $("#cmap-edit-id").value = "";
   $("#cmap-commodity").disabled = false;
   show($("#commodity-map-form"));
@@ -1147,11 +1155,13 @@ $("#commodity-map-form").addEventListener("submit", async e => {
     if (editId) {
       await api("PUT", `/api/commodity-car-type-map/${editId}`, {
         car_type: $("#cmap-car-type").value,
+        base_dwell_turns: parseInt($("#cmap-dwell").value) || 1,
       });
     } else {
       await api("POST", "/api/commodity-car-type-map", {
         commodity: $("#cmap-commodity").value.trim(),
         car_type: $("#cmap-car-type").value,
+        base_dwell_turns: parseInt($("#cmap-dwell").value) || 1,
       });
     }
     hide($("#commodity-map-form"));
