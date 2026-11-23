@@ -5,9 +5,9 @@
 // library open/purge, and the Import Cars (CSV / JMRI XML) preview dialog.
 // Loaded as a classic script before app.js. Shared helpers ($, api, show,
 // hide, showToast, withLoading, _authToken, _subscriberId) come from
-// helpers.js; openPhotoLibrary / refreshLibraryGrid / loadRoster come from
-// app.js but are only invoked inside event handlers (runtime), so load order
-// relative to app.js is safe.
+// helpers.js; openPhotoLibrary / refreshLibraryGrid come from add-car.js and
+// loadRoster comes from roster.js — only invoked inside event handlers
+// (runtime), so relative load order is safe.
 
 // ── Data actions menu ─────────────────────────────────────────────────────────
 // Single trigger collapsed on every screen size (issue #65) — see
