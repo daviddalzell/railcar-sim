@@ -4,10 +4,13 @@
 // Layout Setup tab: the location/track/industry tree (render, CRUD, move/
 // kebab-menu), the industry create/edit form, car-type admin list, and the
 // commodity-map autocomplete + Commodity -> Car Type admin list. Loaded as a
-// classic script before app.js. buildTrackOptgroups (Waybill pool, app.js)
-// and openPhotoLibrary/renderCarGrid (Roster, app.js) are called from inside
-// functions here, never at parse time, so load order relative to app.js is
+// classic script before app.js. buildTrackOptgroups (waybill-pool.js) and
+// openPhotoLibrary (add-car.js) / renderCarGrid (roster.js) are called from
+// inside functions here, never at parse time, so relative load order is
 // safe. Shared helpers/appState come from helpers.js/state.js.
+
+let commodityMap = [];
+let stagingMergeDeleteId = null;
 
 // ── Layout setup ──────────────────────────────────────────────────────────────
 async function loadLayout() {
@@ -1183,5 +1186,18 @@ $("#btn-seed-commodity-map").addEventListener("click", async () => {
     });
   } catch (err) {
     showToast("Error seeding defaults: " + err.message, "error");
+  }
+});
+
+// Moved from app.js's old "Roster" section (#45) — #industries-body lives in this tab.
+$("#btn-toggle-industries").addEventListener("click", () => {
+  const body = $("#industries-body");
+  const btn  = $("#btn-toggle-industries");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
   }
 });

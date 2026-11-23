@@ -9,11 +9,13 @@
 // -> Session's saveSession/renderActiveSession/collapseDispatcher, etc.), so
 // they're kept in one file rather than forced into separate modules with an
 // artificial import boundary. Loaded as a classic script before app.js.
-// renderCarGrid/defaultCarImage/renderPowerStrip (Roster) and
-// buildTrackOptgroups (Waybill pool) remain in app.js and are called from
-// inside functions here, never at parse time, so load order is safe.
+// renderCarGrid/defaultCarImage/renderPowerStrip (roster.js) and
+// buildTrackOptgroups (waybill-pool.js) are called from inside functions
+// here, never at parse time, so relative load order is safe.
 // Shared helpers/appState come from helpers.js/state.js; fetchAndStartClock/
 // startClockTick/stopClock come from clock.js.
+
+let dispatchPlans = [];
 
 // ── Operations view ───────────────────────────────────────────────────────────
 async function loadOperations() {
@@ -1357,5 +1359,31 @@ $("#btn-clear-all-plans").addEventListener("click", async () => {
     renderDispatchPlanList();
   } catch (err) {
     showToast("Error clearing consists: " + err.message, "error");
+  }
+});
+
+// Moved from app.js's old "Roster" section (#45) — #dispatcher-body and
+// #ops-body both live in this tab.
+$("#btn-toggle-dispatcher").addEventListener("click", () => {
+  const body = $("#dispatcher-body");
+  const btn  = $("#btn-toggle-dispatcher");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
+  }
+});
+
+$("#btn-toggle-ops").addEventListener("click", () => {
+  const body = $("#ops-body");
+  const btn  = $("#btn-toggle-ops");
+  if (body.classList.contains("hidden")) {
+    show(body);
+    btn.textContent = "▼";
+  } else {
+    hide(body);
+    btn.textContent = "▶";
   }
 });
